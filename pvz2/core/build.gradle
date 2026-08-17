@@ -3,6 +3,7 @@ eclipse.project.name = appName + '-core'
 
 dependencies {
   api "com.badlogicgames.gdx:gdx:$gdxVersion"
+  api "com.badlogicgames.gdx:gdx-freetype:$gdxVersion"
 
   implementation 'com.github.pizpizi:libPVZ:v0.1.5' // Replace v0.1.0 with desired release tag or commit hash
   implementation 'com.github.pizpizi:pvz-skin:v0.1.1'

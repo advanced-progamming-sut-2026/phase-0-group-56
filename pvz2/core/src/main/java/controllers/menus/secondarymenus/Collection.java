@@ -1,16 +1,22 @@
 package controllers.menus.secondarymenus;
 
 import controllers.datacontroller.Data;
+import controllers.datacontroller.PlantData;
 import controllers.menus.Menu;
 import models.App;
 import models.User;
+import models.entity.ZombieRegistry;
+import models.entity.Zombie;
+import models.factory.ZombieFactory;
 import models.factory.builder.PlantType;
-import models.entity.*;
+import view.PlayView;
 
-
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Collection implements Menu {
+    private static final int PURCHASE_COST = 2000;
+
     @Override
     public String ChangeMenu(String menuName) {
         return "Invalid menu transition from Collection menu.";
@@ -23,122 +29,198 @@ public class Collection implements Menu {
 
     @Override
     public String exitMenu() {
-        App.setScreen(new view.PlayView());
+        App.setScreen(new PlayView());
         return "Returned to Play Menu.";
+    }
+
+    public List<PlantType> getAllPlants() {
+        ArrayList<PlantType> result = new ArrayList<>();
+        for (PlantType type : PlantType.values()) {
+            if (type != PlantType.MARIGOLD) {
+                result.add(type);
+            }
+        }
+        return result;
+    }
+
+    public List<ZombieRegistry.ZombieType> getAllZombies() {
+        User user = Data.getCurrentUser();
+        if (user == null) {
+            return List.of();
+        }
+        return user.getZombieRegistry().getAllZombieTypes();
+    }
+
+
+    public Zombie createZombiePreview(ZombieRegistry.ZombieType type) {
+        if (type == null) {
+            return null;
+        }
+        String factoryName = switch (type) {
+            case NORMAL -> "normal";
+            case CONEHEAD -> "cone";
+            case BUCKETHEAD -> "bucket";
+            case BRICKHEAD -> "brick";
+            case KNIGHT -> "knight";
+            case IMP -> "imp";
+            case GARGANTUAR -> "gargantuar";
+            case ALLSTAR -> "allstar";
+            case ARCADe -> "arcade";
+            case PARASOL -> "parasol";
+            case TURQUOISE -> "turquoise";
+            case PROSPECTOR -> "prospector";
+            case PIANIST -> "piano";
+            case NEWSPAPER -> "newspaper";
+            case BARREL_ROLLER -> "barrel";
+            case RA -> "ra";
+            case EXPLORER -> "explorer";
+            case TOMB_RAISER -> "tombraiser";
+            case DODO_RIDER -> "dodo";
+            case HUNTER -> "hunter";
+            case TROGLOBITE -> "troglobite";
+            case FISHERMAN -> "fisherman";
+            case SNORKEL -> "snorkel";
+            case OCTOPUS -> "octopus";
+            case JUGGLER -> "juggler";
+            case WIZARD -> "wizard";
+            case KING -> "king";
+            case IMP_DRAGON -> "dragon_imp";
+        };
+        return ZombieFactory.createZombie(factoryName);
+    }
+
+    public boolean isPlantUnlocked(PlantType type) {
+        User user = Data.getCurrentUser();
+        return user != null && user.getUnlockedPlants().contains(type);
+    }
+
+    public boolean isZombieUnlocked(ZombieRegistry.ZombieType type) {
+        User user = Data.getCurrentUser();
+        return user != null && user.getZombieRegistry().isUnlocked(type);
+    }
+
+    public int getPlantLevel(PlantType type) {
+        User user = Data.getCurrentUser();
+        if (user == null) {
+            return 1;
+        }
+        return user.getLevels().getOrDefault(type, 1);
+    }
+
+    public int getSeedCount(PlantType type) {
+        User user = Data.getCurrentUser();
+        return user == null ? 0 : user.getSpecificSeedCount(type.name());
+    }
+
+    public int getRequiredSeeds(PlantType type) {
+        return 10 * Math.max(1, getPlantLevel(type));
+    }
+
+    public int getRequiredCoins(PlantType type) {
+        return 500 * Math.max(1, getPlantLevel(type));
+    }
+
+    public boolean canUpgrade(PlantType type) {
+        User user = Data.getCurrentUser();
+        if (user == null || !isPlantUnlocked(type)) {
+            return false;
+        }
+        int level = getPlantLevel(type);
+        return level < 5
+            && user.getCoins() >= getRequiredCoins(type)
+            && getSeedCount(type) >= getRequiredSeeds(type);
+    }
+
+    public PlantData getPlantData(PlantType type) {
+        return Data.getPlants() == null ? null : Data.getPlants().get(type);
+    }
+
+    public String upgradePlant(PlantType plantType) {
+        User user = Data.getCurrentUser();
+        if (user == null) {
+            return "Error: Please log in.";
+        }
+        if (!isPlantUnlocked(plantType)) {
+            return "Error: this plant is locked.";
+        }
+        int level = getPlantLevel(plantType);
+        if (level >= 5) {
+            return "Error: this plant is already at maximum level.";
+        }
+
+        int seedCost = getRequiredSeeds(plantType);
+        int coinCost = getRequiredCoins(plantType);
+        if (getSeedCount(plantType) < seedCost) {
+            return "Error: not enough seed packets. Need " + seedCost + ".";
+        }
+        if (user.getCoins() < coinCost) {
+            return "Error: not enough coins. Need " + coinCost + ".";
+        }
+
+        user.consumeSpecificSeeds(plantType.name(), seedCost);
+        user.addCoins(-coinCost);
+        user.getLevels().put(plantType, level + 1);
+        News.pushNewsToUser(user, plantType.name() + " upgraded to level " + (level + 1) + ".");
+        Data.saveUser();
+        return plantType.name() + " upgraded to level " + (level + 1) + ".";
+    }
+
+    public String buyPlant(String plantName) {
+        User user = Data.getCurrentUser();
+        if (user == null) {
+            return "Error: Please log in.";
+        }
+
+        PlantType type;
+        try {
+            type = PlantType.valueOf(plantName.toUpperCase());
+        } catch (IllegalArgumentException exception) {
+            return "Error: unknown plant.";
+        }
+
+        if (type == PlantType.MARIGOLD) {
+            return "Error: Marigold is a greenhouse plant and cannot be purchased here.";
+        }
+        if (isPlantUnlocked(type)) {
+            return "Error: You already own this plant.";
+        }
+        if (user.getCoins() < PURCHASE_COST) {
+            return "Error: Not enough coins. " + PURCHASE_COST + " coins are required.";
+        }
+
+        user.addCoins(-PURCHASE_COST);
+        user.unlockPlant(type);
+        News.pushNewsToUser(user, "New plant unlocked: " + type.name());
+        Data.saveUser();
+        return type.name() + " purchased successfully.";
     }
 
     public String showunlockedPlant() {
         User user = Data.getCurrentUser();
-        if (user == null) return "Error: User not found.";
-        StringBuilder sb = new StringBuilder("--- Unlocked Plants ---\n");
-        for (PlantType type : user.getUnlockedPlants()) sb.append("--").append(type.name()).append("\n");
-        return sb.toString().trim();
+        if (user == null) {
+            return "Error: User not found.";
+        }
+        return user.getUnlockedPlants().toString();
     }
 
     public String showunlockedZombie() {
-        return "Showing unlocked zombies... (To be integrated with Adventure mode progression)";
+        User user = Data.getCurrentUser();
+        return user == null ? "Error: User not found." : user.getZombieRegistry().getUnlockedZombies().toString();
     }
 
     public String showAllPlants() {
-        StringBuilder sb = new StringBuilder("--- All Plants in the Game ---\n");
-        for (PlantType plant : PlantType.values()) sb.append("- ").append(plant.name()).append("\n");
-        return sb.toString().trim();
+        return getAllPlants().toString();
     }
 
     public String showAllZombies() {
-        User user = Data.getCurrentUser();
-        if (user == null) return "Error: User not found.";
-
-        ZombieRegistry registry = user.getZombieRegistry();
-        List<ZombieRegistry.ZombieType> unlocked = registry.getUnlockedZombies();
-
-        System.out.println("--- Zombie Collection (" + unlocked.size() + "/" + registry.getTotalCount() + ") ---");
-        for (ZombieRegistry.ZombieType type : unlocked) {
-            System.out.println("- " + type.name());
-        }
-        return "chenin bood list" ;
+        return getAllZombies().toString();
     }
 
-//    private String formatZombieInfo(Zombie zombie) {
-//        StringBuilder sb = new StringBuilder();
-//
-//        // 1. Name
-//        sb.append(zombie.getType()).append(": ");
-//
-//        // 2. Position (tile position)
-//        int col = (int) ((zombie.getX() - 100) / 80);
-//        int row = zombie.getRow();
-//        sb.append("position: (").append(row).append(", ").append(col).append(")  ");
-//
-//        // 3. Health
-//        sb.append("health: ").append(zombie.getHp());
-//
-//        // 4. Armors
-//        List<Armor> armors = zombie.getArmors();
-//        if (!armors.isEmpty()) {
-//            sb.append("  armors: ");
-//            for (int i = 0; i < armors.size(); i++) {
-//                Armor armor = armors.get(i);
-//                sb.append(armor.getType()).append(": ").append(armor.getHealth());
-//                if (i < armors.size() - 1) {
-//                    sb.append(", ");
-//                }
-//            }
-//        }
-//
-//        // 5. Effects
-//        List<Effect> effects = zombie.getEffects();
-//        if (!effects.isEmpty()) {
-//            sb.append("  effects: ");
-//            for (int i = 0; i < effects.size(); i++) {
-//                Effect effect = effects.get(i);
-//                float remaining = effect.getRemainingTime();
-//                sb.append(effect.getType().name().toLowerCase());
-//                if (remaining > 0) {
-//                    sb.append(": ").append(String.format("%.1f", remaining)).append("s");
-//                }
-//                if (i < effects.size() - 1) {
-//                    sb.append(", ");
-//                }
-//            }
-//        }
-//
-//        return sb.toString();
-//    }
-
     public String showZombie(String zombieName) {
-        return "Showing details for zombie: " + zombieName;
+        return "Zombie: " + zombieName;
     }
 
     public String showPlant(String plantName) {
-        return "Showing details for plant: " + plantName;
-    }
-
-    public String upgradePlant(PlantType plantType) {
-        int newLevel = App.getCurrentuser().getLevels().get(plantType) + 1;
-        if(newLevel >= 5) return "What the fuck you think you're doing ?";
-        App.getCurrentuser().getLevels().replace(plantType, newLevel);
-        String message = "Damn! You just upgraded ma man " + plantType.name() + " to level " + newLevel;
-        App.getCurrentuser().getUnreadNews().add(message);
-        Data.saveUser();
-        return message;
-    }
-
-    public String buyPlant(String plantName) {
-        User currentUser = Data.getCurrentUser();
-        if (currentUser == null) return "Error: Please log in.";
-        String upperName = plantName.toUpperCase();
-
-        if (currentUser.getUnlockedPlantsNames().contains(upperName)) {
-            return "Error: You already own this plant.";
-        }
-        if (currentUser.getCoins() >= 2000) {
-            currentUser.addCoins(-2000);
-            currentUser.getUnlockedPlantsNames().add(upperName);
-            News.pushNewsToUser(currentUser, "New plant unlocked: " + upperName);
-            Data.saveUser();
-            return "Plant " + upperName + " purchased successfully.";
-        }
-        return "Error: Not enough coins to purchase this plant. 2000 coins required.";
+        return "Plant: " + plantName;
     }
 }
