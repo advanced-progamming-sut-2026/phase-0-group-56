@@ -3,9 +3,12 @@ package controllers.menus;
 import controllers.datacontroller.Data;
 import models.App;
 import models.User;
+import models.utils.RegexHelper;
 import view.HomeView;
+import view.SignUpView;
+import controllers.menus.Menu;
 
-import java.security.MessageDigest;
+import java.util.regex.Pattern;
 
 public class LogIn implements Menu {
     @Override
@@ -15,7 +18,7 @@ public class LogIn implements Menu {
 
     @Override
     public String exitMenu() {
-        App.setScreen(new view.SignUpView());
+        App.setScreen(new SignUpView());
         return "Returned to Sign Up Menu.";
     }
 
@@ -26,10 +29,12 @@ public class LogIn implements Menu {
 
     public String login(String username, String password, boolean stayLoggedIn) {
         User user = Data.getUserByUsername(username);
-        if (user == null) return "Error: username does not exist.";
-
-        String hashedInput = hashPassword(password);
-        if (!user.getPasswordHash().equals(hashedInput)) return "Error: incorrect password.";
+        if (user == null) {
+            return "Error: username does not exist.";
+        }
+        if (!user.getPasswordHash().equals(controllers.menus.SignUp.hashPassword(password))) {
+            return "Error: incorrect password.";
+        }
 
         user.setStayLoggedIn(stayLoggedIn);
         Data.setCurrentUser(user);
@@ -38,30 +43,50 @@ public class LogIn implements Menu {
         return "Logged in successfully.";
     }
 
-    public String resetPassword(String username, String answer, String newPassword) {
+    public String getSecurityQuestion(String username, String email) {
         User user = Data.getUserByUsername(username);
-        if (user == null) return "Error: username does not exist.";
-        if (!user.checkSecurityAnswer(answer)) return "Error: incorrect security answer.";
+        if (user == null) {
+            return "Error: username does not exist.";
+        }
+        if (email == null || !email.equalsIgnoreCase(user.getEmail())) {
+            return "Error: email does not match this account.";
+        }
+        return controllers.menus.SignUp.getQuestionText(user.getSecurityQuestionNumber());
+    }
 
-        String hashedNewPassword = hashPassword(newPassword);
-        user.setPasswordHash(hashedNewPassword);
+    public String resetPassword(String username, String email, String answer,
+                                String newPassword, String confirmPassword) {
+        User user = Data.getUserByUsername(username);
+        if (user == null) {
+            return "Error: username does not exist.";
+        }
+        if (email == null || !email.equalsIgnoreCase(user.getEmail())) {
+            return "Error: email does not match this account.";
+        }
+        if (!user.checkSecurityAnswer(answer == null ? "" : answer.trim())) {
+            return "Error: incorrect security answer.";
+        }
+        if (!newPassword.equals(confirmPassword)) {
+            return "Error: password and confirmation do not match.";
+        }
+        if (!Pattern.matches(RegexHelper.PASSWORD_PATTERN, newPassword)) {
+            return "Error: new password is weak or contains invalid characters.";
+        }
+        if (user.getPasswordHash().equals(controllers.menus.SignUp.hashPassword(newPassword))) {
+            return "Error: new password must be different from the old password.";
+        }
+
+        user.setPasswordHash(controllers.menus.SignUp.hashPassword(newPassword));
         Data.saveUser();
         return "Password reset successfully. You can now log in.";
     }
 
-    private String hashPassword(String password) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] encodedHash = digest.digest(password.getBytes("UTF-8"));
-            StringBuilder hexString = new StringBuilder();
-            for (byte b : encodedHash) {
-                String hex = Integer.toHexString(0xff & b);
-                if (hex.length() == 1) hexString.append('0');
-                hexString.append(hex);
-            }
-            return hexString.toString();
-        } catch (Exception e) {
-            throw new RuntimeException("Error hashing password", e);
+    /** Backward-compatible method used by the old terminal view. */
+    public String resetPassword(String username, String answer, String newPassword) {
+        User user = Data.getUserByUsername(username);
+        if (user == null) {
+            return "Error: username does not exist.";
         }
+        return resetPassword(username, user.getEmail(), answer, newPassword, newPassword);
     }
 }

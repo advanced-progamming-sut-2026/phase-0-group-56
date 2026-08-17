@@ -60,7 +60,7 @@ public class User implements Serializable, QuestObserver {
     private ArrayList<String> readNews;
     private ArrayList<PlantType> boostList;
 
-    private ArrayList<Quest> activeQuests;
+    private ArrayList<models.Quest> activeQuests;
     private ZombieRegistry zombieRegistry;
     private GreenHouse greenHouse;
 
@@ -94,12 +94,12 @@ public class User implements Serializable, QuestObserver {
         }
 
         this.greenHouse = new GreenHouse(this);
-        this.activeQuests = QuestCatalog.createDefaultQuests();
+        this.activeQuests = models.QuestCatalog.createDefaultQuests();
     }
 
     @Override
     public void updateQuestProgress(String action, int amount) {
-        for (Quest quest : getActiveQuests()) {
+        for (models.Quest quest : getActiveQuests()) {
             quest.updateQuestProgress(action, amount);
         }
     }
@@ -111,15 +111,16 @@ public class User implements Serializable, QuestObserver {
         return zombieRegistry;
     }
 
-    public ArrayList<Quest> getActiveQuests() {
+    public ArrayList<models.Quest> getActiveQuests() {
+        // Migrates old saves that had only the two hard-coded placeholder quests.
         if (activeQuests == null || activeQuests.size() < 10) {
-            activeQuests = QuestCatalog.createDefaultQuests();
+            activeQuests = models.QuestCatalog.createDefaultQuests();
         }
         return activeQuests;
     }
 
     public void resetQuestsForTesting() {
-        activeQuests = QuestCatalog.createDefaultQuests();
+        activeQuests = models.QuestCatalog.createDefaultQuests();
     }
 
     public String getName() {
