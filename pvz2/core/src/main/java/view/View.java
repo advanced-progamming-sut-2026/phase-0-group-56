@@ -264,4 +264,49 @@ public class View implements Screen {
             stage = null;
         }
     }
+    protected boolean handleGlobalCommands(String command) {
+        if (command == null || command.isBlank()) {
+            return false;
+        }
+
+        java.util.regex.Matcher enterMatcher =
+            java.util.regex.Pattern
+                .compile("(?i)^menu\\s+enter\\s+(?<menuName>.+)$")
+                .matcher(command);
+
+        if (command.matches("(?i)^menu\\s+show\\s+current$")) {
+            if (menu != null) {
+                System.out.println(menu.ShowCurrentMenu());
+            }
+            return true;
+        }
+
+        if (command.matches("(?i)^menu\\s+exit$")) {
+            if (menu != null) {
+                System.out.println(menu.exitMenu());
+            }
+            return true;
+        }
+
+        if (enterMatcher.matches()) {
+            if (menu == null) {
+                return true;
+            }
+
+            String targetMenu = enterMatcher.group("menuName").trim();
+
+            targetMenu =
+                targetMenu.substring(0, 1).toUpperCase()
+                    + targetMenu.substring(1).toLowerCase();
+
+            if (!targetMenu.endsWith(" menu")) {
+                targetMenu += " menu";
+            }
+
+            System.out.println(menu.ChangeMenu(targetMenu));
+            return true;
+        }
+
+        return false;
+    }
 }
