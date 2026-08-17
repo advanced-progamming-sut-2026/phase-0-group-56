@@ -56,11 +56,11 @@ public class App {
         App.currentmenu = currentmenu;
     }
 
-    public static void setCurrentuser(User currentuser) {
+    public static void setCurrentuser(models.User currentuser) {
         Data.setCurrentUser(currentuser);
     }
 
-    public static User getCurrentuser() {
+    public static models.User getCurrentuser() {
         return Data.getCurrentUser();
     }
 
