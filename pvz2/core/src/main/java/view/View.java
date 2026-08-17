@@ -28,6 +28,8 @@ public class View implements Screen {
     protected static final float VIRTUAL_HEIGHT = 720f;
 
     protected Menu menu;
+    public static java.util.Scanner scanner = App.getInput();
+    protected String input;
     protected Stage stage;
     protected Skin skin;
     protected Table root;
@@ -37,7 +39,9 @@ public class View implements Screen {
     private Label diamondLabel;
 
     public void input() {
-        // Phase 2 is graphical. Intentionally empty.
+        if (scanner != null && scanner.hasNextLine()) {
+            input = scanner.nextLine().trim();
+        }
     }
 
     protected String getScreenTitle() {
