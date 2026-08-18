@@ -46,10 +46,15 @@ public class LogInView extends View {
             String result = controller.login(
                 username.getText().trim(),
                 password.getText(),
-                stayLoggedIn.isChecked());
+                stayLoggedIn.isChecked()
+            );
+
             if (result.startsWith("Error:")) {
                 showMessage(result);
+                return;
             }
+
+            App.setScreen(new HomeView());
         })).width(240f).height(48f).padBottom(10f).row();
 
         table.add(button("Forgot password", this::showForgotPasswordDialog))
