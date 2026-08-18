@@ -2,15 +2,16 @@ package view;
 
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.scenes.scene2d.ui.CheckBox;
-import com.badlogic.gdx.scenes.scene2d.ui.Dialog;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextField;
+import com.badlogic.gdx.utils.Align;
 
 import controllers.menus.LogIn;
 import models.App;
 
 public class LogInView extends View {
+
     public LogInView() {
         menu = new LogIn();
     }
@@ -27,97 +28,445 @@ public class LogInView extends View {
 
     @Override
     protected void buildContent(Table table) {
-        LogIn controller = (LogIn) menu;
-        TextField username = field("Username");
-        TextField password = passwordField("Password");
-        CheckBox stayLoggedIn = new CheckBox(" Stay logged in", skin);
 
-        Table form = new Table();
-        form.add(new Label("Username", skin)).width(170f).left().pad(8f);
-        form.add(username).width(430f).height(44f).pad(8f).row();
-        form.add(new Label("Password", skin)).width(170f).left().pad(8f);
-        form.add(password).width(430f).height(44f).pad(8f).row();
-        form.add().width(170f);
-        form.add(stayLoggedIn).left().pad(8f).row();
+        LogIn controller =
+            (LogIn) menu;
 
-        table.add(form).width(720f).padTop(30f).padBottom(20f).row();
+        Label subtitle =
+            mediumTitle(
+                "WELCOME BACK"
+            );
 
-        table.add(button("Log in", () -> {
-            String result = controller.login(
-                username.getText().trim(),
-                password.getText(),
-                stayLoggedIn.isChecked());
-            if (result.startsWith("Error:")) {
-                showMessage(result);
-            }
-        })).width(240f).height(48f).padBottom(10f).row();
+        subtitle.setAlignment(
+            Align.center
+        );
 
-        table.add(button("Forgot password", this::showForgotPasswordDialog))
-            .width(240f).height(44f).padBottom(10f).row();
-        table.add(button("Create account", () -> App.setScreen(new SignUpView())))
-            .width(240f).height(44f);
+        table.add(subtitle)
+            .padTop(18f)
+            .padBottom(18f)
+            .row();
+
+        Table panel =
+            pvzPanel();
+
+        TextField username =
+            field("Username");
+
+        TextField password =
+            passwordField("Password");
+
+        CheckBox stayLoggedIn =
+            new CheckBox(
+                " STAY LOGGED IN",
+                skin
+            );
+
+        Table form =
+            new Table();
+
+        form.add(
+                new Label(
+                    "USERNAME",
+                    skin,
+                    "medium_outline"
+                )
+            )
+            .width(190f)
+            .left()
+            .pad(10f);
+
+        form.add(username)
+            .width(400f)
+            .height(44f)
+            .pad(10f)
+            .row();
+
+        form.add(
+                new Label(
+                    "PASSWORD",
+                    skin,
+                    "medium_outline"
+                )
+            )
+            .width(190f)
+            .left()
+            .pad(10f);
+
+        form.add(password)
+            .width(400f)
+            .height(44f)
+            .pad(10f)
+            .row();
+
+        form.add()
+            .width(190f);
+
+        form.add(stayLoggedIn)
+            .left()
+            .pad(10f)
+            .row();
+
+        panel.add(form)
+            .width(650f)
+            .row();
+
+        table.add(panel)
+            .width(760f)
+            .padBottom(20f)
+            .row();
+
+        table.add(
+                greenButton(
+                    "LOG IN",
+                    () -> {
+
+                        String result =
+                            controller.login(
+                                username
+                                    .getText()
+                                    .trim(),
+                                password.getText(),
+                                stayLoggedIn
+                                    .isChecked()
+                            );
+
+                        if (
+                            result.startsWith(
+                                "Error:"
+                            )
+                        ) {
+
+                            showMessage(result);
+                            return;
+                        }
+
+                        App.setScreen(
+                            new HomeView()
+                        );
+                    }
+                )
+            )
+            .width(270f)
+            .height(58f)
+            .padBottom(10f)
+            .row();
+
+        table.add(
+                purpleButton(
+                    "FORGOT PASSWORD",
+                    this::showForgotPasswordPanel
+                )
+            )
+            .width(270f)
+            .height(52f)
+            .padBottom(10f)
+            .row();
+
+        table.add(
+                brownButton(
+                    "CREATE ACCOUNT",
+                    () ->
+                        App.setScreen(
+                            new SignUpView()
+                        )
+                )
+            )
+            .width(270f)
+            .height(52f);
     }
 
-    private void showForgotPasswordDialog() {
-        LogIn controller = (LogIn) menu;
-        TextField username = field("Username");
-        TextField email = field("Email");
+    private void showForgotPasswordPanel() {
 
-        Dialog first = new Dialog("Recover account", skin) {
-            @Override
-            protected void result(Object object) {
-                if (!Boolean.TRUE.equals(object)) {
-                    return;
-                }
-                String question = controller.getSecurityQuestion(
-                    username.getText().trim(), email.getText().trim());
-                if (question.startsWith("Error:")) {
-                    showMessage(question);
-                    return;
-                }
-                showResetDialog(username.getText().trim(), email.getText().trim(), question);
-            }
-        };
-        first.getContentTable().add(new Label("Username", skin)).pad(8f);
-        first.getContentTable().add(username).width(340f).pad(8f).row();
-        first.getContentTable().add(new Label("Email", skin)).pad(8f);
-        first.getContentTable().add(email).width(340f).pad(8f).row();
-        first.button("Cancel", false);
-        first.button("Continue", true);
-        first.show(stage);
+        content.clearChildren();
+
+        LogIn controller =
+            (LogIn) menu;
+
+        Label title =
+            mediumTitle(
+                "RECOVER ACCOUNT"
+            );
+
+        title.setAlignment(
+            Align.center
+        );
+
+        TextField username =
+            field("Username");
+
+        TextField email =
+            field("Email");
+
+        Table panel =
+            pvzPanel();
+
+        panel.add(title)
+            .colspan(2)
+            .padBottom(18f)
+            .row();
+
+        panel.add(
+                new Label(
+                    "USERNAME",
+                    skin,
+                    "medium_outline"
+                )
+            )
+            .width(180f)
+            .left()
+            .pad(8f);
+
+        panel.add(username)
+            .width(380f)
+            .height(44f)
+            .pad(8f)
+            .row();
+
+        panel.add(
+                new Label(
+                    "EMAIL",
+                    skin,
+                    "medium_outline"
+                )
+            )
+            .width(180f)
+            .left()
+            .pad(8f);
+
+        panel.add(email)
+            .width(380f)
+            .height(44f)
+            .pad(8f)
+            .row();
+
+        content.add(panel)
+            .width(700f)
+            .padTop(60f)
+            .padBottom(18f)
+            .row();
+
+        Table buttons =
+            new Table();
+
+        buttons.add(
+                brownButton(
+                    "CANCEL",
+                    () -> {
+                        content.clearChildren();
+                        buildContent(content);
+                    }
+                )
+            )
+            .width(200f)
+            .height(52f)
+            .padRight(10f);
+
+        buttons.add(
+                greenButton(
+                    "CONTINUE",
+                    () -> {
+
+                        String question =
+                            controller
+                                .getSecurityQuestion(
+                                    username
+                                        .getText()
+                                        .trim(),
+                                    email
+                                        .getText()
+                                        .trim()
+                                );
+
+                        if (
+                            question.startsWith(
+                                "Error:"
+                            )
+                        ) {
+
+                            showMessage(
+                                question
+                            );
+
+                            return;
+                        }
+
+                        showResetPasswordPanel(
+                            username
+                                .getText()
+                                .trim(),
+                            email
+                                .getText()
+                                .trim(),
+                            question
+                        );
+                    }
+                )
+            )
+            .width(200f)
+            .height(52f);
+
+        content.add(buttons);
     }
 
-    private void showResetDialog(String username, String email, String question) {
-        LogIn controller = (LogIn) menu;
-        TextField answer = field("Security answer");
-        TextField newPassword = passwordField("New password");
-        TextField confirm = passwordField("Confirm new password");
+    private void showResetPasswordPanel(
+        String username,
+        String email,
+        String question
+    ) {
 
-        Dialog dialog = new Dialog("Reset password", skin) {
-            @Override
-            protected void result(Object object) {
-                if (!Boolean.TRUE.equals(object)) {
-                    return;
-                }
-                String result = controller.resetPassword(
-                    username,
-                    email,
-                    answer.getText().trim(),
-                    newPassword.getText(),
-                    confirm.getText());
-                showMessage(result);
-            }
-        };
-        Table contentTable = dialog.getContentTable();
-        contentTable.add(wrappedLabel(question, 460f)).width(460f).colspan(2).pad(10f).row();
-        contentTable.add(new Label("Answer", skin)).pad(8f);
-        contentTable.add(answer).width(340f).pad(8f).row();
-        contentTable.add(new Label("New password", skin)).pad(8f);
-        contentTable.add(newPassword).width(340f).pad(8f).row();
-        contentTable.add(new Label("Confirm", skin)).pad(8f);
-        contentTable.add(confirm).width(340f).pad(8f).row();
-        dialog.button("Cancel", false);
-        dialog.button("Reset", true);
-        dialog.show(stage);
+        content.clearChildren();
+
+        LogIn controller =
+            (LogIn) menu;
+
+        TextField answer =
+            field(
+                "Security answer"
+            );
+
+        TextField newPassword =
+            passwordField(
+                "New password"
+            );
+
+        TextField confirm =
+            passwordField(
+                "Confirm new password"
+            );
+
+        Table panel =
+            pvzPanel();
+
+        Label title =
+            mediumTitle(
+                "RESET PASSWORD"
+            );
+
+        title.setAlignment(
+            Align.center
+        );
+
+        panel.add(title)
+            .colspan(2)
+            .padBottom(16f)
+            .row();
+
+        Label questionLabel =
+            wrappedLabel(
+                question,
+                520f
+            );
+
+        questionLabel.setAlignment(
+            Align.center
+        );
+
+        panel.add(questionLabel)
+            .colspan(2)
+            .width(520f)
+            .padBottom(18f)
+            .row();
+
+        addRecoveryRow(
+            panel,
+            "ANSWER",
+            answer
+        );
+
+        addRecoveryRow(
+            panel,
+            "NEW PASSWORD",
+            newPassword
+        );
+
+        addRecoveryRow(
+            panel,
+            "CONFIRM",
+            confirm
+        );
+
+        content.add(panel)
+            .width(720f)
+            .padTop(35f)
+            .padBottom(18f)
+            .row();
+
+        Table buttons =
+            new Table();
+
+        buttons.add(
+                brownButton(
+                    "CANCEL",
+                    () -> {
+                        content.clearChildren();
+                        buildContent(content);
+                    }
+                )
+            )
+            .width(200f)
+            .height(52f)
+            .padRight(10f);
+
+        buttons.add(
+                greenButton(
+                    "RESET",
+                    () -> {
+
+                        String result =
+                            controller
+                                .resetPassword(
+                                    username,
+                                    email,
+                                    answer
+                                        .getText()
+                                        .trim(),
+                                    newPassword
+                                        .getText(),
+                                    confirm
+                                        .getText()
+                                );
+
+                        showMessage(result);
+
+                        if (
+                            !result.startsWith(
+                                "Error:"
+                            )
+                        ) {
+
+                            content.clearChildren();
+                            buildContent(content);
+                        }
+                    }
+                )
+            )
+            .width(200f)
+            .height(52f);
+
+        content.add(buttons);
+    }
+
+    private void addRecoveryRow(
+        Table table,
+        String label,
+        TextField field
+    ) {
+
+        table.add(
+                new Label(
+                    label,
+                    skin,
+                    "medium_outline"
+                )
+            )
+            .width(190f)
+            .left()
+            .pad(8f);
+
+        table.add(field)
+            .width(370f)
+            .height(44f)
+            .pad(8f)
+            .row();
     }
 }
