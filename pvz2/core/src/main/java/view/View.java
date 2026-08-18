@@ -196,26 +196,79 @@ public class View implements Screen {
     }
 
     protected void showMessage(String message) {
-        Dialog dialog = new Dialog("Message", skin);
-        Label label = wrappedLabel(message == null ? "" : message, 520f);
-        dialog.getContentTable().add(label).width(520f).pad(18f);
-        dialog.button("OK");
-        dialog.show(stage);
+        final Table overlay = new Table();
+        overlay.setFillParent(true);
+
+        final Table box = new Table(skin);
+        box.pad(30f);
+
+        Label titleLabel = new Label("Message", skin, "big");
+        Label messageLabel = wrappedLabel(message == null ? "" : message, 520f);
+
+        TextButton okButton = new TextButton("OK", skin);
+
+        box.add(titleLabel).padBottom(20f).row();
+        box.add(messageLabel).width(520f).padBottom(25f).row();
+        box.add(okButton).width(160f).height(48f);
+
+        overlay.add(box).width(620f);
+
+        okButton.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                overlay.remove();
+            }
+        });
+
+        stage.addActor(overlay);
     }
 
     protected void showConfirmation(String title, String message, Runnable onConfirm) {
-        Dialog dialog = new Dialog(title, skin) {
+        final Table overlay = new Table();
+        overlay.setFillParent(true);
+
+        final Table box = new Table(skin);
+        box.pad(30f);
+
+        Label titleLabel = new Label(title == null ? "Confirm" : title, skin, "big");
+        Label messageLabel = wrappedLabel(message == null ? "" : message, 500f);
+
+        TextButton cancelButton = new TextButton("Cancel", skin);
+        TextButton confirmButton = new TextButton("Confirm", skin);
+
+        box.add(titleLabel).colspan(2).padBottom(20f).row();
+        box.add(messageLabel).colspan(2).width(500f).padBottom(25f).row();
+
+        box.add(cancelButton)
+            .width(160f)
+            .height(48f)
+            .padRight(10f);
+
+        box.add(confirmButton)
+            .width(160f)
+            .height(48f);
+
+        overlay.add(box).width(620f);
+
+        cancelButton.addListener(new ClickListener() {
             @Override
-            protected void result(Object object) {
-                if (Boolean.TRUE.equals(object)) {
+            public void clicked(InputEvent event, float x, float y) {
+                overlay.remove();
+            }
+        });
+
+        confirmButton.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                overlay.remove();
+
+                if (onConfirm != null) {
                     onConfirm.run();
                 }
             }
-        };
-        dialog.getContentTable().add(wrappedLabel(message, 500f)).width(500f).pad(18f);
-        dialog.button("Cancel", false);
-        dialog.button("Confirm", true);
-        dialog.show(stage);
+        });
+
+        stage.addActor(overlay);
     }
 
     protected void reload(Screen screen) {
