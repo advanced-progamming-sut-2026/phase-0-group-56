@@ -3,8 +3,9 @@ package view;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.Stage;
-import com.badlogic.gdx.scenes.scene2d.ui.Dialog;
+import com.badlogic.gdx.scenes.scene2d.Touchable;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
@@ -12,7 +13,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.ui.TextField;
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
-import com.badlogic.gdx.scenes.scene2d.InputEvent;
+import com.badlogic.gdx.scenes.scene2d.utils.Drawable;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 
@@ -22,16 +23,23 @@ import models.App;
 import models.User;
 import pvz.skin.PvzSkin;
 
-
 public class View implements Screen {
+
     protected static final float VIRTUAL_WIDTH = 1280f;
     protected static final float VIRTUAL_HEIGHT = 720f;
 
     protected Menu menu;
+
+    /*
+     * Legacy terminal views still depend on these two fields.
+     * Do not remove them until all old terminal views are deleted.
+     */
     public static java.util.Scanner scanner = App.getInput();
     protected String input;
+
     protected Stage stage;
     protected Skin skin;
+
     protected Table root;
     protected Table content;
 
@@ -45,13 +53,20 @@ public class View implements Screen {
     }
 
     protected String getScreenTitle() {
-        return getClass().getSimpleName().replace("View", "");
+        return getClass()
+            .getSimpleName()
+            .replace("View", "");
     }
 
+    /*
+     * Each child View builds its own content here.
+     */
     protected void buildContent(Table table) {
-        // Subclasses override.
     }
 
+    /*
+     * Child screens may override this to enable the Back button.
+     */
     protected Screen getBackScreen() {
         return null;
     }
@@ -59,236 +74,796 @@ public class View implements Screen {
     @Override
     public void show() {
         skin = PvzSkin.get();
-        stage = new Stage(new FitViewport(VIRTUAL_WIDTH, VIRTUAL_HEIGHT));
+
+        stage = new Stage(
+            new FitViewport(
+                VIRTUAL_WIDTH,
+                VIRTUAL_HEIGHT
+            )
+        );
+
         Gdx.input.setInputProcessor(stage);
 
         root = new Table();
         root.setFillParent(true);
-        root.pad(18f);
+        root.top();
+        root.pad(
+            16f,
+            22f,
+            20f,
+            22f
+        );
+
         stage.addActor(root);
 
         buildHeader();
-        content = new Table();
-        content.top().pad(12f);
 
-        ScrollPane scrollPane = new ScrollPane(content, skin);
+        content = new Table();
+        content.top();
+        content.pad(18f);
+
+        ScrollPane scrollPane =
+            new ScrollPane(content, skin);
+
         scrollPane.setFadeScrollBars(false);
-        scrollPane.setScrollingDisabled(true, false);
-        root.add(scrollPane).grow().padTop(10f);
+        scrollPane.setScrollingDisabled(
+            true,
+            false
+        );
+
+        root.add(scrollPane)
+            .grow()
+            .padTop(12f);
 
         buildContent(content);
+
         refreshResourceLabels();
     }
 
+    /*
+     * ============================================================
+     * HEADER
+     * ============================================================
+     */
+
     private void buildHeader() {
+
         Table header = new Table();
 
         Screen backScreen = getBackScreen();
+
         if (backScreen != null) {
-            TextButton back = new TextButton("< Back", skin);
-            back.addListener(new ClickListener() {
-                @Override
-                public void clicked(InputEvent event, float x, float y) {
-                    App.setScreen(getBackScreen());
+
+            TextButton back =
+                new TextButton(
+                    "BACK",
+                    skin,
+                    "brown"
+                );
+
+            back.addListener(
+                new ClickListener() {
+                    @Override
+                    public void clicked(
+                        InputEvent event,
+                        float x,
+                        float y
+                    ) {
+                        App.setScreen(
+                            getBackScreen()
+                        );
+                    }
                 }
-            });
-            header.add(back).width(120f).height(42f).left();
+            );
+
+            header.add(back)
+                .width(135f)
+                .height(52f)
+                .left();
+
         } else {
-            header.add().width(120f);
+
+            header.add()
+                .width(135f);
         }
 
-        Label title = new Label(getScreenTitle(), skin, "big");
-        title.setAlignment(Align.center);
-        header.add(title).expandX().center();
+        Label title =
+            new Label(
+                getScreenTitle()
+                    .toUpperCase(),
+                skin,
+                "big_outline"
+            );
 
-        Table resources = buildResourceBar();
-        header.add(resources).right();
+        title.setAlignment(
+            Align.center
+        );
 
-        root.add(header).growX().height(58f).row();
+        header.add(title)
+            .expandX()
+            .center();
+
+        Table resourceBar =
+            buildResourceBar();
+
+        header.add(resourceBar)
+            .right();
+
+        root.add(header)
+            .growX()
+            .height(62f)
+            .row();
     }
 
+    /*
+     * ============================================================
+     * RESOURCE BAR
+     * ============================================================
+     */
+
     private Table buildResourceBar() {
+
         Table bar = new Table();
+
         User user = Data.getCurrentUser();
+
         if (user == null) {
             return bar;
         }
 
-        coinLabel = new Label("Coins: " + user.getCoins(), skin);
-        diamondLabel = new Label("Gems: " + user.getDiamonds(), skin);
-        bar.add(coinLabel).padRight(16f);
-        bar.add(diamondLabel).padRight(8f);
+        coinLabel =
+            new Label(
+                "COINS: " + user.getCoins(),
+                skin,
+                "medium_outline"
+            );
 
+        diamondLabel =
+            new Label(
+                "GEMS: " + user.getDiamonds(),
+                skin,
+                "medium_outline"
+            );
+
+        bar.add(coinLabel)
+            .padRight(18f);
+
+        bar.add(diamondLabel);
+
+        /*
+         * Debug resource buttons.
+         * They only appear when debug mode is enabled.
+         */
         if (user.isDebugMode()) {
-            TextButton addCoins = new TextButton("+Coin", skin);
-            TextButton addGems = new TextButton("+Gem", skin);
-            addCoins.addListener(new ClickListener() {
-                @Override
-                public void clicked(InputEvent event, float x, float y) {
-                    User current = Data.getCurrentUser();
-                    if (current != null) {
+
+            TextButton addCoins =
+                new TextButton(
+                    "+ COINS",
+                    skin,
+                    "green_small"
+                );
+
+            TextButton addGems =
+                new TextButton(
+                    "+ GEMS",
+                    skin,
+                    "green_small"
+                );
+
+            addCoins.addListener(
+                new ClickListener() {
+                    @Override
+                    public void clicked(
+                        InputEvent event,
+                        float x,
+                        float y
+                    ) {
+
+                        User current =
+                            Data.getCurrentUser();
+
+                        if (current == null) {
+                            return;
+                        }
+
                         current.addCoins(1000);
+
                         Data.saveUser();
+
                         refreshResourceLabels();
                     }
                 }
-            });
-            addGems.addListener(new ClickListener() {
-                @Override
-                public void clicked(InputEvent event, float x, float y) {
-                    User current = Data.getCurrentUser();
-                    if (current != null) {
+            );
+
+            addGems.addListener(
+                new ClickListener() {
+                    @Override
+                    public void clicked(
+                        InputEvent event,
+                        float x,
+                        float y
+                    ) {
+
+                        User current =
+                            Data.getCurrentUser();
+
+                        if (current == null) {
+                            return;
+                        }
+
                         current.addDiamonds(10);
+
                         Data.saveUser();
+
                         refreshResourceLabels();
                     }
                 }
-            });
-            bar.add(addCoins).width(78f).height(36f).padLeft(4f);
-            bar.add(addGems).width(78f).height(36f).padLeft(4f);
+            );
+
+            bar.row();
+
+            bar.add(addCoins)
+                .width(105f)
+                .height(38f)
+                .padTop(4f);
+
+            bar.add(addGems)
+                .width(105f)
+                .height(38f)
+                .padTop(4f);
         }
+
         return bar;
     }
 
     protected void refreshResourceLabels() {
-        User user = Data.getCurrentUser();
+
+        User user =
+            Data.getCurrentUser();
+
         if (user == null) {
             return;
         }
+
         if (coinLabel != null) {
-            coinLabel.setText("Coins: " + user.getCoins());
+
+            coinLabel.setText(
+                "COINS: "
+                    + user.getCoins()
+            );
         }
+
         if (diamondLabel != null) {
-            diamondLabel.setText("Gems: " + user.getDiamonds());
+
+            diamondLabel.setText(
+                "GEMS: "
+                    + user.getDiamonds()
+            );
         }
     }
 
-    protected TextButton button(String text, Runnable action) {
-        TextButton button = new TextButton(text, skin);
-        button.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                action.run();
+    /*
+     * ============================================================
+     * PVZ UI HELPERS
+     * ============================================================
+     */
+
+    protected TextButton button(
+        String text,
+        Runnable action
+    ) {
+
+        return greenButton(
+            text,
+            action
+        );
+    }
+
+    protected TextButton greenButton(
+        String text,
+        Runnable action
+    ) {
+
+        return styledButton(
+            text,
+            "green",
+            action
+        );
+    }
+
+    protected TextButton greenSmallButton(
+        String text,
+        Runnable action
+    ) {
+
+        return styledButton(
+            text,
+            "green_small",
+            action
+        );
+    }
+
+    protected TextButton brownButton(
+        String text,
+        Runnable action
+    ) {
+
+        return styledButton(
+            text,
+            "brown",
+            action
+        );
+    }
+
+    protected TextButton purpleButton(
+        String text,
+        Runnable action
+    ) {
+
+        return styledButton(
+            text,
+            "purple",
+            action
+        );
+    }
+
+    private TextButton styledButton(
+        String text,
+        String style,
+        Runnable action
+    ) {
+
+        TextButton button;
+
+        try {
+
+            button =
+                new TextButton(
+                    text,
+                    skin,
+                    style
+                );
+
+        } catch (Exception exception) {
+
+            /*
+             * Safe fallback if a skin version
+             * does not contain a requested style.
+             */
+            button =
+                new TextButton(
+                    text,
+                    skin
+                );
+        }
+
+        button.addListener(
+            new ClickListener() {
+                @Override
+                public void clicked(
+                    InputEvent event,
+                    float x,
+                    float y
+                ) {
+
+                    if (action != null) {
+                        action.run();
+                    }
+                }
             }
-        });
+        );
+
         return button;
     }
 
-    protected TextField field(String placeholder) {
-        TextField field = new TextField("", skin);
-        field.setMessageText(placeholder);
+    protected Label titleLabel(
+        String text
+    ) {
+
+        try {
+
+            return new Label(
+                text,
+                skin,
+                "big_outline"
+            );
+
+        } catch (Exception exception) {
+
+            return new Label(
+                text,
+                skin
+            );
+        }
+    }
+
+    protected Label mediumTitle(
+        String text
+    ) {
+
+        try {
+
+            return new Label(
+                text,
+                skin,
+                "medium_outline"
+            );
+
+        } catch (Exception exception) {
+
+            return new Label(
+                text,
+                skin
+            );
+        }
+    }
+
+    protected Label secondaryLabel(
+        String text
+    ) {
+
+        try {
+
+            return new Label(
+                text,
+                skin,
+                "secondary"
+            );
+
+        } catch (Exception exception) {
+
+            return new Label(
+                text,
+                skin
+            );
+        }
+    }
+
+    /*
+     * Main reusable PvZ panel.
+     */
+    protected Table pvzPanel() {
+
+        Table panel = new Table();
+
+        panel.pad(
+            24f,
+            30f,
+            28f,
+            30f
+        );
+
+        Drawable background =
+            getSkinDrawableSafe(
+                "image_ui_quests_panel_edge_to_edge_ten"
+            );
+
+        if (background != null) {
+            panel.setBackground(background);
+        }
+
+        return panel;
+    }
+
+    /*
+     * Smaller panel suitable for settings,
+     * profile information, shop cards, etc.
+     */
+    protected Table pvzInnerPanel() {
+
+        Table panel = new Table();
+
+        panel.pad(18f);
+
+        Drawable background =
+            getSkinDrawableSafe(
+                "image_ui_dialog_asset_inner_bkgd_10"
+            );
+
+        if (background != null) {
+            panel.setBackground(background);
+        }
+
+        return panel;
+    }
+
+    protected Drawable getSkinDrawableSafe(
+        String name
+    ) {
+
+        if (skin == null || name == null) {
+            return null;
+        }
+
+        try {
+            return skin.getDrawable(name);
+        } catch (Exception exception) {
+            return null;
+        }
+    }
+
+    /*
+     * ============================================================
+     * INPUT HELPERS
+     * ============================================================
+     */
+
+    protected TextField field(
+        String placeholder
+    ) {
+
+        TextField field =
+            new TextField(
+                "",
+                skin
+            );
+
+        field.setMessageText(
+            placeholder
+        );
+
         return field;
     }
 
-    protected TextField passwordField(String placeholder) {
-        TextField field = field(placeholder);
+    protected TextField passwordField(
+        String placeholder
+    ) {
+
+        TextField field =
+            field(placeholder);
+
         field.setPasswordMode(true);
         field.setPasswordCharacter('*');
+
         return field;
     }
 
-    protected Label wrappedLabel(String text, float width) {
-        Label label = new Label(text, skin);
+    protected Label wrappedLabel(
+        String text,
+        float width
+    ) {
+
+        Label label =
+            new Label(
+                text == null ? "" : text,
+                skin
+            );
+
         label.setWrap(true);
         label.setAlignment(Align.left);
         label.setWidth(width);
+
         return label;
     }
 
-    protected void showMessage(String message) {
-        final Table overlay = new Table();
+    /*
+     * ============================================================
+     * MESSAGE OVERLAY
+     * ============================================================
+     *
+     * We intentionally do NOT use Scene2D Dialog here.
+     *
+     * pvz-skin currently does not provide the default WindowStyle
+     * that LibGDX Dialog expects, so using Dialog causes:
+     *
+     * No Window$WindowStyle registered with name: default
+     */
+
+    protected void showMessage(
+        String message
+    ) {
+
+        final Table overlay =
+            new Table();
+
         overlay.setFillParent(true);
+        overlay.setTouchable(
+            Touchable.enabled
+        );
 
-        final Table box = new Table(skin);
-        box.pad(30f);
+        final Table box =
+            pvzPanel();
 
-        Label titleLabel = new Label("Message", skin, "big");
-        Label messageLabel = wrappedLabel(message == null ? "" : message, 520f);
+        Label title =
+            mediumTitle("MESSAGE");
 
-        TextButton okButton = new TextButton("OK", skin);
+        title.setAlignment(
+            Align.center
+        );
 
-        box.add(titleLabel).padBottom(20f).row();
-        box.add(messageLabel).width(520f).padBottom(25f).row();
-        box.add(okButton).width(160f).height(48f);
+        Label body =
+            wrappedLabel(
+                message == null
+                    ? ""
+                    : message,
+                500f
+            );
 
-        overlay.add(box).width(620f);
+        body.setAlignment(
+            Align.center
+        );
 
-        okButton.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                overlay.remove();
-            }
-        });
+        TextButton ok =
+            greenButton(
+                "OK",
+                overlay::remove
+            );
+
+        box.add(title)
+            .center()
+            .padBottom(18f)
+            .row();
+
+        box.add(body)
+            .width(500f)
+            .center()
+            .padBottom(22f)
+            .row();
+
+        box.add(ok)
+            .width(180f)
+            .height(52f)
+            .center();
+
+        overlay.add(box)
+            .width(600f);
 
         stage.addActor(overlay);
     }
 
-    protected void showConfirmation(String title, String message, Runnable onConfirm) {
-        final Table overlay = new Table();
+    /*
+     * ============================================================
+     * CONFIRMATION OVERLAY
+     * ============================================================
+     */
+
+    protected void showConfirmation(
+        String title,
+        String message,
+        Runnable onConfirm
+    ) {
+
+        final Table overlay =
+            new Table();
+
         overlay.setFillParent(true);
+        overlay.setTouchable(
+            Touchable.enabled
+        );
 
-        final Table box = new Table(skin);
-        box.pad(30f);
+        final Table box =
+            pvzPanel();
 
-        Label titleLabel = new Label(title == null ? "Confirm" : title, skin, "big");
-        Label messageLabel = wrappedLabel(message == null ? "" : message, 500f);
+        Label titleLabel =
+            mediumTitle(
+                title == null
+                    ? "CONFIRM"
+                    : title.toUpperCase()
+            );
 
-        TextButton cancelButton = new TextButton("Cancel", skin);
-        TextButton confirmButton = new TextButton("Confirm", skin);
+        titleLabel.setAlignment(
+            Align.center
+        );
 
-        box.add(titleLabel).colspan(2).padBottom(20f).row();
-        box.add(messageLabel).colspan(2).width(500f).padBottom(25f).row();
+        Label messageLabel =
+            wrappedLabel(
+                message == null
+                    ? ""
+                    : message,
+                500f
+            );
 
-        box.add(cancelButton)
-            .width(160f)
-            .height(48f)
-            .padRight(10f);
+        messageLabel.setAlignment(
+            Align.center
+        );
 
-        box.add(confirmButton)
-            .width(160f)
-            .height(48f);
+        TextButton cancel =
+            brownButton(
+                "CANCEL",
+                overlay::remove
+            );
 
-        overlay.add(box).width(620f);
+        TextButton confirm =
+            greenButton(
+                "CONFIRM",
+                () -> {
 
-        cancelButton.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                overlay.remove();
-            }
-        });
+                    overlay.remove();
 
-        confirmButton.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                overlay.remove();
-
-                if (onConfirm != null) {
-                    onConfirm.run();
+                    if (onConfirm != null) {
+                        onConfirm.run();
+                    }
                 }
-            }
-        });
+            );
+
+        box.add(titleLabel)
+            .colspan(2)
+            .center()
+            .padBottom(18f)
+            .row();
+
+        box.add(messageLabel)
+            .colspan(2)
+            .width(500f)
+            .center()
+            .padBottom(24f)
+            .row();
+
+        box.add(cancel)
+            .width(180f)
+            .height(52f)
+            .padRight(12f);
+
+        box.add(confirm)
+            .width(180f)
+            .height(52f);
+
+        overlay.add(box)
+            .width(620f);
 
         stage.addActor(overlay);
     }
 
-    protected void reload(Screen screen) {
+    /*
+     * ============================================================
+     * SCREEN RELOAD
+     * ============================================================
+     */
+
+    protected void reload(
+        Screen screen
+    ) {
+
         App.setScreen(screen);
     }
 
+    /*
+     * ============================================================
+     * RENDER
+     * ============================================================
+     */
+
     @Override
     public void render(float delta) {
-        Gdx.gl.glClearColor(0.08f, 0.10f, 0.08f, 1f);
-        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+
+        Gdx.gl.glClearColor(
+            0.025f,
+            0.09f,
+            0.055f,
+            1f
+        );
+
+        Gdx.gl.glClear(
+            GL20.GL_COLOR_BUFFER_BIT
+        );
+
         if (stage != null) {
-            stage.act(Math.min(delta, 1f / 30f));
+
+            stage.act(
+                Math.min(
+                    delta,
+                    1f / 30f
+                )
+            );
+
             stage.draw();
         }
     }
 
     @Override
-    public void resize(int width, int height) {
+    public void resize(
+        int width,
+        int height
+    ) {
+
         if (stage != null) {
-            stage.getViewport().update(width, height, true);
+
+            stage.getViewport()
+                .update(
+                    width,
+                    height,
+                    true
+                );
         }
     }
 
@@ -299,12 +874,13 @@ public class View implements Screen {
 
     @Override
     public void resume() {
-        // No-op.
     }
 
     @Override
     public void hide() {
+
         if (stage != null) {
+
             stage.dispose();
             stage = null;
         }
@@ -312,51 +888,109 @@ public class View implements Screen {
 
     @Override
     public void dispose() {
+
         if (stage != null) {
+
             stage.dispose();
             stage = null;
         }
     }
-    protected boolean handleGlobalCommands(String command) {
-        if (command == null || command.isBlank()) {
+
+    /*
+     * ============================================================
+     * LEGACY TERMINAL COMMAND SUPPORT
+     * ============================================================
+     *
+     * NetworkView, WalletView and old minigame views
+     * still depend on this method.
+     */
+
+    protected boolean handleGlobalCommands(
+        String command
+    ) {
+
+        if (
+            command == null
+                || command.isBlank()
+        ) {
+
             return false;
         }
 
         java.util.regex.Matcher enterMatcher =
             java.util.regex.Pattern
-                .compile("(?i)^menu\\s+enter\\s+(?<menuName>.+)$")
+                .compile(
+                    "(?i)^menu\\s+enter\\s+(?<menuName>.+)$"
+                )
                 .matcher(command);
 
-        if (command.matches("(?i)^menu\\s+show\\s+current$")) {
+        if (
+            command.matches(
+                "(?i)^menu\\s+show\\s+current$"
+            )
+        ) {
+
             if (menu != null) {
-                System.out.println(menu.ShowCurrentMenu());
+
+                System.out.println(
+                    menu.ShowCurrentMenu()
+                );
             }
+
             return true;
         }
 
-        if (command.matches("(?i)^menu\\s+exit$")) {
+        if (
+            command.matches(
+                "(?i)^menu\\s+exit$"
+            )
+        ) {
+
             if (menu != null) {
-                System.out.println(menu.exitMenu());
+
+                System.out.println(
+                    menu.exitMenu()
+                );
             }
+
             return true;
         }
 
         if (enterMatcher.matches()) {
+
             if (menu == null) {
                 return true;
             }
 
-            String targetMenu = enterMatcher.group("menuName").trim();
+            String targetMenu =
+                enterMatcher
+                    .group("menuName")
+                    .trim();
 
             targetMenu =
-                targetMenu.substring(0, 1).toUpperCase()
-                    + targetMenu.substring(1).toLowerCase();
+                targetMenu
+                    .substring(0, 1)
+                    .toUpperCase()
+                    +
+                    targetMenu
+                        .substring(1)
+                        .toLowerCase();
 
-            if (!targetMenu.endsWith(" menu")) {
+            if (
+                !targetMenu.endsWith(
+                    " menu"
+                )
+            ) {
+
                 targetMenu += " menu";
             }
 
-            System.out.println(menu.ChangeMenu(targetMenu));
+            System.out.println(
+                menu.ChangeMenu(
+                    targetMenu
+                )
+            );
+
             return true;
         }
 

@@ -1,24 +1,29 @@
 package view;
 
 import com.badlogic.gdx.Screen;
+import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.SelectBox;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
+import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
+import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.Array;
 
 import controllers.datacontroller.PlantData;
 import controllers.menus.secondarymenus.Collection;
-import models.entity.ZombieRegistry;
-import models.entity.Zombie;
 import models.entity.PlantCategory;
+import models.entity.Zombie;
+import models.entity.ZombieRegistry;
 import models.factory.builder.PlantType;
 
-
 public class CollectionView extends View {
+
     private boolean plantTab = true;
+
     private String filter = "ALL";
     private String familyFilter = "ANY";
+
     private PlantType selectedPlant;
     private ZombieRegistry.ZombieType selectedZombie;
 
@@ -38,228 +43,1032 @@ public class CollectionView extends View {
 
     @Override
     protected void buildContent(Table table) {
-        Collection controller = (Collection) menu;
 
-        Table tabs = new Table();
-        tabs.add(button(plantTab ? "[ Plants ]" : "Plants", () -> {
-            plantTab = true;
-            rebuild();
-        })).width(180f).height(44f).pad(4f);
-        tabs.add(button(!plantTab ? "[ Zombies ]" : "Zombies", () -> {
-            plantTab = false;
-            rebuild();
-        })).width(180f).height(44f).pad(4f);
-        table.add(tabs).padBottom(10f).row();
+        Collection controller =
+            (Collection) menu;
+
+        buildTabs(table);
 
         if (plantTab) {
-            buildPlants(table, controller);
+            buildPlants(
+                table,
+                controller
+            );
         } else {
-            buildZombies(table, controller);
+            buildZombies(
+                table,
+                controller
+            );
         }
     }
 
-    private void buildPlants(Table table, Collection controller) {
-        SelectBox<String> filterBox = new SelectBox<>(skin);
-        filterBox.setItems(new Array<>(new String[]{"ALL", "UNLOCKED", "LOCKED", "UPGRADEABLE"}));
-        filterBox.setSelected(filter);
-        filterBox.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ChangeListener() {
-            @Override
-            public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
-                filter = filterBox.getSelected();
-                rebuild();
-            }
-        });
+    private void buildTabs(
+        Table table
+    ) {
 
-        SelectBox<String> familyBox = new SelectBox<>(skin);
-        Array<String> familyItems = new Array<>();
+        Table tabPanel =
+            pvzInnerPanel();
+
+        TextButton plants =
+            plantTab
+                ? greenButton(
+                "PLANTS",
+                () -> {
+                }
+            )
+                : brownButton(
+                "PLANTS",
+                () -> {
+                    plantTab = true;
+                    rebuild();
+                }
+            );
+
+        TextButton zombies =
+            !plantTab
+                ? purpleButton(
+                "ZOMBIES",
+                () -> {
+                }
+            )
+                : brownButton(
+                "ZOMBIES",
+                () -> {
+                    plantTab = false;
+                    rebuild();
+                }
+            );
+
+        tabPanel.add(plants)
+            .width(220f)
+            .height(54f)
+            .padRight(12f);
+
+        tabPanel.add(zombies)
+            .width(220f)
+            .height(54f);
+
+        table.add(tabPanel)
+            .width(520f)
+            .padBottom(16f)
+            .row();
+    }
+
+    /*
+     * ============================================================
+     * PLANTS
+     * ============================================================
+     */
+
+    private void buildPlants(
+        Table table,
+        Collection controller
+    ) {
+
+        buildPlantFilters(table);
+
+        Table mainPanel =
+            new Table();
+
+        Table plantList =
+            buildPlantList(
+                controller
+            );
+
+        Table detail =
+            buildPlantDetail(
+                controller
+            );
+
+        mainPanel.add(plantList)
+            .width(700f)
+            .top()
+            .padRight(18f);
+
+        mainPanel.add(detail)
+            .width(410f)
+            .top();
+
+        table.add(mainPanel)
+            .growX();
+    }
+
+    private void buildPlantFilters(
+        Table table
+    ) {
+
+        Table filters =
+            pvzInnerPanel();
+
+        SelectBox<String> filterBox =
+            new SelectBox<>(skin);
+
+        filterBox.setItems(
+            new Array<>(
+                new String[]{
+                    "ALL",
+                    "UNLOCKED",
+                    "LOCKED",
+                    "UPGRADEABLE"
+                }
+            )
+        );
+
+        filterBox.setSelected(
+            filter
+        );
+
+        filterBox.addListener(
+            new ChangeListener() {
+                @Override
+                public void changed(
+                    ChangeEvent event,
+                    Actor actor
+                ) {
+
+                    filter =
+                        filterBox.getSelected();
+
+                    rebuild();
+                }
+            }
+        );
+
+        SelectBox<String> familyBox =
+            new SelectBox<>(skin);
+
+        Array<String> familyItems =
+            new Array<>();
+
         familyItems.add("ANY");
-        for (PlantCategory category : PlantCategory.values()) {
-            familyItems.add(category.name());
+
+        for (
+            PlantCategory category :
+            PlantCategory.values()
+        ) {
+
+            familyItems.add(
+                category.name()
+            );
         }
-        familyBox.setItems(familyItems);
-        familyBox.setSelected(familyFilter);
-        familyBox.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ChangeListener() {
-            @Override
-            public void changed(ChangeEvent event, com.badlogic.gdx.scenes.scene2d.Actor actor) {
-                familyFilter = familyBox.getSelected();
-                rebuild();
+
+        familyBox.setItems(
+            familyItems
+        );
+
+        familyBox.setSelected(
+            familyFilter
+        );
+
+        familyBox.addListener(
+            new ChangeListener() {
+                @Override
+                public void changed(
+                    ChangeEvent event,
+                    Actor actor
+                ) {
+
+                    familyFilter =
+                        familyBox.getSelected();
+
+                    rebuild();
+                }
             }
-        });
+        );
 
-        Table filterRow = new Table();
-        filterRow.add(new Label("Status filter", skin)).padRight(10f);
-        filterRow.add(filterBox).width(200f).padRight(20f);
-        filterRow.add(new Label("Family", skin)).padRight(10f);
-        filterRow.add(familyBox).width(200f);
-        table.add(filterRow).padBottom(10f).row();
+        Label statusLabel =
+            new Label(
+                "STATUS",
+                skin,
+                "medium_outline"
+            );
 
-        Table body = new Table();
-        Table list = new Table();
-        list.top();
+        Label familyLabel =
+            new Label(
+                "FAMILY",
+                skin,
+                "medium_outline"
+            );
+
+        filters.add(statusLabel)
+            .padRight(10f);
+
+        filters.add(filterBox)
+            .width(220f)
+            .height(42f)
+            .padRight(25f);
+
+        filters.add(familyLabel)
+            .padRight(10f);
+
+        filters.add(familyBox)
+            .width(220f)
+            .height(42f);
+
+        table.add(filters)
+            .width(800f)
+            .padBottom(14f)
+            .row();
+    }
+
+    private Table buildPlantList(
+        Collection controller
+    ) {
+
+        Table panel =
+            pvzPanel();
+
+        Label title =
+            mediumTitle(
+                "PLANT COLLECTION"
+            );
+
+        title.setAlignment(
+            Align.center
+        );
+
+        panel.add(title)
+            .colspan(3)
+            .padBottom(14f)
+            .row();
+
         int shown = 0;
-        for (PlantType type : controller.getAllPlants()) {
-            if (!plantMatchesFilter(controller, type)) {
+
+        for (
+            PlantType type :
+            controller.getAllPlants()
+        ) {
+
+            if (
+                !plantMatchesFilter(
+                    controller,
+                    type
+                )
+            ) {
                 continue;
             }
-            boolean unlocked = controller.isPlantUnlocked(type);
-            int level = controller.getPlantLevel(type);
-            int seeds = controller.getSeedCount(type);
-            int required = controller.getRequiredSeeds(type);
-            String cardText = type.name().replace('_', ' ')
-                + "\nLevel: " + level
-                + "\nSeeds: " + seeds + "/" + required
-                + (unlocked ? "" : "\nLOCKED");
-            TextButton card = button(cardText, () -> {
-                selectedPlant = type;
-                rebuild();
-            });
-            list.add(card).width(200f).height(112f).pad(5f);
+
+            boolean unlocked =
+                controller
+                    .isPlantUnlocked(
+                        type
+                    );
+
+            int level =
+                controller
+                    .getPlantLevel(
+                        type
+                    );
+
+            int seeds =
+                controller
+                    .getSeedCount(
+                        type
+                    );
+
+            int required =
+                controller
+                    .getRequiredSeeds(
+                        type
+                    );
+
+            String text =
+                type.name()
+                    .replace(
+                        '_',
+                        ' '
+                    )
+                    + "\nLVL "
+                    + level
+                    + "\n"
+                    + seeds
+                    + " / "
+                    + required
+                    + " SEEDS"
+                    + (
+                    unlocked
+                        ? ""
+                        : "\nLOCKED"
+                );
+
+            TextButton card;
+
+            if (!unlocked) {
+
+                card =
+                    brownButton(
+                        text,
+                        () -> {
+
+                            selectedPlant =
+                                type;
+
+                            rebuild();
+                        }
+                    );
+
+            } else if (
+                controller.canUpgrade(
+                    type
+                )
+            ) {
+
+                card =
+                    purpleButton(
+                        text,
+                        () -> {
+
+                            selectedPlant =
+                                type;
+
+                            rebuild();
+                        }
+                    );
+
+            } else {
+
+                card =
+                    greenButton(
+                        text,
+                        () -> {
+
+                            selectedPlant =
+                                type;
+
+                            rebuild();
+                        }
+                    );
+            }
+
+            panel.add(card)
+                .width(205f)
+                .height(120f)
+                .pad(6f);
+
             shown++;
-            if (shown % 3 == 0) {
-                list.row();
+
+            if (
+                shown % 3 == 0
+            ) {
+                panel.row();
             }
         }
+
         if (shown == 0) {
-            list.add(new Label("No plants match this filter.", skin)).pad(20f);
+
+            Label empty =
+                wrappedLabel(
+                    "No plants match the selected filters.",
+                    560f
+                );
+
+            empty.setAlignment(
+                Align.center
+            );
+
+            panel.add(empty)
+                .colspan(3)
+                .width(560f)
+                .pad(30f);
         }
 
-        Table detail = buildPlantDetail(controller);
-        body.add(list).width(660f).top().padRight(16f);
-        body.add(detail).width(420f).top();
-        table.add(body).growX();
+        return panel;
     }
 
-    private boolean plantMatchesFilter(Collection controller, PlantType type) {
-        boolean unlocked = controller.isPlantUnlocked(type);
-        boolean statusMatches = switch (filter) {
-            case "UNLOCKED" -> unlocked;
-            case "LOCKED" -> !unlocked;
-            case "UPGRADEABLE" -> controller.canUpgrade(type);
-            default -> true;
-        };
+    private boolean plantMatchesFilter(
+        Collection controller,
+        PlantType type
+    ) {
+
+        boolean unlocked =
+            controller
+                .isPlantUnlocked(
+                    type
+                );
+
+        boolean statusMatches =
+            switch (filter) {
+
+                case "UNLOCKED" ->
+                    unlocked;
+
+                case "LOCKED" ->
+                    !unlocked;
+
+                case "UPGRADEABLE" ->
+                    controller.canUpgrade(
+                        type
+                    );
+
+                default ->
+                    true;
+            };
+
         if (!statusMatches) {
             return false;
         }
-        if ("ANY".equals(familyFilter)) {
+
+        if (
+            "ANY".equals(
+                familyFilter
+            )
+        ) {
             return true;
         }
-        return type.getCategory() != null && type.getCategory().name().equals(familyFilter);
+
+        return type.getCategory()
+            != null
+            &&
+            type.getCategory()
+                .name()
+                .equals(
+                    familyFilter
+                );
     }
 
-    private Table buildPlantDetail(Collection controller) {
-        Table detail = new Table();
+    private Table buildPlantDetail(
+        Collection controller
+    ) {
+
+        Table detail =
+            pvzPanel();
+
         if (selectedPlant == null) {
-            detail.add(wrappedLabel("Select a plant to view details.", 380f)).width(380f).pad(14f);
+
+            Label select =
+                wrappedLabel(
+                    "Select a plant card to view its details.",
+                    330f
+                );
+
+            select.setAlignment(
+                Align.center
+            );
+
+            detail.add(
+                    mediumTitle(
+                        "PLANT DETAILS"
+                    )
+                )
+                .padBottom(16f)
+                .row();
+
+            detail.add(select)
+                .width(330f)
+                .pad(20f);
+
             return detail;
         }
 
-        PlantType type = selectedPlant;
-        boolean unlocked = controller.isPlantUnlocked(type);
-        PlantData data = controller.getPlantData(type);
+        PlantType type =
+            selectedPlant;
 
-        detail.add(new Label(type.name().replace('_', ' '), skin)).pad(10f).row();
-        addDetail(detail, "Status", unlocked ? "Unlocked" : "Locked");
-        addDetail(detail, "Level", String.valueOf(controller.getPlantLevel(type)));
-        addDetail(detail, "Seed packets", controller.getSeedCount(type)
-            + " / " + controller.getRequiredSeeds(type));
+        boolean unlocked =
+            controller
+                .isPlantUnlocked(
+                    type
+                );
+
+        PlantData data =
+            controller
+                .getPlantData(
+                    type
+                );
+
+        Label title =
+            mediumTitle(
+                type.name()
+                    .replace(
+                        '_',
+                        ' '
+                    )
+            );
+
+        title.setAlignment(
+            Align.center
+        );
+
+        detail.add(title)
+            .colspan(2)
+            .padBottom(14f)
+            .row();
+
+        addDetail(
+            detail,
+            "STATUS",
+            unlocked
+                ? "UNLOCKED"
+                : "LOCKED"
+        );
+
+        addDetail(
+            detail,
+            "LEVEL",
+            String.valueOf(
+                controller
+                    .getPlantLevel(
+                        type
+                    )
+            )
+        );
+
+        addDetail(
+            detail,
+            "SEEDS",
+            controller
+                .getSeedCount(type)
+                + " / "
+                + controller
+                .getRequiredSeeds(
+                    type
+                )
+        );
 
         if (data != null) {
-            addDetail(detail, "Health", String.valueOf(data.getHp()));
-            addDetail(detail, "Sun cost", String.valueOf(data.getCost()));
-            addDetail(detail, "Recharge", String.valueOf(data.getRecharge()));
-            addDetail(detail, "Damage", String.valueOf(data.getDamage()));
-            addDetail(detail, "Tags", data.getTags() == null ? "-" : data.getTags().toString());
+
+            addDetail(
+                detail,
+                "HEALTH",
+                String.valueOf(
+                    data.getHp()
+                )
+            );
+
+            addDetail(
+                detail,
+                "SUN COST",
+                String.valueOf(
+                    data.getCost()
+                )
+            );
+
+            addDetail(
+                detail,
+                "RECHARGE",
+                String.valueOf(
+                    data.getRecharge()
+                )
+            );
+
+            addDetail(
+                detail,
+                "DAMAGE",
+                String.valueOf(
+                    data.getDamage()
+                )
+            );
+
+            addDetail(
+                detail,
+                "TAGS",
+                data.getTags() == null
+                    ? "-"
+                    : data.getTags()
+                    .toString()
+            );
+
         } else {
-            addDetail(detail, "Stats", "PlantData is not loaded in the current project asset setup.");
+
+            addDetail(
+                detail,
+                "STATS",
+                "Plant data is not loaded yet."
+            );
         }
 
-        String category = type.getCategory() == null ? "Unknown" : type.getCategory().name();
-        addDetail(detail, "Family", category);
+        String category =
+            type.getCategory()
+                == null
+                ? "UNKNOWN"
+                : type.getCategory()
+                .name();
+
+        addDetail(
+            detail,
+            "FAMILY",
+            category
+        );
 
         if (!unlocked) {
-            detail.add(button("Buy - 2000 coins", () -> showConfirmation(
-                "Purchase plant",
-                "Buy " + type.name() + " for 2000 coins?",
-                () -> {
-                    String result = controller.buyPlant(type.name());
-                    showMessage(result);
-                    refreshResourceLabels();
-                    if (!result.startsWith("Error:")) {
-                        rebuild();
-                    }
-                }))).width(260f).height(45f).pad(10f).row();
+
+            detail.add(
+                    greenButton(
+                        "BUY - 2000 COINS",
+                        () ->
+                            showConfirmation(
+                                "Purchase Plant",
+                                "Buy "
+                                    + type.name()
+                                    + " for 2000 coins?",
+                                () -> {
+
+                                    String result =
+                                        controller
+                                            .buyPlant(
+                                                type.name()
+                                            );
+
+                                    showMessage(
+                                        result
+                                    );
+
+                                    refreshResourceLabels();
+
+                                    if (
+                                        !result.startsWith(
+                                            "Error:"
+                                        )
+                                    ) {
+                                        rebuild();
+                                    }
+                                }
+                            )
+                    )
+                )
+                .colspan(2)
+                .width(290f)
+                .height(54f)
+                .padTop(18f)
+                .row();
+
         } else {
-            String upgradeText = "Upgrade - " + controller.getRequiredCoins(type)
-                + " coins + " + controller.getRequiredSeeds(type) + " seeds";
-            detail.add(button(upgradeText, () -> showConfirmation(
-                "Upgrade plant",
-                "Upgrade " + type.name() + "?",
-                () -> {
-                    String result = controller.upgradePlant(type);
-                    showMessage(result);
-                    refreshResourceLabels();
-                    if (!result.startsWith("Error:")) {
-                        rebuild();
-                    }
-                }))).width(330f).height(48f).pad(10f).row();
+
+            String upgradeText =
+                "UPGRADE - "
+                    + controller
+                    .getRequiredCoins(
+                        type
+                    )
+                    + " COINS + "
+                    + controller
+                    .getRequiredSeeds(
+                        type
+                    )
+                    + " SEEDS";
+
+            detail.add(
+                    purpleButton(
+                        upgradeText,
+                        () ->
+                            showConfirmation(
+                                "Upgrade Plant",
+                                "Upgrade "
+                                    + type.name()
+                                    + "?",
+                                () -> {
+
+                                    String result =
+                                        controller
+                                            .upgradePlant(
+                                                type
+                                            );
+
+                                    showMessage(
+                                        result
+                                    );
+
+                                    refreshResourceLabels();
+
+                                    if (
+                                        !result.startsWith(
+                                            "Error:"
+                                        )
+                                    ) {
+                                        rebuild();
+                                    }
+                                }
+                            )
+                    )
+                )
+                .colspan(2)
+                .width(340f)
+                .height(54f)
+                .padTop(18f)
+                .row();
         }
+
         return detail;
     }
 
-    private void buildZombies(Table table, Collection controller) {
-        Table body = new Table();
-        Table list = new Table();
+    /*
+     * ============================================================
+     * ZOMBIES
+     * ============================================================
+     */
+
+    private void buildZombies(
+        Table table,
+        Collection controller
+    ) {
+
+        Table body =
+            new Table();
+
+        Table list =
+            pvzPanel();
+
+        Label listTitle =
+            mediumTitle(
+                "ZOMBIE COLLECTION"
+            );
+
+        listTitle.setAlignment(
+            Align.center
+        );
+
+        list.add(listTitle)
+            .colspan(3)
+            .padBottom(14f)
+            .row();
+
         int index = 0;
-        for (ZombieRegistry.ZombieType type : controller.getAllZombies()) {
-            boolean unlocked = controller.isZombieUnlocked(type);
-            String text = unlocked ? type.name().replace('_', ' ') : "???\nUNDISCOVERED";
-            TextButton card = button(text, () -> {
-                selectedZombie = type;
-                rebuild();
-            });
-            list.add(card).width(205f).height(88f).pad(5f);
+
+        for (
+            ZombieRegistry.ZombieType type :
+            controller.getAllZombies()
+        ) {
+
+            boolean unlocked =
+                controller
+                    .isZombieUnlocked(
+                        type
+                    );
+
+            String text =
+                unlocked
+                    ? type.name()
+                    .replace(
+                        '_',
+                        ' '
+                    )
+                    : "???\nUNDISCOVERED";
+
+            TextButton card =
+                unlocked
+                    ? purpleButton(
+                    text,
+                    () -> {
+
+                        selectedZombie =
+                            type;
+
+                        rebuild();
+                    }
+                )
+                    : brownButton(
+                    text,
+                    () -> {
+
+                        selectedZombie =
+                            type;
+
+                        rebuild();
+                    }
+                );
+
+            list.add(card)
+                .width(205f)
+                .height(92f)
+                .pad(6f);
+
             index++;
-            if (index % 3 == 0) {
+
+            if (
+                index % 3 == 0
+            ) {
                 list.row();
             }
         }
 
-        Table detail = new Table();
-        if (selectedZombie == null) {
-            detail.add(wrappedLabel("Select a zombie to view details.", 360f)).width(360f).pad(14f);
-        } else if (!controller.isZombieUnlocked(selectedZombie)) {
-            detail.add(wrappedLabel(
-                    "This zombie has not been seen by the current user yet, so its details remain hidden.", 360f))
-                .width(360f).pad(14f);
-        } else {
-            detail.add(new Label(selectedZombie.name().replace('_', ' '), skin)).pad(10f).row();
-            Zombie preview = controller.createZombiePreview(selectedZombie);
-            addDetail(detail, "Discovered", "Yes");
-            addDetail(detail, "Type", selectedZombie.name());
-            if (preview != null) {
-                addDetail(detail, "Health", String.valueOf(preview.getMaxHp()));
-                addDetail(detail, "Damage", String.valueOf(preview.getDamage()));
-                addDetail(detail, "Speed", String.valueOf(Math.abs(preview.getSpeed())));
-                addDetail(detail, "Wave cost", String.valueOf(preview.getCost()));
-                addDetail(detail, "Armor", preview.hasArmor() ? preview.getArmors().toString() : "None");
-                addDetail(detail, "Abilities", preview.getAbilities().isEmpty()
-                    ? "None" : preview.getAbilities().toString());
-            }
-        }
+        Table detail =
+            buildZombieDetail(
+                controller
+            );
 
-        body.add(list).width(690f).top().padRight(16f);
-        body.add(detail).width(400f).top();
-        table.add(body).growX();
+        body.add(list)
+            .width(700f)
+            .top()
+            .padRight(18f);
+
+        body.add(detail)
+            .width(410f)
+            .top();
+
+        table.add(body)
+            .growX();
     }
 
-    private void addDetail(Table table, String key, String value) {
-        table.add(new Label(key + ":", skin)).width(115f).left().pad(5f);
-        table.add(wrappedLabel(value == null ? "" : value, 250f)).width(250f).left().pad(5f).row();
+    private Table buildZombieDetail(
+        Collection controller
+    ) {
+
+        Table detail =
+            pvzPanel();
+
+        Label title =
+            mediumTitle(
+                "ZOMBIE DETAILS"
+            );
+
+        title.setAlignment(
+            Align.center
+        );
+
+        detail.add(title)
+            .colspan(2)
+            .padBottom(16f)
+            .row();
+
+        if (
+            selectedZombie
+                == null
+        ) {
+
+            Label message =
+                wrappedLabel(
+                    "Select a zombie card to view its details.",
+                    330f
+                );
+
+            message.setAlignment(
+                Align.center
+            );
+
+            detail.add(message)
+                .colspan(2)
+                .width(330f)
+                .pad(20f);
+
+            return detail;
+        }
+
+        if (
+            !controller
+                .isZombieUnlocked(
+                    selectedZombie
+                )
+        ) {
+
+            Label hidden =
+                wrappedLabel(
+                    "This zombie has not been discovered yet. "
+                        + "Its details remain hidden until encountered.",
+                    330f
+                );
+
+            hidden.setAlignment(
+                Align.center
+            );
+
+            detail.add(hidden)
+                .colspan(2)
+                .width(330f)
+                .pad(20f);
+
+            return detail;
+        }
+
+        Label name =
+            mediumTitle(
+                selectedZombie
+                    .name()
+                    .replace(
+                        '_',
+                        ' '
+                    )
+            );
+
+        name.setAlignment(
+            Align.center
+        );
+
+        detail.add(name)
+            .colspan(2)
+            .padBottom(12f)
+            .row();
+
+        Zombie preview =
+            controller
+                .createZombiePreview(
+                    selectedZombie
+                );
+
+        addDetail(
+            detail,
+            "DISCOVERED",
+            "YES"
+        );
+
+        addDetail(
+            detail,
+            "TYPE",
+            selectedZombie
+                .name()
+        );
+
+        if (preview != null) {
+
+            addDetail(
+                detail,
+                "HEALTH",
+                String.valueOf(
+                    preview.getMaxHp()
+                )
+            );
+
+            addDetail(
+                detail,
+                "DAMAGE",
+                String.valueOf(
+                    preview.getDamage()
+                )
+            );
+
+            addDetail(
+                detail,
+                "SPEED",
+                String.valueOf(
+                    Math.abs(
+                        preview.getSpeed()
+                    )
+                )
+            );
+
+            addDetail(
+                detail,
+                "WAVE COST",
+                String.valueOf(
+                    preview.getCost()
+                )
+            );
+
+            addDetail(
+                detail,
+                "ARMOR",
+                preview.hasArmor()
+                    ? preview
+                    .getArmors()
+                    .toString()
+                    : "NONE"
+            );
+
+            addDetail(
+                detail,
+                "ABILITIES",
+                preview
+                    .getAbilities()
+                    .isEmpty()
+                    ? "NONE"
+                    : preview
+                    .getAbilities()
+                    .toString()
+            );
+        }
+
+        return detail;
+    }
+
+    private void addDetail(
+        Table table,
+        String key,
+        String value
+    ) {
+
+        Label keyLabel =
+            new Label(
+                key,
+                skin,
+                "medium_outline"
+            );
+
+        Label valueLabel =
+            wrappedLabel(
+                value == null
+                    ? ""
+                    : value,
+                235f
+            );
+
+        table.add(keyLabel)
+            .width(125f)
+            .left()
+            .pad(5f);
+
+        table.add(valueLabel)
+            .width(235f)
+            .left()
+            .pad(5f)
+            .row();
     }
 
     private void rebuild() {
+
         content.clearChildren();
-        buildContent(content);
+
+        buildContent(
+            content
+        );
+
         refreshResourceLabels();
     }
 }

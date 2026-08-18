@@ -5,6 +5,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.CheckBox;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.SelectBox;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
+import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.Array;
 
 import controllers.datacontroller.Data;
@@ -12,6 +13,7 @@ import controllers.menus.secondarymenus.Settings;
 import models.User;
 
 public class SettingsView extends View {
+
     public SettingsView() {
         menu = new Settings();
     }
@@ -27,49 +29,236 @@ public class SettingsView extends View {
     }
 
     @Override
-    protected void buildContent(Table table) {
-        User user = Data.getCurrentUser();
+    protected void buildContent(
+        Table table
+    ) {
+
+        User user =
+            Data.getCurrentUser();
+
         if (user == null) {
-            table.add(new Label("Please log in.", skin));
+
+            table.add(
+                mediumTitle(
+                    "PLEASE LOG IN"
+                )
+            );
+
             return;
         }
 
-        SelectBox<Integer> difficulty = new SelectBox<>(skin);
-        difficulty.setItems(new Array<>(new Integer[]{1, 2, 3, 4, 5}));
-        difficulty.setSelected(user.getDifficultyLevel());
+        Label heading =
+            mediumTitle(
+                "GAME SETTINGS"
+            );
 
-        SelectBox<Integer> speed = new SelectBox<>(skin);
-        speed.setItems(new Array<>(new Integer[]{1, 2, 3}));
-        speed.setSelected(user.getGameSpeed());
+        heading.setAlignment(
+            Align.center
+        );
 
-        CheckBox showGrid = new CheckBox(" Show red board grid", skin);
-        showGrid.setChecked(user.isShowGrid());
+        table.add(heading)
+            .padTop(10f)
+            .padBottom(16f)
+            .row();
 
-        CheckBox debug = new CheckBox(" Debug mode", skin);
-        debug.setChecked(user.isDebugMode());
+        SelectBox<Integer> difficulty =
+            new SelectBox<>(skin);
 
-        Table form = new Table();
-        form.add(new Label("Difficulty (1-5)", skin)).width(260f).left().pad(10f);
-        form.add(difficulty).width(240f).pad(10f).row();
-        form.add(new Label("Game speed (1-3)", skin)).width(260f).left().pad(10f);
-        form.add(speed).width(240f).pad(10f).row();
-        form.add(showGrid).colspan(2).left().pad(10f).row();
-        form.add(debug).colspan(2).left().pad(10f).row();
+        difficulty.setItems(
+            new Array<>(
+                new Integer[]{
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                }
+            )
+        );
 
-        table.add(form).width(620f).padTop(25f).padBottom(22f).row();
-        table.add(wrappedLabel(
-                "Debug mode enables resource cheat buttons in every graphical menu. "
-                    + "Game speed and grid visibility are saved per user for gameplay views to read.", 650f))
-            .width(650f).padBottom(18f).row();
+        difficulty.setSelected(
+            user.getDifficultyLevel()
+        );
 
-        table.add(button("Save settings", () -> {
-            Settings controller = (Settings) menu;
-            String first = controller.ChangeHardness(difficulty.getSelected());
-            String second = controller.changeGameSpeed(speed.getSelected());
-            String third = controller.setGridVisible(showGrid.isChecked());
-            String fourth = controller.setDebugMode(debug.isChecked());
-            showMessage(first + "\n" + second + "\n" + third + "\n" + fourth);
-            refreshResourceLabels();
-        })).width(260f).height(50f);
+        SelectBox<Integer> speed =
+            new SelectBox<>(skin);
+
+        speed.setItems(
+            new Array<>(
+                new Integer[]{
+                    1,
+                    2,
+                    3
+                }
+            )
+        );
+
+        speed.setSelected(
+            user.getGameSpeed()
+        );
+
+        CheckBox showGrid =
+            new CheckBox(
+                " SHOW RED BOARD GRID",
+                skin
+            );
+
+        showGrid.setChecked(
+            user.isShowGrid()
+        );
+
+        CheckBox debug =
+            new CheckBox(
+                " DEBUG MODE",
+                skin
+            );
+
+        debug.setChecked(
+            user.isDebugMode()
+        );
+
+        Table panel =
+            pvzPanel();
+
+        addOption(
+            panel,
+            "DIFFICULTY",
+            difficulty
+        );
+
+        addOption(
+            panel,
+            "GAME SPEED",
+            speed
+        );
+
+        panel.add(showGrid)
+            .colspan(2)
+            .left()
+            .pad(
+                16f,
+                20f,
+                10f,
+                20f
+            )
+            .row();
+
+        panel.add(debug)
+            .colspan(2)
+            .left()
+            .pad(
+                10f,
+                20f,
+                16f,
+                20f
+            )
+            .row();
+
+        table.add(panel)
+            .width(650f)
+            .padBottom(16f)
+            .row();
+
+        Table helpPanel =
+            pvzInnerPanel();
+
+        Label description =
+            wrappedLabel(
+                "Difficulty changes game hardness. "
+                    + "Game Speed controls gameplay speed from 1x to 3x. "
+                    + "Grid displays the board helper. "
+                    + "Debug Mode enables resource cheat buttons.",
+                600f
+            );
+
+        description.setAlignment(
+            Align.center
+        );
+
+        helpPanel.add(description)
+            .width(600f);
+
+        table.add(helpPanel)
+            .width(660f)
+            .padBottom(20f)
+            .row();
+
+        table.add(
+                greenButton(
+                    "SAVE SETTINGS",
+                    () -> {
+
+                        Settings controller =
+                            (Settings) menu;
+
+                        String first =
+                            controller
+                                .ChangeHardness(
+                                    difficulty
+                                        .getSelected()
+                                );
+
+                        String second =
+                            controller
+                                .changeGameSpeed(
+                                    speed
+                                        .getSelected()
+                                );
+
+                        String third =
+                            controller
+                                .setGridVisible(
+                                    showGrid
+                                        .isChecked()
+                                );
+
+                        String fourth =
+                            controller
+                                .setDebugMode(
+                                    debug
+                                        .isChecked()
+                                );
+
+                        showMessage(
+                            first
+                                + "\n"
+                                + second
+                                + "\n"
+                                + third
+                                + "\n"
+                                + fourth
+                        );
+
+                        refreshResourceLabels();
+                    }
+                )
+            )
+            .width(300f)
+            .height(58f);
+    }
+
+    private void addOption(
+        Table table,
+        String title,
+        com.badlogic.gdx.scenes.scene2d.Actor actor
+    ) {
+
+        Label label =
+            new Label(
+                title,
+                skin,
+                "medium_outline"
+            );
+
+        table.add(label)
+            .width(270f)
+            .left()
+            .pad(14f);
+
+        table.add(actor)
+            .width(230f)
+            .height(44f)
+            .pad(14f)
+            .row();
     }
 }
