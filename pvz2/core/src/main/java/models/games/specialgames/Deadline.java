@@ -3,12 +3,20 @@ package models.games.specialgames;
 import models.Constants;
 import models.entity.Zombie;
 import models.factory.builder.PlantType;
+import models.gameadventure.Chapters;
+import models.gameadventure.levels.Level;
 import models.games.NormalGame;
 import models.utils.Result;
 
 import java.util.ArrayList;
 
 public class Deadline extends NormalGame implements SpecialGame {
+    private int deadLine;
+    public Deadline(Chapters chapter, Level level) {
+        super(chapter, level);
+        deadLine = Constants.DEAD_LINE_TILE_INDEX + level.getId();
+    }
+
     @Override
     public ArrayList<PlantType> filterPlants() {
         return null;
@@ -22,7 +30,7 @@ public class Deadline extends NormalGame implements SpecialGame {
     @Override
     public Result check_endGame() {
         for (Zombie z : zombies) {
-            if(z.getTileIndex() <= Constants.DEAD_LINE_TILE_INDEX){
+            if(z.getTileIndex() <= deadLine){
                 return new Result(true , "Loss" , null);
             }
         }

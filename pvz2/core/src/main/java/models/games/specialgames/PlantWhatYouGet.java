@@ -7,16 +7,22 @@ import models.entity.Plant;
 import models.entity.PlantCategory;
 import models.factory.builder.PlantBuilder;
 import models.factory.builder.PlantType;
+import models.gameadventure.Chapters;
+import models.gameadventure.levels.Level;
 import models.gamepanes.Tile;
 import models.games.NormalGame;
 
 import java.util.ArrayList;
 
 public class PlantWhatYouGet extends NormalGame implements SpecialGame {
-    public PlantWhatYouGet(){
+
+
+    public PlantWhatYouGet(Chapters chapter, Level level) {
+        super(chapter, level);
         selection = new PlantSelection(filterPlants());
         sunCount = Constants.PLANT_WHAT_YOU_GET_STARTING_SUN_COUNT;
     }
+
     @Override
     public ArrayList<PlantType> filterPlants() {
         ArrayList<PlantType> plantTypes = new ArrayList<>();

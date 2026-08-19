@@ -3,12 +3,13 @@ package models;
 import models.entity.Entity;
 
 public class Constants {
+    public final static int PROTECTED_SEEDS_COUNT = 3;
         public final static float GRAVITY = 300;
     public final static float LOBBER_BULLET_VELOCITY_X = 100;
     public final static float BULLET_VELOCITY_X = 120;
     public final static float MAGICAL_BULLET_VELOCITY = 120;
     public final static float TALL_WALL_NUT_HEIGHT = 250;
-    public final static int DEAD_LINE_TILE_INDEX = 3;
+    public final static int DEAD_LINE_TILE_INDEX = 2;
     public final static int LAP_Count = 5;
     public final static int PLANTS_COUNT_IN_A_GAME = 8;
     public final static int PLANT_WHAT_YOU_GET_STARTING_SUN_COUNT = 800;

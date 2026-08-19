@@ -4,6 +4,8 @@ import models.App;
 import models.entity.Plant;
 import models.factory.PlantFactory;
 import models.factory.builder.PlantType;
+import models.gameadventure.Chapters;
+import models.gameadventure.levels.Level;
 import models.gamepanes.Tile;
 import models.games.NormalGame;
 
@@ -14,14 +16,17 @@ public class ConveyorBelt extends NormalGame implements SpecialGame {
     ArrayList<PlantType> belt =  new ArrayList<>();
     ArrayList<PlantType> plants =  new ArrayList<>();
 
-    public  ConveyorBelt() {
-
+    public  ConveyorBelt(Chapters chapter, Level level) {
+        super(chapter, level);
         initPlants(5);
         belt.add(plants.getFirst());
         state = GameState.PLAYING;
     }
 
     Random random = new Random();
+
+
+
     private void initPlants(int i){
         if(i == 0) return;
         int index = random.nextInt(App.getCurrentuser().getUnlockedPlants().size());

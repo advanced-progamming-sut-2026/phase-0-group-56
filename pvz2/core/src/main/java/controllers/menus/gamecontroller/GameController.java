@@ -54,15 +54,15 @@ public class GameController implements Controller, Menu {
         this.chapter = chapter;
 
         game = switch (level.getLevelType().toLowerCase()) {
-            case "night ops" -> new NightsOps();
-            case "plant what you get" -> new PlantWhatYouGet();
+            case "night ops" -> new NightsOps(chapter,level);
+            case "plant what you get" -> new PlantWhatYouGet(chapter,level);
             case "locked plants by category" -> new LockedPlants(LockedPlants.LockType.ByCategory);
-            case "conveyor belt" -> new ConveyorBelt();
-            case "deadline" -> new Deadline();
-            case "save our seeds" -> new SaveOurSeeds();
-            case "timed war" -> new TimedWar();
-            case "love your plants" -> new LoveYourPlants();
-            default -> new NormalGame();
+            case "conveyor belt" -> new ConveyorBelt(chapter,level);
+            case "deadline" -> new Deadline(chapter,level);
+            case "save our seeds" -> new SaveOurSeeds(chapter,level);
+            case "timed war" -> new TimedWar(chapter,level);
+            case "love your plants" -> new LoveYourPlants(chapter,level);
+            default -> new NormalGame(chapter,level);
         };
 
         game.initGame(chapter, level);

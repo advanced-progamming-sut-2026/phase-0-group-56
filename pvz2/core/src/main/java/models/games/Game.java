@@ -13,7 +13,7 @@ public interface Game {
     public void updatePlants(float delta);
     public void updateZombies(float delta);
     public void updateScene(float delta);
-    public String plant(String plantName , int x , int y);
+    public boolean plant(String plantName , int x , int y);
     public String pluck(int x , int y);
     public Result check_endGame();
     public void endGame();
