@@ -84,7 +84,6 @@ public class NormalGame extends BaseGame{
     @Override
     public String playGame(float delta) {
         updateProjectiles(delta);
-        mawners(delta);
         return super.playGame(delta);
     }
 
@@ -218,12 +217,7 @@ public class NormalGame extends BaseGame{
         return "Booooom. zombies got nuked";
     }
 
-    private void mawners(float delta){
-        for (Mawner x : this.field.getMoaners()){
-            String a = x.run(delta , this);
-            if(a != null) output.append(a);
-        }
-    }
+
 
     public String boost(PlantType type){
         SeedPackage seedPackage = availablePlants.get(type);

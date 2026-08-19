@@ -30,6 +30,7 @@ public final class WorldEntityRenderer implements Disposable {
 
     private PlantRenderer plantRenderer;
     private SunRenderer sunRenderer;
+    private MowerRenderer mowerRenderer;
     private ChapterElementRenderer chapterElementRenderer;
 
     public WorldEntityRenderer(
@@ -65,9 +66,60 @@ public final class WorldEntityRenderer implements Disposable {
         // map -> chapter ground/water -> plants -> chapter foreground -> suns.
         initialiseChapterBackground(pvzAssetsRoot, sharedTextureBank);
         initialisePlants(pvzAssetsRoot);
+        initialiseMowers(pvzAssetsRoot, sharedTextureBank);
         initialiseChapterForeground();
         initialiseSuns(sharedTextureBank, sunFallback);
     }
+
+
+    private void initialiseMowers(
+        FileHandle pvzAssetsRoot,
+        TextureBank sharedTextureBank
+    ) {
+        if (pvzAssetsRoot == null || sharedTextureBank == null) {
+            Gdx.app.log(
+                TAG,
+                "Mower rendering disabled because extracted PVZ assets are unavailable."
+            );
+            return;
+        }
+
+        try {
+            mowerRenderer = new MowerRenderer(
+                pvzAssetsRoot,
+                sharedTextureBank,
+                controller.getChapter()
+            );
+
+            MowerLayer mowerLayer = new MowerLayer(
+                controller,
+                mowerRenderer,
+                false
+            );
+
+            mowerLayer.setBounds(
+                pitchBounds.x,
+                pitchBounds.y,
+                pitchBounds.width,
+                pitchBounds.height
+            );
+
+            stage.addActor(mowerLayer);
+        } catch (RuntimeException e) {
+            if (mowerRenderer != null) {
+                mowerRenderer.dispose();
+                mowerRenderer = null;
+            }
+
+            Gdx.app.error(
+                TAG,
+                "Failed to initialise mower rendering.",
+                e
+            );
+        }
+    }
+
+
 
     private void initialiseChapterBackground(
         FileHandle pvzAssetsRoot,
@@ -251,6 +303,10 @@ public final class WorldEntityRenderer implements Disposable {
             plantRenderer = null;
         }
 
+        if (mowerRenderer != null) {
+            mowerRenderer.dispose();
+            mowerRenderer = null;
+        }
         // SunRenderer does not own sharedTextureBank.
         sunRenderer = null;
     }
