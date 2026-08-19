@@ -1,0 +1,47 @@
+[
+  {
+    "id": 101,
+    "plants": ["PEASHOOTER", "WALL_NUT", "POTATO_MINE"],
+    "zombiesNames": ["RegularZombie", "RegularZombie", "ConeheadZombie"]
+  },
+  {
+    "id": 102,
+    "plants": ["REPEATER", "WALL_NUT", "SQUASH", "SNOW_PEA"],
+    "zombiesNames": ["ConeheadZombie", "BucketheadZombie", "BucketheadZombie", "PoleVaultingZombie"]
+  },
+  {
+    "id": 103,
+    "plants": ["MELON_PULT", "TALL_NUT", "CHERRY_BOMB", "JALAPENO"],
+    "zombiesNames": ["BucketheadZombie", "Gargantuar", "Gargantuar", "Imp", "WizardZombie"]
+  },
+  {
+    "id": 201,
+    "plants": ["BOWLING_WALLNUT"],
+    "zombiesNames": ["RegularZombie", "RegularZombie", "ConeheadZombie", "ConeheadZombie"]
+  },
+  {
+    "id": 202,
+    "plants": ["BOWLING_WALLNUT", "EXPLODE_O_NUT"],
+    "zombiesNames": ["ConeheadZombie", "BucketheadZombie", "NewspaperZombie", "AllStarZombie"]
+  },
+  {
+    "id": 203,
+    "plants": ["BOWLING_WALLNUT", "EXPLODE_O_NUT", "GIANT_WALLNUT"],
+    "zombiesNames": ["BucketheadZombie", "KnightZombie", "Gargantuar", "Gargantuar"]
+  },
+  {
+    "id": 301,
+    "plants": ["PEASHOOTER", "SUNFLOWER", "WALL_NUT"],
+    "zombiesNames": ["RegularZombie", "ConeheadZombie"]
+  },
+  {
+    "id": 302,
+    "plants": ["REPEATER", "SPIKEWEED", "TALL_NUT", "SUNFLOWER"],
+    "zombiesNames": ["BucketheadZombie", "AllStarZombie", "PianistZombie"]
+  },
+  {
+    "id": 303,
+    "plants": ["WINTER_MELON", "TORCHWOOD", "TALL_NUT", "SUN_SHROOM"],
+    "zombiesNames": ["Gargantuar", "WizardZombie", "ImpDragon", "KingZombie"]
+  }
+]

@@ -13,7 +13,7 @@ public class Constants {
     public final static int PLANTS_COUNT_IN_A_GAME = 8;
     public final static int PLANT_WHAT_YOU_GET_STARTING_SUN_COUNT = 800;
     public final static int DISASTER_ZOMBIES_BASE_COUNT = 3;
-    public final static float TORNADO_VELOCITY = 200f;
+    public final static float TORNADO_VELOCITY = 40;
     public final static float ENDURIAN_ARMOR_DAMAGE = 80f;
     public final static float WATER_SURFACE_CHANGE_TIME = 30f;
     public final static float SUN_DROPPING_VELOCITY = 70f;

@@ -77,7 +77,7 @@ public final class PlantRenderer implements Disposable {
      * tune CELL_FILL only. No game logic needs to change.
      */
     private static final float PAM_REFERENCE_SIZE = 390f;
-    private static final float CELL_FILL = 1.18f;
+    private static final float CELL_FILL = 1.5f;
 
     private final FileHandle assetsRoot;
     private final FileHandle pamRoot;

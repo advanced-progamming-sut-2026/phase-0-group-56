@@ -3,7 +3,7 @@ package models.entity;
 import models.Constants;
 import models.games.BaseGame;
 
-public class Mawner extends Entity {
+public class LawnMower extends Entity {
 
 
     private boolean on = false;
@@ -17,7 +17,7 @@ public class Mawner extends Entity {
             if(Constants.overlap(z , this)){
                 if(!on){
                     on = true;
-                    return "Lawn Mawner turned on at line " + line;
+                    return "Lawn LawnMower turned on at line " + line;
                 }
                 z.setHurt(true);
                 z.setAlive(false);
@@ -26,7 +26,7 @@ public class Mawner extends Entity {
         }
         return null;
     }
-    public Mawner(int line){
+    public LawnMower(int line){
         this.line = line;
         this.y = line * height;
     }

@@ -7,6 +7,7 @@ import models.App;
 import models.entity.Plant;
 import models.entity.PlantTags;
 import models.entity.WrampUpPlant;
+import models.gamepanes.Tile;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -23,6 +24,8 @@ public class PlantBuilder {
 
     public Plant build(PlantType plantType){
         plant = new Plant();
+        plant.setWidth(Tile.getWidth());
+        plant.setHeight(Tile.getHeight());
         plant.setType(plantType);
         int level = App.getCurrentuser().getLevels().get(plantType);
         plant.setHp(upgradedHP(plantType , level));

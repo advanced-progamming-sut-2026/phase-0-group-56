@@ -1,0 +1,146 @@
+[
+  {
+    "id": 1,
+    "chapters": "AncientEgypt",
+    "levelType": "normal",
+    "waves": 3,
+    "baseHardness": 300,
+    "allowedZombies": ["normal", "cone"],
+    "unlockingPlants": ["CABBAGE_PULT", "CHERRY_BOMB"]
+  },
+  {
+    "id": 2,
+    "chapters": "AncientEgypt",
+    "levelType": "conveyor belt",
+    "waves": 2,
+    "baseHardness": 600,
+    "allowedZombies": ["normal", "cone", "bucket"],
+    "unlockingPlants": ["POTATO_MINE"]
+  },
+  {
+    "id": 3,
+    "chapters": "AncientEgypt",
+    "levelType": "save our seeds",
+    "waves": 3,
+    "baseHardness": 800,
+    "allowedZombies": ["normal", "cone", "ra"],
+    "unlockingPlants": ["GRAVE_BUSTER"]
+  },
+  {
+    "id": 4,
+    "chapters": "AncientEgypt",
+    "levelType": "normal",
+    "waves": 4,
+    "baseHardness": 2.0,
+    "allowedZombies": ["normal", "cone", "bucket", "explorer", "tombraiser"],
+    "unlockingPlants": ["TWIN_SUNFLOWER"]
+  },
+  {
+    "id": 5,
+    "chapters": "FrozenCaves",
+    "levelType": "normal",
+    "waves": 3,
+    "baseHardness": 1.5,
+    "allowedZombies": ["normal", "cone", "dodo"],
+    "unlockingPlants": ["HOT_POTATO"]
+  },
+  {
+    "id": 6,
+    "chapters": "FrozenCaves",
+    "levelType": "locked plants by category",
+    "waves": 3,
+    "baseHardness": 1.8,
+    "allowedZombies": ["normal", "cone", "bucket", "hunter"],
+    "unlockingPlants": ["PEPPER_PULT"]
+  },
+  {
+    "id": 7,
+    "chapters": "FrozenCaves",
+    "levelType": "deadline",
+    "waves": 3,
+    "baseHardness": 2.2,
+    "allowedZombies": ["normal", "bucket", "dodo", "troglobite"],
+    "unlockingPlants": ["FIRE_PEASHOOTER"]
+  },
+  {
+    "id": 8,
+    "chapters": "FrozenCaves",
+    "levelType": "normal",
+    "waves": 4,
+    "baseHardness": 2.5,
+    "allowedZombies": ["normal", "cone", "bucket", "dodo", "hunter", "troglobite"],
+    "unlockingPlants": ["ROTOBAGA"]
+  },
+  {
+    "id": 9,
+    "chapters": "BigWaveBeach",
+    "levelType": "normal",
+    "waves": 3,
+    "baseHardness": 2.0,
+    "allowedZombies": ["normal", "cone", "snorkel"],
+    "unlockingPlants": ["LILY_PAD"]
+  },
+  {
+    "id": 10,
+    "chapters": "BigWaveBeach",
+    "levelType": "timed war",
+    "waves": 4,
+    "baseHardness": 2.3,
+    "allowedZombies": ["normal", "bucket", "snorkel", "fisherman"],
+    "unlockingPlants": ["TANGLE_KELP"]
+  },
+  {
+    "id": 11,
+    "chapters": "BigWaveBeach",
+    "levelType": "plant what you get",
+    "waves": 3,
+    "baseHardness": 2.6,
+    "allowedZombies": ["normal", "cone", "bucket", "octopus"],
+    "unlockingPlants": ["BOWLING_BULB"]
+  },
+  {
+    "id": 12,
+    "chapters": "BigWaveBeach",
+    "levelType": "normal",
+    "waves": 5,
+    "baseHardness": 3.0,
+    "allowedZombies": ["normal", "cone", "bucket", "snorkel", "fisherman", "octopus"],
+    "unlockingPlants": []
+  },
+  {
+    "id": 13,
+    "chapters": "DarkAge",
+    "levelType": "night ops",
+    "waves": 3,
+    "baseHardness": 2.5,
+    "allowedZombies": ["normal", "cone", "juggler"],
+    "unlockingPlants": ["SUN_SHROOM", "PUFF_SHROOM"]
+  },
+  {
+    "id": 14,
+    "chapters": "DarkAge",
+    "levelType": "love your plants",
+    "waves": 4,
+    "baseHardness": 2.8,
+    "allowedZombies": ["normal", "bucket", "juggler", "wizard"],
+    "unlockingPlants": ["FUM_SHROOM"]
+  },
+  {
+    "id": 15,
+    "chapters": "DarkAge",
+    "levelType": "conveyor belt",
+    "waves": 4,
+    "baseHardness": 3.2,
+    "allowedZombies": ["normal", "cone", "bucket", "wizard", "king"],
+    "unlockingPlants": ["MAGNET_SHROOM"]
+  },
+  {
+    "id": 16,
+    "chapters": "DarkAge",
+    "levelType": "normal",
+    "waves": 5,
+    "baseHardness": 4.0,
+    "allowedZombies": ["normal", "cone", "bucket", "juggler", "wizard", "king", "dragon_imp"],
+    "unlockingPlants": ["MELON_PULT", "WINTER_MELON"]
+  }
+]

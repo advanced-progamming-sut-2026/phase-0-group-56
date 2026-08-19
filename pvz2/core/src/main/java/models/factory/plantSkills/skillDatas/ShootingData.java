@@ -1,15 +1,15 @@
 package models.factory.plantSkills.skillDatas;
 
-import models.entity.BulletType;
+import models.entity.ProjectileType;
 
 public class ShootingData {
-    private BulletType bullet; /// type of your bullet
+    private ProjectileType bullet; /// type of your bullet
     private ShootingMood mood; /// how you wanna shoot
-    private int bulletNumber; /// how many bullets you wanna shoot each time
+    private int bulletNumber; /// how many projectiles you wanna shoot each time
     private int randomCount; /// random zombies to shoot
     public int range; /// range for mid - ranged plants
 
-    public ShootingData(BulletType type , ShootingMood mood ,  int bulletNumber) {
+    public ShootingData(ProjectileType type , ShootingMood mood , int bulletNumber) {
         this.bulletNumber = bulletNumber;
         this.mood = mood;
         bullet = type;
@@ -18,11 +18,11 @@ public class ShootingData {
     public ShootingData(){
 
     }
-    public BulletType getBullet() {
+    public ProjectileType getBullet() {
         return bullet;
     }
 
-    public void setBullet(BulletType bullet) {
+    public void setBullet(ProjectileType bullet) {
         this.bullet = bullet;
     }
 

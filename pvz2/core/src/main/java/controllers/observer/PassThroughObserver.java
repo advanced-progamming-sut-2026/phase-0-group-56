@@ -1,13 +1,13 @@
 package controllers.observer;
 
-import models.entity.Bullet;
+import models.entity.Projectile;
 import models.entity.Zombie;
 import models.gamepanes.*;
 
 public class PassThroughObserver implements BulletObserver{
 
     @Override
-    public void onBulletHit(Zombie zombie, Bullet bullet){
+    public void onBulletHit(Zombie zombie, Projectile projectile){
         // just for asani structure
         return;
     }

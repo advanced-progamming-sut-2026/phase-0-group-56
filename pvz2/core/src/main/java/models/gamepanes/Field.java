@@ -1,7 +1,7 @@
 package models.gamepanes;
 
 import models.gameadventure.Chapters;
-import models.entity.Mawner;
+import models.entity.LawnMower;
 import models.entity.Plant;
 import models.entity.PlantTags;
 import models.games.BaseGame;
@@ -13,7 +13,7 @@ public class Field {
     private int width;
     private int height;
     private ArrayList<ArrayList<Tile>> tiles = new ArrayList<>(5);
-    private final ArrayList<Mawner> mawners = new ArrayList<>(5);
+    private final ArrayList<LawnMower> lawnMowers = new ArrayList<>(5);
     private int WaveLimitColumn;
     private int waterCurrentSurface;
 
@@ -98,7 +98,7 @@ public class Field {
 
             private void initMoaners(){
                 for (int i = 0; i < 5; i++) {
-                    mawners.add(new Mawner(i));
+                    lawnMowers.add(new LawnMower(i));
                 }
             }
 
@@ -127,8 +127,8 @@ public class Field {
         this.tiles = tiles;
     }
 
-    public ArrayList<Mawner> getMoaners() {
-        return mawners;
+    public ArrayList<LawnMower> getMoaners() {
+        return lawnMowers;
     }
 
     public int getWaveLimitColumn() {

@@ -3,31 +3,24 @@ package controllers.datacontroller;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.utils.Json;
-
-import models.*;
+import models.App;
+import models.User;
+import models.factory.builder.PlantType;
 import models.gameadventure.*;
 import models.gameadventure.levels.*;
-import models.*;
-import models.factory.builder.*;
-import view.*;
 import view.*;
 
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
 import java.io.*;
-import java.lang.reflect.Type;
 import java.util.ArrayList;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Locale;
 
 public class Data {
     private static final String USERS_FILE = "users_data.dat";
     private static ArrayList<User> allUsers = new ArrayList<>();
     private static User currentUser = null;
     private static User tempUser = null;
-    private static HashMap<PlantType , PlantData> plants = new HashMap<>();
+    private static HashMap<PlantType, PlantData> plants = new HashMap<>();
     private static HashMap<Chapters, ArrayList<Level>> allLevels = new HashMap<>();
 
     public static void saveUser() {
@@ -55,20 +48,25 @@ public class Data {
         }
     }
 
-    public static void setUp(){
+    public static void setUp() {
+        User testUser = new User("LeBron", "passhash", "LeBron", "LeBron", "LeBron");
+        currentUser = testUser;
+        App.setScreen(new PlayView());
 
-        if(allUsers.isEmpty()) App.setScreen(new SignUpView());
-        else{
+        /*
+        if (allUsers.isEmpty()) {
+            App.setScreen(new SignUpView());
+        } else {
             for (User user : allUsers) {
-                if(user.isStayLoggedIn()){
+                if (user.isStayLoggedIn()) {
                     currentUser = user;
                     App.setScreen(new HomeView());
                     return;
                 }
             }
         }
-        //currentUser = allUsers.getFirst();
         App.setScreen(new SignUpView());
+        */
     }
 
     public static void addUser(User user) {
@@ -94,16 +92,18 @@ public class Data {
         return null;
     }
 
-
-
-
-// ... بقیه کدهای کلاس Data ...
-
+    /**
+     * Loads plants.json using PlantData's custom LibGDX Json reader.
+     *
+     * PlantData handles the legacy tag format and the description/effect mismatch.
+     * This method only has to normalize the human-readable plant name to PlantType.
+     */
     public static void loadPlantsFromJson() {
-        FileHandle file = Gdx.files.internal("plants.json"); // فایل حتماً تو پوشه assets باشه
+        FileHandle file = Gdx.files.internal("plants.json");
 
         if (!file.exists()) {
-            Gdx.app.error("Data", "❌ plants.json not found in assets folder!");
+            Gdx.app.error("Data", "plants.json not found in assets folder!");
+            plants = new HashMap<>();
             return;
         }
 
@@ -111,28 +111,54 @@ public class Data {
             Json json = new Json();
             json.setIgnoreUnknownFields(true);
 
-            // اول جیسون رو به عنوان یه آرایه (لیست) می‌خونیم
-            ArrayList<PlantData> plantsList = json.fromJson(ArrayList.class, PlantData.class, file);
+            ArrayList<PlantData> plantsList =
+                json.fromJson(ArrayList.class, PlantData.class, file);
 
-            // حالا تبدیلش می‌کنیم به HashMap که خودت تعریف کرده بودی
-            plants = new HashMap<>();
+            HashMap<PlantType, PlantData> loadedPlants = new HashMap<>();
+
             for (PlantData plant : plantsList) {
-                // فرض کردم متدی مثل getType() برای گرفتن نوع گیاه (Enum) توی PlantData داری
-                plants.put(PlantType.valueOf(plant.getName()), plant);
+                if (plant == null || plant.getName() == null || plant.getName().isBlank()) {
+                    Gdx.app.error("Data", "Skipping plant with missing name in plants.json");
+                    continue;
+                }
+
+                try {
+                    PlantType type = parsePlantType(plant.getName());
+                    loadedPlants.put(type, plant);
+                } catch (IllegalArgumentException e) {
+                    Gdx.app.error(
+                        "Data",
+                        "Unknown PlantType for plants.json name: " + plant.getName(),
+                        e
+                    );
+                }
             }
 
-            Gdx.app.log("Data", "✅ Plants loaded successfully!");
+            plants = loadedPlants;
+            Gdx.app.log("Data", "Plants loaded successfully: " + plants.size());
+
         } catch (Exception e) {
-            Gdx.app.error("Data", "❌ Error reading plants: " + e.getMessage());
+            plants = new HashMap<>();
+            Gdx.app.error("Data", "Error reading plants.json", e);
         }
     }
 
+    private static PlantType parsePlantType(String jsonName) {
+        String enumName = jsonName
+            .trim()
+            .replace('-', '_')
+            .replace(' ', '_')
+            .replaceAll("_+", "_")
+            .toUpperCase(Locale.ROOT);
+
+        return PlantType.valueOf(enumName);
+    }
 
     public static void loadLevelsFromJson() {
-        FileHandle file = Gdx.files.internal("levels.json"); // فایل حتماً تو پوشه assets باشه
+        FileHandle file = Gdx.files.internal("levels.json");
 
         if (!file.exists()) {
-            Gdx.app.error("Data", "❌ levels.json not found in assets folder!");
+            Gdx.app.error("Data", "levels.json not found in assets folder!");
             return;
         }
 
@@ -140,37 +166,48 @@ public class Data {
             Json json = new Json();
             json.setIgnoreUnknownFields(true);
 
-            // اول جیسون رو به عنوان یه آرایه (لیست) از Level ها می‌خونیم
             ArrayList<Level> levelsList = json.fromJson(ArrayList.class, Level.class, file);
 
-            // هش‌مپ allLevels رو ریست می‌کنیم تا دیتای تکراری اضافه نشه
             allLevels = new HashMap<>();
-
             for (Level level : levelsList) {
-                // فرض بر این است که متدی برای گرفتن چپتر این مرحله داری
                 Chapters chapter = level.getChapters();
-
-                // اگر این چپتر هنوز توی مپ ساخته نشده، یه لیست خالی براش می‌سازیم
-                allLevels.putIfAbsent(chapter, new ArrayList<Level>());
-
-                // مرحله رو به لیستِ همون چپتر اضافه می‌کنیم
+                allLevels.putIfAbsent(chapter, new ArrayList<>());
                 allLevels.get(chapter).add(level);
             }
 
-            Gdx.app.log("Data", "✅ Levels loaded successfully! Total chapters: " + allLevels.size());
+            Gdx.app.log(
+                "Data",
+                "Levels loaded successfully! Total chapters: " + allLevels.size()
+            );
+
         } catch (Exception e) {
-            Gdx.app.error("Data", "❌ Error reading levels: " + e.getMessage());
+            Gdx.app.error("Data", "Error reading levels.json", e);
         }
     }
+
     public static HashMap<Chapters, ArrayList<Level>> getAllLevels() {
         return allLevels;
     }
 
-    public static void setCurrentUser(User user) { currentUser = user; }
-    public static User getCurrentUser() { return currentUser; }
-    public static void setTempUser(User user) { tempUser = user; }
-    public static User getTempUser() { return tempUser; }
-    public static ArrayList<User> getAllUsers() { return allUsers; }
+    public static void setCurrentUser(User user) {
+        currentUser = user;
+    }
+
+    public static User getCurrentUser() {
+        return currentUser;
+    }
+
+    public static void setTempUser(User user) {
+        tempUser = user;
+    }
+
+    public static User getTempUser() {
+        return tempUser;
+    }
+
+    public static ArrayList<User> getAllUsers() {
+        return allUsers;
+    }
 
     public static HashMap<PlantType, PlantData> getPlants() {
         return plants;
@@ -180,6 +217,9 @@ public class Data {
         Data.plants = plants;
     }
 
-    public void saveGame() { }
-    public void deserializeGame() { }
+    public void saveGame() {
+    }
+
+    public void deserializeGame() {
+    }
 }

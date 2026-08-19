@@ -1,5 +1,6 @@
 package controllers.Start;
 
+import com.badlogic.gdx.Gdx;
 import controllers.datacontroller.Data;
 import controllers.datacontroller.SeedPackage;
 import models.App;
@@ -40,7 +41,12 @@ public class PlantSelection {
             float cost =  updates.upgradedCost(plantType , level);
 
             return new SeedPackage(plantType ,recharge , cost );
-        }catch (Exception e){
+        }catch (Exception e) {
+            Gdx.app.error(
+                "PlantSelection",
+                "Failed to create SeedPackage for " + plantName,
+                e
+            );
             return null;
         }
 

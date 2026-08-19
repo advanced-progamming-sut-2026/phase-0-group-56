@@ -57,10 +57,10 @@ public class Modify implements Skill {
 
     public boolean pf;
     private void fire(Plant plant, BaseGame game) {
-        for (Bullet x : game.getBullets()) {
+        for (Projectile x : game.getBullets()) {
             if(x.getX() >= plant.getX() && x.getY() - plant.getY() <= 20){
                 x.setDamage(x.getDamage() * (pf ? 3 : 2));
-                x.getTags().add(Bullet.Tag.FIRE);
+                x.getTags().add(Projectile.Tag.FIRE);
             }
         }
     }

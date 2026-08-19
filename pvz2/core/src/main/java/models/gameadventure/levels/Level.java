@@ -15,7 +15,9 @@ public class Level implements Serializable {
     private ArrayList<String> allowedZombies;
     private ArrayList<PlantType> unlockingPlants;
 
-    public Level(){}
+    public Level(){
+
+    }
 
 
 
