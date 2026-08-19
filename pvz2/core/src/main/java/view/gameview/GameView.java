@@ -1,6 +1,13 @@
 package view.gameview;
 
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.g2d.Batch;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
+import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.Cursor;
+import com.badlogic.gdx.graphics.GL20;
+import models.entity.Plant;
 import models.entity.Sun;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
@@ -67,6 +74,7 @@ public final class GameView extends View {
     private static final float CAMERA_SLIDE_DURATION = 0.75f;
     private static final int REQUIRED_SELECTION_COUNT = 5;
     private static final String PVZ_ASSET_RESOLUTION = "768";
+    private static final String SHOVEL_CURSOR_ID = "IMAGE_UI_HUD_INGAME_SHOVEL_ICON";
 
     private final Chapters chapter;
     private final Level level;
@@ -76,6 +84,8 @@ public final class GameView extends View {
     private final OrthographicCamera uiCamera = new OrthographicCamera();
     private final Vector2 pointerWorld = new Vector2();
     private final Rectangle lawnBounds = new Rectangle();
+    private int hoverColumn = -1;
+    private int hoverRow = -1;
 
     private FitViewport worldViewport;
     private FitViewport uiViewport;
@@ -112,8 +122,16 @@ public final class GameView extends View {
     private FileHandle pvzAssetsRoot;
     private TextureBank textureBank;
     private SpriteBatch entityBatch;
+    private ShapeRenderer interactionShapes;
     private ProjectileRenderer projectileRenderer;
     private WorldEntityRenderer worldEntities;
+
+    // Cursor/placement feedback. Kept visual-only; none of these objects enter BaseGame.
+    private PlantRenderer cursorPlantRenderer;
+    private CursorPreviewPlant cursorPlant;
+    private PlantType cursorPlantType;
+    private TextureRegion shovelCursorRegion;
+    private boolean customCursorHidden;
 
     private boolean appPausedGame;
     private boolean disposed;
@@ -148,6 +166,8 @@ public final class GameView extends View {
         configureMapGeometry();
         initialisePvzAssets();
         entityBatch = new SpriteBatch();
+        interactionShapes = new ShapeRenderer();
+        initialiseInteractionCursorAssets();
         if (pvzAssetsRoot != null && textureBank != null) {
             projectileRenderer = new ProjectileRenderer(pvzAssetsRoot, textureBank);
         }
@@ -186,8 +206,14 @@ public final class GameView extends View {
         if (textureBank != null) {
             textureBank.update();
         }
+        if (cursorPlantRenderer != null) {
+            cursorPlantRenderer.update();
+        }
 
         BaseGame.GameState state = controller.getGame().getState();
+        updatePointerFromScreen(Gdx.input.getX(), Gdx.input.getY());
+        updateCursorPlant(safeDelta, state);
+        syncSystemCursor(state);
 
         if (cameraSliding) {
             updateCameraSlide(safeDelta);
@@ -214,6 +240,10 @@ public final class GameView extends View {
 
         renderMap();
 
+        if (state == BaseGame.GameState.PLAYING) {
+            renderPlacementHighlight();
+        }
+
         if (state == BaseGame.GameState.PLAYING || state == BaseGame.GameState.PAUSE) {
             renderGameEntities(safeDelta);
         }
@@ -236,9 +266,9 @@ public final class GameView extends View {
             worldEntities.render(delta);
         }
 
-        // Projectiles use their own batch because WorldEntityRenderer
-        // manages its own rendering pipeline.
-        if (projectileRenderer == null || entityBatch == null) {
+        // Projectiles and the custom interaction cursor use this batch because
+        // WorldEntityRenderer manages its own Stage/batch internally.
+        if (entityBatch == null) {
             return;
         }
 
@@ -251,15 +281,281 @@ public final class GameView extends View {
 
         entityBatch.begin();
         try {
-            projectileRenderer.render(
-                entityBatch,
-                controller.getGame().getBullets(),
-                lawnBounds,
-                animationDelta
-            );
+            if (projectileRenderer != null) {
+                projectileRenderer.render(
+                    entityBatch,
+                    controller.getGame().getBullets(),
+                    lawnBounds,
+                    animationDelta
+                );
+            }
+
+            renderInteractionCursor(entityBatch);
         } finally {
+            entityBatch.setColor(Color.WHITE);
             entityBatch.end();
         }
+    }
+
+    /**
+     * VaseBreaker-style translucent row + column feedback for plant/shovel placement.
+     * It is rendered after the TMX map and before world entities, so plants/zombies
+     * stay visually above it.
+     */
+    private void renderPlacementHighlight() {
+        if (interactionShapes == null
+            || toolsStack == null
+            || hoverColumn < 0
+            || hoverRow < 0
+            || lawnBounds.width <= 0f
+            || lawnBounds.height <= 0f) {
+            return;
+        }
+
+        ToolsStack.InteractionMode mode = toolsStack.getInteractionMode();
+        if (mode != ToolsStack.InteractionMode.PLANT
+            && mode != ToolsStack.InteractionMode.SHOVEL) {
+            return;
+        }
+
+        float cellWidth = lawnBounds.width / 9f;
+        float cellHeight = lawnBounds.height / 5f;
+        float columnX = lawnBounds.x + hoverColumn * cellWidth;
+        float rowY = lawnBounds.y + hoverRow * cellHeight;
+
+        worldViewport.apply();
+        worldCamera.update();
+        interactionShapes.setProjectionMatrix(worldCamera.combined);
+
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+
+        interactionShapes.begin(ShapeRenderer.ShapeType.Filled);
+        try {
+            interactionShapes.setColor(1f, 1f, 1f, 0.12f);
+            interactionShapes.rect(
+                columnX,
+                lawnBounds.y,
+                cellWidth,
+                lawnBounds.height
+            );
+            interactionShapes.rect(
+                lawnBounds.x,
+                rowY,
+                lawnBounds.width,
+                cellHeight
+            );
+
+            interactionShapes.setColor(1f, 1f, 1f, 0.16f);
+            interactionShapes.rect(
+                columnX,
+                rowY,
+                cellWidth,
+                cellHeight
+            );
+        } finally {
+            interactionShapes.end();
+            Gdx.gl.glDisable(GL20.GL_BLEND);
+        }
+    }
+
+    /**
+     * Draws the idle plant animation or shovel image at the current mouse position.
+     */
+    private void renderInteractionCursor(Batch batch) {
+        if (batch == null
+            || toolsStack == null
+            || cameraSliding
+            || controller.getGame().getState() != BaseGame.GameState.PLAYING) {
+            return;
+        }
+
+        ToolsStack.InteractionMode mode = toolsStack.getInteractionMode();
+        float cellWidth = lawnBounds.width / 9f;
+        float cellHeight = lawnBounds.height / 5f;
+
+        if (mode == ToolsStack.InteractionMode.PLANT
+            && cursorPlant != null
+            && cursorPlantRenderer != null) {
+
+            Color old = batch.getColor().cpy();
+            batch.setColor(old.r, old.g, old.b, 0.60f);
+            try {
+                cursorPlantRenderer.render(
+                    batch,
+                    cursorPlant,
+                    pointerWorld.x,
+                    pointerWorld.y,
+                    cellWidth,
+                    cellHeight
+                );
+            } finally {
+                batch.setColor(old);
+            }
+            return;
+        }
+
+        if (mode == ToolsStack.InteractionMode.SHOVEL
+            && shovelCursorRegion != null) {
+
+            float width = 72f;
+            float height = width
+                * shovelCursorRegion.getRegionHeight()
+                / (float) shovelCursorRegion.getRegionWidth();
+
+            batch.draw(
+                shovelCursorRegion,
+                pointerWorld.x - width * 0.22f,
+                pointerWorld.y - height * 0.72f,
+                width,
+                height
+            );
+        }
+    }
+
+    private void initialiseInteractionCursorAssets() {
+        if (pvzAssetsRoot != null) {
+            try {
+                cursorPlantRenderer = new PlantRenderer(pvzAssetsRoot);
+                for (PlantType type : controller.getSelectedPlants()) {
+                    if (type != null) {
+                        cursorPlantRenderer.preload(type);
+                    }
+                }
+            } catch (RuntimeException e) {
+                cursorPlantRenderer = null;
+                Gdx.app.error(
+                    "GameView",
+                    "Failed to initialise plant cursor preview renderer.",
+                    e
+                );
+            }
+        }
+
+        if (textureBank != null) {
+            try {
+                shovelCursorRegion = textureBank.region(SHOVEL_CURSOR_ID);
+                if (shovelCursorRegion == null) {
+                    Gdx.app.error(
+                        "GameView",
+                        "Shovel cursor asset was not found: " + SHOVEL_CURSOR_ID
+                    );
+                }
+            } catch (RuntimeException e) {
+                shovelCursorRegion = null;
+                Gdx.app.error(
+                    "GameView",
+                    "Failed to load shovel cursor asset: " + SHOVEL_CURSOR_ID,
+                    e
+                );
+            }
+        }
+    }
+
+    private void updateCursorPlant(float delta, BaseGame.GameState state) {
+        if (toolsStack == null
+            || cameraSliding
+            || state != BaseGame.GameState.PLAYING
+            || toolsStack.getInteractionMode() != ToolsStack.InteractionMode.PLANT) {
+            cursorPlant = null;
+            cursorPlantType = null;
+            return;
+        }
+
+        PlantType selected = toolsStack.getSelectedPlant();
+        if (selected == null) {
+            cursorPlant = null;
+            cursorPlantType = null;
+            return;
+        }
+
+        if (cursorPlant == null || cursorPlantType != selected) {
+            cursorPlantType = selected;
+            cursorPlant = new CursorPreviewPlant(selected);
+
+            if (cursorPlantRenderer != null) {
+                cursorPlantRenderer.preload(selected);
+            }
+        }
+
+        float timeScale = toolsStack.getTimeScale();
+        cursorPlant.advance(Math.max(0f, delta) * timeScale);
+    }
+
+    /**
+     * Updates both the world-space pointer and the hovered 9x5 tile.
+     */
+    private void updatePointerFromScreen(int screenX, int screenY) {
+        if (worldViewport == null) {
+            hoverColumn = -1;
+            hoverRow = -1;
+            return;
+        }
+
+        pointerWorld.set(screenX, screenY);
+        worldViewport.unproject(pointerWorld);
+
+        if (lawnBounds.width <= 0f
+            || lawnBounds.height <= 0f
+            || !lawnBounds.contains(pointerWorld)) {
+            hoverColumn = -1;
+            hoverRow = -1;
+            return;
+        }
+
+        float cellWidth = lawnBounds.width / 9f;
+        float cellHeight = lawnBounds.height / 5f;
+
+        hoverColumn = MathUtils.clamp(
+            (int) ((pointerWorld.x - lawnBounds.x) / cellWidth),
+            0,
+            8
+        );
+        hoverRow = MathUtils.clamp(
+            (int) ((pointerWorld.y - lawnBounds.y) / cellHeight),
+            0,
+            4
+        );
+    }
+
+    private void syncSystemCursor(BaseGame.GameState state) {
+        boolean customVisualAvailable = false;
+
+        if (state == BaseGame.GameState.PLAYING
+            && !cameraSliding
+            && toolsStack != null) {
+
+            ToolsStack.InteractionMode mode = toolsStack.getInteractionMode();
+            customVisualAvailable =
+                (mode == ToolsStack.InteractionMode.PLANT
+                    && cursorPlant != null
+                    && cursorPlantRenderer != null)
+                    || (mode == ToolsStack.InteractionMode.SHOVEL
+                    && shovelCursorRegion != null);
+        }
+
+        if (customVisualAvailable == customCursorHidden) {
+            return;
+        }
+
+        try {
+            Gdx.graphics.setSystemCursor(
+                customVisualAvailable
+                    ? Cursor.SystemCursor.None
+                    : Cursor.SystemCursor.Arrow
+            );
+            customCursorHidden = customVisualAvailable;
+        } catch (RuntimeException ignored) {
+            customCursorHidden = false;
+        }
+    }
+
+    private void restoreSystemCursor() {
+        try {
+            Gdx.graphics.setSystemCursor(Cursor.SystemCursor.Arrow);
+        } catch (RuntimeException ignored) {
+        }
+        customCursorHidden = false;
     }
 
 
@@ -458,6 +754,18 @@ public final class GameView extends View {
     private InputAdapter createWorldInput() {
         return new InputAdapter() {
             @Override
+            public boolean mouseMoved(int screenX, int screenY) {
+                updatePointerFromScreen(screenX, screenY);
+                return false;
+            }
+
+            @Override
+            public boolean touchDragged(int screenX, int screenY, int pointer) {
+                updatePointerFromScreen(screenX, screenY);
+                return false;
+            }
+
+            @Override
             public boolean keyDown(int keycode) {
                 if (keycode == Input.Keys.ESCAPE) {
                     BaseGame.GameState state = controller.getGame().getState();
@@ -478,8 +786,7 @@ public final class GameView extends View {
                     return false;
                 }
 
-                pointerWorld.set(screenX, screenY);
-                worldViewport.unproject(pointerWorld);
+                updatePointerFromScreen(screenX, screenY);
 
                 if (toolsStack.getInteractionMode() == ToolsStack.InteractionMode.NORMAL
                     && worldEntities != null) {
@@ -897,6 +1204,8 @@ public final class GameView extends View {
             Gdx.input.setInputProcessor(null);
         }
 
+        restoreSystemCursor();
+
         if (!disposed) {
             Gdx.app.postRunnable(this::dispose);
         }
@@ -908,6 +1217,8 @@ public final class GameView extends View {
             return;
         }
         disposed = true;
+
+        restoreSystemCursor();
 
         if (stage != null) {
             stage.dispose();
@@ -939,9 +1250,37 @@ public final class GameView extends View {
             entityBatch.dispose();
             entityBatch = null;
         }
+        if (interactionShapes != null) {
+            interactionShapes.dispose();
+            interactionShapes = null;
+        }
+        if (cursorPlantRenderer != null) {
+            cursorPlantRenderer.dispose();
+            cursorPlantRenderer = null;
+        }
+        shovelCursorRegion = null;
+        cursorPlant = null;
+        cursorPlantType = null;
+
         if (textureBank != null) {
             textureBank.dispose();
             textureBank = null;
+        }
+    }
+
+    /**
+     * Visual-only Plant accepted by PlantRenderer for the animated planting cursor.
+     * It is never added to BaseGame.
+     */
+    private static final class CursorPreviewPlant extends Plant {
+        private CursorPreviewPlant(PlantType type) {
+            this.type = type;
+            this.hp = 1f;
+            this.isAlive = true;
+        }
+
+        private void advance(float delta) {
+            stateTime += Math.max(0f, delta);
         }
     }
 }

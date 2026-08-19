@@ -327,6 +327,9 @@ public final class WorldEntityRenderer implements Disposable {
         }
     }
 
+    public PlantRenderer getPlantRenderer() {
+                return plantRenderer;
+            }
     @Override
     public void dispose() {
         stage.dispose();

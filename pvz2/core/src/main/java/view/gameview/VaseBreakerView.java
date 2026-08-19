@@ -1,15 +1,12 @@
 package view.gameview;
 
-import com.badlogic.gdx.Cursor;
+import com.badlogic.gdx.graphics.Cursor;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.InputMultiplexer;
 import com.badlogic.gdx.files.FileHandle;
-import com.badlogic.gdx.graphics.Color;
-import com.badlogic.gdx.graphics.GL20;
-import com.badlogic.gdx.graphics.OrthographicCamera;
-import com.badlogic.gdx.graphics.Pixmap;
+import com.badlogic.gdx.graphics.*;
 import com.badlogic.gdx.graphics.g2d.Batch;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
@@ -40,6 +37,7 @@ import pvz.libpvz.textures.TextureBank;
 import pvz.skin.PvzSkin;
 import view.TravelLogView;
 import view.View;
+
 
 import java.io.File;
 import java.util.ArrayList;
