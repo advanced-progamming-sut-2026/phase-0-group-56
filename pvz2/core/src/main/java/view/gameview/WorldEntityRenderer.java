@@ -10,6 +10,7 @@ import com.badlogic.gdx.utils.viewport.Viewport;
 
 import controllers.menus.gamecontroller.GameController;
 import models.entity.Sun;
+import models.entity.Zombie;
 import models.factory.builder.PlantType;
 import models.games.BaseGame;
 import pvz.libpvz.textures.TextureBank;
@@ -293,6 +294,7 @@ public final class WorldEntityRenderer implements Disposable {
                 : 0f;
             chapterElementRenderer.update(animationDelta);
         }
+
 
         stage.act(delta);
         stage.draw();

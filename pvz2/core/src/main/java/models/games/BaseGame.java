@@ -335,7 +335,7 @@ public class BaseGame implements Game {
         for (Zombie z : zombies) {
             if (z == center) continue;
             float dx = z.getX() - center.getX();
-            if (Math.abs(dx) <= range * 80 && z.getRow() == center.getRow()) {
+            if (Math.abs(dx) <= range * 80 && z.getLine() == center.getLine()) {
                 float dist = Math.abs(dx);
                 if (dist < minDist) {
                     minDist = dist;
@@ -374,7 +374,7 @@ public class BaseGame implements Game {
 
     public void explodeAreaOnZombies(int row, float x, float range, int damage) {
         for (Zombie z : zombies) {
-            if (z.getRow() != row) continue;
+            if (z.getLine() != row) continue;
             float dx = Math.abs(z.getX() - x);
             if (dx <= range * 80) {
                 z.takeDamage(damage);
@@ -383,7 +383,7 @@ public class BaseGame implements Game {
     }
 
     public Plant findPullablePlant(Zombie zombie) {
-        int row = zombie.getRow();
+        int row = zombie.getLine();
         int col = zombie.getTileIndex();
         for (int i = 2; i <= 8; i++) {
             int targetCol = col + i;
@@ -411,13 +411,13 @@ public class BaseGame implements Game {
     }
 
     public void swapZombieToRow(Zombie target, int row) {
-        target.setRow(row);
+        target.setLine(row);
     }
 
     public Plant getRandomPlantInRange(Zombie zombie, float range) {
         List<Plant> candidates = new ArrayList<>();
         for (Plant p : plantsInField) {
-            if (p.getLine() != zombie.getRow()) continue;
+            if (p.getLine() != zombie.getLine()) continue;
             float dx = p.getX() - zombie.getX();
             if (dx > 0 && dx <= range * 80) {
                 candidates.add(p);
@@ -432,7 +432,7 @@ public class BaseGame implements Game {
         for (Zombie z : zombies) {
             if (z == center) continue;
             float dx = z.getX() - center.getX();
-            if (Math.abs(dx) <= range * 80 && z.getRow() == center.getRow()) {
+            if (Math.abs(dx) <= range * 80 && z.getLine() == center.getLine()) {
                 candidates.add(z);
             }
         }
@@ -449,12 +449,12 @@ public class BaseGame implements Game {
         if (spawnType.equals("imp")) {
             for (int i = 0; i < count; i++) {
                 Zombie imp = ZombieFactory.createZombie("imp");
-                imp.setRow(source.getRow());
+                imp.setLine(source.getLine());
                 imp.setPosition(source.getX() + 50, source.getY());
                 zombies.add(imp);
             }
         } else if (spawnType.equals("grave")) {
-            int row = source.getRow();
+            int row = source.getLine();
             int col = source.getTileIndex() + 1;
             if (col < 9 && isCellEmpty(row, col)) {
                 spawnGrave(row, col);

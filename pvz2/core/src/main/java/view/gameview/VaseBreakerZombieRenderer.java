@@ -98,7 +98,7 @@ public final class VaseBreakerZombieRenderer {
 
             float normalizedX = modelBoardWidth <= 0f ? 0f : zombie.getX() / modelBoardWidth;
             float centerX = lawnBounds.x + normalizedX * lawnBounds.width;
-            int row = Math.max(0, Math.min(4, zombie.getRow()));
+            int row = Math.max(0, Math.min(4, zombie.getLine()));
             float centerY = lawnBounds.y + (row + 0.5f) * cellHeight;
 
             float scale = 0.65f;

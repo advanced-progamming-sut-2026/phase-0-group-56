@@ -53,7 +53,7 @@ public class GridItem {
     public void setOwner(Zombie owner) {
         this.owner = owner;
         if (owner != null) {
-            this.row = owner.getRow();
+            this.row = owner.getLine();
             this.col = owner.getTileIndex() + 1;
             this.x = owner.getX();
             this.y = owner.getY();

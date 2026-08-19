@@ -46,7 +46,7 @@ public class SpawnAbility implements Ability {
             if (triggered) return;
             if ((float) zombie.getHp() / zombie.getMaxHp() <= healthThreshold) {
                 Zombie imp = ZombieFactory.createZombie("imp");
-                imp.setRow(zombie.getLine());
+                imp.setLine(zombie.getLine());
                 imp.setTileIndex(2);
                 imp.setX(imp.getTileIndex() * 80 + 100);
                 imp.setY(zombie.getY());

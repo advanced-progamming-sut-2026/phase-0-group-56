@@ -35,7 +35,7 @@ public class GridController {
             for (Zombie z : zombies) {
                 if (!z.isAlive()) continue;
 
-                if (z.getRow() == item.getRow() && z.getTileIndex() == item.getCol()) {
+                if (z.getLine() == item.getRow() && z.getTileIndex() == item.getCol()) {
 
                     boolean canAttach = false;
                     if (item.getType().equals("arcade") || z.getType().toLowerCase().contains("arcade")) {
@@ -60,7 +60,7 @@ public class GridController {
             if (item.getOwner() != null && item.getOwner().isAlive()) {
                 item.setX(item.getOwner().getX());
                 item.setY(item.getOwner().getY());
-                item.setRow(item.getOwner().getRow());
+                item.setRow(item.getOwner().getLine());
                 item.setCol(item.getOwner().getTileIndex() + 1);
             }
             else if (item.getOwner() != null && !item.getOwner().isAlive()) {

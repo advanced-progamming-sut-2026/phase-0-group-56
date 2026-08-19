@@ -141,7 +141,7 @@ public class VaseBraker extends BaseGame {
         Zombie zombie = ZombieFactory.createZombie(zombieName);
 
         // See README_APPLY.md: Zombie.setRow/setLine must use 0..4 consistently.
-        zombie.setRow(vase.getLine());
+        zombie.setLine(vase.getLine());
         zombie.setLine(vase.getLine());
         zombie.setTileIndex(vase.getTileIndex());
         zombie.setX((vase.getTileIndex() + 0.5f) * Tile.getWidth());

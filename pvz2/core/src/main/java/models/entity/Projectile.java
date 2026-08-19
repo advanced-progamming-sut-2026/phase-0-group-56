@@ -17,8 +17,8 @@ public class Projectile implements Cloneable {
     private PlantType sourcePlantType;
     private float velocityX;
     private float velocityY;
-    private float width = 50;
-    private float height = 50;
+    private float width = 30;
+    private float height = 30;
     private float destinationX;
     private float destinationY;
     private float damage;

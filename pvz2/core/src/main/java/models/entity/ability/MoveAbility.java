@@ -69,7 +69,7 @@ public class MoveAbility implements Ability {
     public void pianoSwap(BaseGame game){
         Zombie target = game.getRandomZombie();
         if(target != null)
-            target.changeRow();
+            target.changeLine();
     }
 
     public boolean isCarrying() { return isCarrying; }

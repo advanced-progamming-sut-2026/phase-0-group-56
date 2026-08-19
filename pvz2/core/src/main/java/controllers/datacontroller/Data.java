@@ -50,6 +50,8 @@ public class Data {
 
     public static void setUp() {
         User testUser = new User("LeBron", "passhash", "LeBron", "LeBron", "LeBron");
+        testUser.setLevelId(1);
+        testUser.setLevelsPassed(5);
         currentUser = testUser;
         App.setScreen(new PlayView());
 
