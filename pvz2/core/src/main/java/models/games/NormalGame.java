@@ -84,7 +84,6 @@ public class NormalGame extends BaseGame{
     @Override
     public String playGame(float delta) {
         updateProjectiles(delta);
-        mawners(delta);
         return super.playGame(delta);
     }
 

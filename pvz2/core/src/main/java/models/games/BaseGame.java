@@ -113,6 +113,7 @@ public class BaseGame implements Game {
             }
 
             updateSuns(output , delta);
+
             updateZombies(delta);
             updatePlants(delta);
             updateScene(delta);
@@ -176,6 +177,23 @@ public class BaseGame implements Game {
             }
         }
     }
+    protected void updateMowers(float delta) {
+        if (field == null) {
+            return;
+        }
+
+        for (LawnMower mower : field.getMoaners()) {
+            if (mower == null) {
+                continue;
+            }
+
+            String message = mower.run(delta, this);
+            if (message != null && !message.isBlank()) {
+                output.append(message).append('\n');
+            }
+        }
+    }
+
 
     @Override
     public void updateZombies(float delta) {
@@ -184,6 +202,7 @@ public class BaseGame implements Game {
         }
         gridController.checkAndAttachZombies(zombies);
         gridController.updateItems();
+        updateMowers(delta);
 
         for (Zombie zombie : zombies) {
             if (event instanceof Tornado tornado && tornado.isCarrying(zombie)) {

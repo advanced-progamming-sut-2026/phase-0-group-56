@@ -1,5 +1,6 @@
 package models.gamepanes;
 
+import models.entity.LawnMower;
 import models.gameadventure.Chapters;
 import models.entity.LawnMower;
 import models.entity.Plant;
