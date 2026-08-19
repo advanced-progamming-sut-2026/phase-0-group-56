@@ -5,12 +5,8 @@ import controllers.datacontroller.SeedPackage;
 import controllers.menus.Menu;
 import models.App;
 import models.User;
-import models.entity.Armor;
-import models.entity.Bullet;
-import models.entity.Effect;
-import models.entity.Plant;
-import models.entity.Sun;
-import models.entity.Zombie;
+import models.entity.*;
+import models.entity.Projectile;
 import models.factory.builder.PlantType;
 import models.gameadventure.Chapters;
 import models.gameadventure.levels.Level;
@@ -143,25 +139,45 @@ public class GameController implements Controller, Menu {
         while (iterator.hasNext()) {
             Sun sun = iterator.next();
             if (sun.getTileIndex() == x && sun.getLine() == y) {
-                if (sun.isRadioActive()) {
-                    sun.dispose(game);
-                    iterator.remove();
-                    return "Radioactive sun exploded.";
-                }
-
-                game.setSunCount(game.getSunCount() + sun.getPrice());
-
-                if (App.getCurrentuser() != null) {
-                    App.getCurrentuser().updateQuestProgress("COLLECT_SUN", sun.getPrice());
-                }
-
-                float price = sun.getPrice();
-                iterator.remove();
-                return "Sun collected: +" + price;
+                return collectMatchedSun(iterator, sun);
             }
         }
         return null;
     }
+
+    public String collectSun(Sun target) {
+        if (game.getState() != BaseGame.GameState.PLAYING || target == null) {
+            return null;
+        }
+
+        Iterator<Sun> iterator = game.getSuns().iterator();
+        while (iterator.hasNext()) {
+            Sun sun = iterator.next();
+            if (sun == target) {
+                return collectMatchedSun(iterator, sun);
+            }
+        }
+        return null;
+    }
+
+    private String collectMatchedSun(Iterator<Sun> iterator, Sun sun) {
+        if (sun.isRadioActive()) {
+            sun.dispose(game);
+            iterator.remove();
+            return "Radioactive sun exploded.";
+        }
+
+        game.setSunCount(game.getSunCount() + sun.getPrice());
+
+        if (App.getCurrentuser() != null) {
+            App.getCurrentuser().updateQuestProgress("COLLECT_SUN", sun.getPrice());
+        }
+
+        int price = sun.getPrice();
+        iterator.remove();
+        return "Sun collected: +" + price;
+    }
+
 
     public String boost(int x, int y) {
         if (game.getState() != BaseGame.GameState.PLAYING) {
@@ -647,10 +663,10 @@ public class GameController implements Controller, Menu {
 
     public String showBullets() {
         StringBuilder sb = new StringBuilder();
-        for (Bullet bullet : game.getBullets()) {
+        for (Projectile projectile : game.getBullets()) {
             sb.append("=====\n")
-                .append("type : ").append(bullet.getType()).append("\n")
-                .append("location (").append(bullet.getX()).append(",").append(bullet.getY()).append(")\n");
+                .append("type : ").append(projectile.getType()).append("\n")
+                .append("location (").append(projectile.getX()).append(",").append(projectile.getY()).append(")\n");
         }
         return sb.toString();
     }

@@ -5,55 +5,106 @@ import models.entity.Zombie;
 import models.games.BaseGame;
 
 import java.util.ArrayList;
-import java.util.Iterator;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
-public class Tornado implements ChapterSpecialEvent{
-    ArrayList<Zombie> zombies;
-    int[] destinations;
-    public Tornado(BaseGame game) {
-        zombies = new ArrayList<>();
-        Random rand = new Random();
-        int count = rand.nextInt(game.getCurrentWave().getHardness()
-                * Constants.DISASTER_ZOMBIES_BASE_COUNT);
-        Iterator<Zombie> iterator = game.getCurrentWave().getZombies().iterator();
+/**
+ * Ancient Egypt sandstorm event.
+ *
+ * A subset of the current wave is temporarily carried from the right side of
+ * the board to a random destination column. While a zombie is carried it stays
+ * in BaseGame#getZombies(), but BaseGame should skip its normal update and let
+ * this event own its horizontal movement.
+ */
+public class Tornado implements ChapterSpecialEvent {
 
-        while (iterator.hasNext() && count > 0) {
-            Zombie zombie =  iterator.next();
-            zombies.add(zombie);
-            iterator.remove();
-            count -= 1;
+    private final ArrayList<Zombie> carriedZombies = new ArrayList<>();
+    private final Map<Zombie, Integer> destinations = new IdentityHashMap<>();
+
+    public Tornado(BaseGame game) {
+        if (game == null || game.getCurrentWave() == null) {
+            return;
         }
 
-        destinations = new int[zombies.size()];
-        for (int i = 0; i < zombies.size(); i++) {
-            int dest =  rand.nextInt(4) + 1;
-            destinations[i] = 9 -  dest;
+        Random random = new Random();
+        List<Zombie> waveZombies = game.getCurrentWave().getZombies();
+        if (waveZombies == null || waveZombies.isEmpty()) {
+            return;
+        }
+
+        int hardness = Math.max(1, game.getCurrentWave().getHardness());
+        int upperBound = Math.max(1, hardness * Constants.DISASTER_ZOMBIES_BASE_COUNT);
+
+        // At least one zombie when a Tornado event is actually created, but never
+        // more than the number that exists in this wave.
+        int count = Math.min(waveZombies.size(), random.nextInt(upperBound) + 1);
+
+        // Keep zombies in the wave list. Wave.isFinished() calculates progress from
+        // that list, so removing tornado zombies would make the wave finish early.
+        for (int i = 0; i < count; i++) {
+            Zombie zombie = waveZombies.get(i);
+            carriedZombies.add(zombie);
+
+            // Original intent was columns 5..8.
+            int destinationColumn = 5 + random.nextInt(4);
+            destinations.put(zombie, destinationColumn);
         }
     }
+
     @Override
-    public void run(BaseGame game  , float delta) {
-        int i = 0;
-        Iterator iterator = game.getZombies().iterator();
-        while (iterator.hasNext()){
-            Zombie zombie = (Zombie) iterator.next();
-            zombie.setX(zombie.getX() - Constants.TORNADO_VELOCITY * delta );
-            /// TODO: update zombies tile index , and change this to Iterator
-            if(zombie.getTileIndex() == destinations[i]) {
-                game.getCurrentWave().getZombies().add(zombie);
-                iterator.remove();
-            }
-            i++;
+    public void run(BaseGame game, float delta) {
+        if (game == null) {
+            return;
         }
 
-        if(zombies.isEmpty()){
+        if (carriedZombies.isEmpty()) {
+            dispose(game);
+            return;
+        }
+
+        float movement = Math.max(0f, delta) * Constants.TORNADO_VELOCITY;
+        for (int i = carriedZombies.size() - 1; i >= 0; i--) {
+            Zombie zombie = carriedZombies.get(i);
+            if (zombie == null || zombie.isDead()) {
+                destinations.remove(zombie);
+                carriedZombies.remove(i);
+                continue;
+            }
+
+            Integer destinationColumn = destinations.get(zombie);
+            if (destinationColumn == null) {
+                carriedZombies.remove(i);
+                continue;
+            }
+
+            float destinationX = 100f + destinationColumn * 50f;
+            float nextX = zombie.getX() - movement;
+
+            if (nextX <= destinationX) {
+                zombie.setX(destinationX);
+                zombie.setTileIndex(destinationColumn);
+                destinations.remove(zombie);
+                carriedZombies.remove(i);
+            } else {
+                zombie.setX(nextX);
+            }
+        }
+
+        if (carriedZombies.isEmpty()) {
             dispose(game);
         }
-
     }
 
-    @Override
-    public void dispose(BaseGame game) {
-        game.setEvent(null);
+    /** Zombies currently hidden inside / transported by the sandstorm. */
+    public List<Zombie> getCarriedZombies() {
+        return Collections.unmodifiableList(carriedZombies);
+    }
+
+    /** Used by BaseGame so normal Zombie.update() does not fight this event. */
+    public boolean isCarrying(Zombie zombie) {
+        return zombie != null && destinations.containsKey(zombie);
     }
 }

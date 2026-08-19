@@ -1,0 +1,1106 @@
+[
+  {
+    "id": 1,
+    "name": "Sunflower",
+    "category": "Sun Producer",
+    "tags": ["Day"],
+    "cost": 50,
+    "hp": 300,
+    "damage": 0,
+    "actionInterval": 24,
+    "recharge": 5,
+    "upgrades": [
+      { "level": 2, "description": "Prod. Time -2s", "specialFlag": false },
+      { "level": 3, "description": "HP +150", "specialFlag": false },
+      { "level": 4, "description": "Double Sun Chance", "specialFlag": true }
+    ]
+  },
+  {
+    "id": 2,
+    "name": "Twin_Sunflower",
+    "category": "Sun Producer",
+    "tags": ["Day"],
+    "cost": 125,
+    "hp": 300,
+    "damage": 0,
+    "actionInterval": 24,
+    "recharge": 15,
+    "upgrades": [
+      { "level": 2, "description": "Prod. Time -2s", "specialFlag": false },
+      { "level": 3, "description": "HP +150", "specialFlag": false },
+      { "level": 4, "description": "Cost -25", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 3,
+    "name": "Sun_shroom",
+    "category": "Sun Producer",
+    "tags": ["Shroom", "Wramp_up", "Night"],
+    "cost": 25,
+    "hp": 300,
+    "damage": 0,
+    "actionInterval": 24,
+    "recharge": 5,
+    "upgrades": [
+      { "level": 2, "description": "Grow Time -5s", "specialFlag": false },
+      { "level": 3, "description": "HP +150", "specialFlag": false },
+      { "level": 4, "description": "Double Sun Chance", "specialFlag": true }
+    ]
+  },
+  {
+    "id": 4,
+    "name": "Primal_Sunflower",
+    "category": "Sun Producer",
+    "tags": [],
+    "cost": 75,
+    "hp": 300,
+    "damage": 0,
+    "actionInterval": 24,
+    "recharge": 5,
+    "upgrades": [
+      { "level": 2, "description": "Prod. Time -2s", "specialFlag": false },
+      { "level": 3, "description": "HP +150", "specialFlag": false },
+      { "level": 4, "description": "Cost -25", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 5,
+    "name": "Gold_Bloom",
+    "category": "Sun Producer",
+    "tatags":[],
+    "cost": 0,
+    "hp": 0,
+    "damage": 0,
+    "actionInterval": 0,
+    "recharge": 75,
+    "upgrades": [
+      { "level": 2, "description": "Cooldown -5s", "specialFlag": false },
+      { "level": 3, "description": "Sun +50", "specialFlag": false },
+      { "level": 4, "description": "Cost -25", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 6,
+    "name": "Peashooter",
+    "category": "Shooter",
+    "tags": ["Pea"],
+    "cost": 100,
+    "hp": 300,
+    "damage": 20,
+    "actionInterval": 1.5,
+    "recharge": 5,
+    "upgrades": [
+      { "level": 2, "description": "Dmg +10", "specialFlag": false },
+      { "level": 3, "description": "HP +150", "specialFlag": false },
+      { "level": 4, "description": "Cost -25", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 7,
+    "name": "Repeater",
+    "category": "Shooter",
+    "tags": ["Pea"],
+    "cost": 200,
+    "hp": 300,
+    "damage": 20,
+    "actionInterval": 1.5,
+    "recharge": 5,
+    "upgrades": [
+      { "level": 2, "description": "Dmg +10", "specialFlag": false },
+      { "level": 3, "description": "HP +200", "specialFlag": false },
+      { "level": 4, "description": "Cost -25", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 8,
+    "name": "Threepeater",
+    "category": "Shooter",
+    "tags": ["Pea"],
+    "cost": 300,
+    "hp": 300,
+    "damage": 20,
+    "actionInterval": 1.5,
+    "recharge": 5,
+    "upgrades": [
+      { "level": 2, "description": "Cost -25", "specialFlag": false },
+      { "level": 3, "description": "Dmg +10", "specialFlag": false },
+      { "level": 4, "description": "HP +200", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 9,
+    "name": "Snow_Pea",
+    "category": "Shooter",
+    "tags": ["Ice, Pea"],
+    "cost": 150,
+    "hp": 300,
+    "damage": 20,
+    "actionInterval": 1.5,
+    "recharge": 5,
+    "upgrades": [
+      { "level": 2, "description": "Chill Time +2s", "specialFlag": false },
+      { "level": 3, "description": "Cost -25", "specialFlag": false },
+      { "level": 4, "description": "1.5", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 10,
+    "name": "Rotobaga",
+    "category": "Shooter",
+    "tatags":[],
+    "cost": 150,
+    "hp": 300,
+    "damage": 10,
+    "actionInterval": 1.5,
+    "recharge": 5,
+    "upgrades": [
+      { "level": 2, "description": "Dmg +10", "specialFlag": false },
+      { "level": 3, "description": "HP +150", "specialFlag": false },
+      { "level": 4, "description": "Cost -25", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 11,
+    "name": "Pea_Pod",
+    "category": "Shooter",
+    "tags": ["Pea, stack"],
+    "cost": 125,
+    "hp": 300,
+    "damage": 20,
+    "actionInterval": 1.5,
+    "recharge": 5,
+    "upgrades": [
+      { "level": 2, "description": "Dmg +10", "specialFlag": false },
+      { "level": 3, "description": "HP +200", "specialFlag": false },
+      { "level": 4, "description": "Cost -25", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 12,
+    "name": "Split_Pea",
+    "category": "Shooter",
+    "tags": ["Pea"],
+    "cost": 125,
+    "hp": 300,
+    "damage": 20,
+    "actionInterval": 1.5,
+    "recharge": 5,
+    "upgrades": [
+      { "level": 2, "description": "Dmg +10", "specialFlag": false },
+      { "level": 3, "description": "HP +200", "specialFlag": false },
+      { "level": 4, "description": "Cost -25", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 13,
+    "name": "Citron",
+    "category": "Shooter",
+    "tags": ["Charge"],
+    "cost": 350,
+    "hp": 300,
+    "damage": 800,
+    "actionInterval": 9,
+    "recharge": 5,
+    "upgrades": [
+      { "level": 2, "description": "Charge Time -1s", "specialFlag": false },
+      { "level": 3, "description": "Dmg +150", "specialFlag": false },
+      { "level": 4, "description": "Cost -50", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 14,
+    "name": "Caulipower",
+    "category": "Homing",
+    "tags": ["Magic, Charge" , "Insta_kill"],
+    "cost": 250,
+    "hp": 300,
+    "damage": 0,
+    "actionInterval": 12,
+    "recharge": 15,
+    "upgrades": [
+      { "level": 2, "description": "Cooldown -2s", "specialFlag": false },
+      { "level": 3, "description": "HP +150", "specialFlag": false },
+      { "level": 4, "description": "Cost -50", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 15,
+    "name": "Electric_Blueberry",
+    "category": "Homing",
+    "tags": ["Charge"],
+    "cost": 150,
+    "hp": 300,
+    "damage": 5000,
+    "actionInterval": 12,
+    "recharge": 15,
+    "upgrades": [
+      { "level": 2, "description": "Cooldown -2s", "specialFlag": false },
+      { "level": 3, "description": "Target Priority Up", "specialFlag": true },
+      { "level": 4, "description": "Cost -25", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 16,
+    "name": "Bowling_Bulb",
+    "category": "Shooter",
+    "tags": ["Charge"],
+    "cost": 200,
+    "hp": 300,
+    "damage": 40,
+    "actionInterval": 2,
+    "recharge": 5,
+    "upgrades": [
+      { "level": 2, "description": "Regen -1s", "specialFlag": false },
+      { "level": 3, "description": "Dmg +15", "specialFlag": false },
+      { "level": 4, "description": "Cost -25", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 17,
+    "name": "Cactus",
+    "category": "Strike_through",
+    "tatags":[],
+    "cost": 175,
+    "hp": 300,
+    "damage": 30,
+    "actionInterval": 1.5,
+    "recharge": 5,
+    "upgrades": [
+      { "level": 2, "description": "Pierce +1", "specialFlag": true },
+      { "level": 3, "description": "Dmg +10", "specialFlag": false },
+      { "level": 4, "description": "Cost -25", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 18,
+    "name": "Fire_Peashooter",
+    "category": "Shooter",
+    "tags": ["Fire, Pea"],
+    "cost": 175,
+    "hp": 300,
+    "damage": 40,
+    "actionInterval": 1.5,
+    "recharge": 5,
+    "upgrades": [
+      { "level": 2, "description": "Dmg +10", "specialFlag": false },
+      { "level": 3, "description": "HP +200", "specialFlag": false },
+      { "level": 4, "description": "Cost -25", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 19,
+    "name": "Starfruit",
+    "category": "Shooter",
+    "tatags":[],
+    "cost": 150,
+    "hp": 300,
+    "damage": 20,
+    "actionInterval": 1.5,
+    "recharge": 5,
+    "upgrades": [
+      { "level": 2, "description": "Atk Speed +10%", "specialFlag": false },
+      { "level": 3, "description": "Dmg +10", "specialFlag": false },
+      { "level": 4, "description": "Cost -25", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 20,
+    "name": "Goo_Peashooter",
+    "category": "Shooter",
+    "tags": ["Poison"],
+    "cost": 125,
+    "hp": 300,
+    "damage": 20,
+    "actionInterval": 1.5,
+    "recharge": 5,
+    "upgrades": [
+      { "level": 2, "description": "Dmg/Tick +5", "specialFlag": false },
+      { "level": 3, "description": "HP +150", "specialFlag": false },
+      { "level": 4, "description": "Cost -25", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 21,
+    "name": "Mega_Gatling_Pea",
+    "category": "Shooter",
+    "tags": ["Pea"],
+    "cost": 400,
+    "hp": 300,
+    "damage": 20,
+    "actionInterval": 1.5,
+    "recharge": 5,
+    "upgrades": [
+      { "level": 2, "description": "Dmg +10", "specialFlag": false },
+      { "level": 3, "description": "Plant Food Chance +5%", "specialFlag": true },
+      { "level": 4, "description": "Cost -50", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 22,
+    "name": "Sea_shroom",
+    "category": "Shooter",
+    "tags": ["Shroom, Water"],
+    "cost": 0,
+    "hp": 300,
+    "damage": 20,
+    "actionInterval": 1.5,
+    "recharge": 15,
+    "upgrades": [
+      { "level": 2, "description": "Range +1 Tile", "specialFlag": true },
+      { "level": 3, "description": "Dmg +5", "specialFlag": false },
+      { "level": 4, "description": "Lifespan +10s", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 23,
+    "name": "Puff_shroom",
+    "category": "Shooter",
+    "tags": ["Shroom"],
+    "cost": 0,
+    "hp": 300,
+    "damage": 20,
+    "actionInterval": 1.5,
+    "recharge": 5,
+    "upgrades": [
+      { "level": 2, "description": "Lifespan +10s", "specialFlag": false },
+      { "level": 3, "description": "Dmg +10", "specialFlag": false },
+      { "level": 4, "description": "Range +1 Tile", "specialFlag": true }
+    ]
+  },
+  {
+    "id": 24,
+    "name": "Fum_shroom",
+    "category": "Strike_through",
+    "tags": ["Shroom"],
+    "cost": 125,
+    "hp": 300,
+    "damage": 20,
+    "actionInterval": 1.5,
+    "recharge": 5,
+    "upgrades": [
+      { "level": 2, "description": "Range +1 Tile", "specialFlag": true },
+      { "level": 3, "description": "Dmg +10", "specialFlag": false },
+      { "level": 4, "description": "Cost -25", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 25,
+    "name": "Cabbage_pult",
+    "category": "Lobber",
+    "tatags":[],
+    "cost": 100,
+    "hp": 300,
+    "damage": 40,
+    "actionInterval": 2.9,
+    "recharge": 5,
+    "upgrades": [
+      { "level": 2, "description": "Dmg +10", "specialFlag": false },
+      { "level": 3, "description": "Atk Speed +15%", "specialFlag": false },
+      { "level": 4, "description": "HP +150", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 26,
+    "name": "Kernel_pult",
+    "category": "Lobber",
+    "tatags":[],
+    "cost": 100,
+    "hp": 300,
+    "damage": 20,
+    "actionInterval": 2.9,
+    "recharge": 5,
+    "upgrades": [
+      { "level": 2, "description": "Butter +5%", "specialFlag": true },
+      { "level": 3, "description": "Dmg +10", "specialFlag": false },
+      { "level": 4, "description": "HP +150", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 27,
+    "name": "Melon_pult",
+    "category": "Lobber",
+    "tags": ["AoE"],
+    "cost": 325,
+    "hp": 300,
+    "damage": 80,
+    "actionInterval": 2.9,
+    "recharge": 5,
+    "upgrades": [
+      { "level": 2, "description": "Cost -25", "specialFlag": false },
+      { "level": 3, "description": "AoE Dmg +15", "specialFlag": false },
+      { "level": 4, "description": "Dmg +30", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 28,
+    "name": "Winter_Melon",
+    "category": "Lobber",
+    "tags": ["Ice, AoE"],
+    "cost": 500,
+    "hp": 300,
+    "damage": 80,
+    "actionInterval": 2.9,
+    "recharge": 5,
+    "upgrades": [
+      { "level": 2, "description": "Cost -50", "specialFlag": false },
+      { "level": 3, "description": "AoE Dmg +15", "specialFlag": false },
+      { "level": 4, "description": "Cost -25", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 29,
+    "name": "Pepper_pult",
+    "category": "Lobber",
+    "tags": ["Fire, AoE"],
+    "cost": 200,
+    "hp": 300,
+    "damage": 50,
+    "actionInterval": 2.9,
+    "recharge": 5,
+    "upgrades": [
+      { "level": 2, "description": "Dmg +15", "specialFlag": false },
+      { "level": 3, "description": "Warmth Radius +1", "specialFlag": true },
+      { "level": 4, "description": "Cost -25", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 30,
+    "name": "Potato_Mine",
+    "category": "Explosive",
+    "tags": ["Trap, Charge"],
+    "cost": 25,
+    "hp": 300,
+    "damage": 1800,
+    "actionInterval": 0,
+    "recharge": 25,
+    "upgrades": [
+      { "level": 2, "description": "Arm Time -3s", "specialFlag": false },
+      { "level": 3, "description": "Cooldown -5s", "specialFlag": false },
+      { "level": 4, "description": "Dmg +600", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 31,
+    "name": "Primal_Potato_Mine",
+    "category": "Explosive",
+    "tags": ["Trap, Charge"],
+    "cost": 50,
+    "hp": 300,
+    "damage": 2400,
+    "actionInterval": 0,
+    "recharge": 5,
+    "upgrades": [
+      { "level": 2, "description": "Arm Time -1s", "specialFlag": false },
+      { "level": 3, "description": "Cooldown -3s", "specialFlag": false },
+      { "level": 4, "description": "Dmg +400", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 32,
+    "name": "Cherry_Bomb",
+    "category": "Explosive",
+    "tatags":[],
+    "cost": 150,
+    "hp": 0,
+    "damage": 1800,
+    "actionInterval": 0,
+    "recharge": 35,
+    "upgrades": [
+      { "level": 2, "description": "Cooldown -5s", "specialFlag": false },
+      { "level": 3, "description": "Dmg +600", "specialFlag": false },
+      { "level": 4, "description": "Cost -25", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 33,
+    "name": "Squash",
+    "category": "Explosive",
+    "tags": ["Trap"],
+    "cost": 50,
+    "hp": 300,
+    "damage": 1800,
+    "actionInterval": 0,
+    "recharge": 20,
+    "upgrades": [
+      { "level": 2, "description": "Cooldown -3s", "specialFlag": false },
+      { "level": 3, "description": "Dmg +600", "specialFlag": false },
+      { "level": 4, "description": "Can crush 2x", "specialFlag": true }
+    ]
+  },
+  {
+    "id": 34,
+    "name": "Grapeshot",
+    "category": "Explosive",
+    "tatags":[],
+    "cost": 150,
+    "hp": 0,
+    "damage": 1800,
+    "actionInterval": 0,
+    "recharge": 35,
+    "upgrades": [
+      { "level": 2, "description": "Dmg +600", "specialFlag": false },
+      { "level": 3, "description": "Bounces +1", "specialFlag": true },
+      { "level": 4, "description": "Cost -25", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 35,
+    "name": "Jalapeno",
+    "category": "Explosive",
+    "tags": ["Fire"],
+    "cost": 125,
+    "hp": 0,
+    "damage": 1800,
+    "actionInterval": 0,
+    "recharge": 35,
+    "upgrades": [
+      { "level": 2, "description": "Cooldown -5s", "specialFlag": false },
+      { "level": 3, "description": "Dmg +600", "specialFlag": false },
+      { "level": 4, "description": "Cost -25", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 36,
+    "name": "Doom_shroom",
+    "category": "Explosive",
+    "tags": ["Shroom"],
+    "cost": 125,
+    "hp": 0,
+    "damage": 1800,
+    "actionInterval": 0,
+    "recharge": 15,
+    "upgrades": [
+      { "level": 2, "description": "Cooldown -5s", "specialFlag": false },
+      { "level": 3, "description": "Dmg +800", "specialFlag": false },
+      { "level": 4, "description": "Cost -50", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 37,
+    "name": "Tangle_Kelp",
+    "category": "Explosive",
+    "tags": ["Trap, Water","Insta_kill"],
+    "cost": 25,
+    "hp": 300,
+    "damage": 0,
+    "actionInterval": 0,
+    "recharge": 15,
+    "upgrades": [
+      { "level": 2, "description": "Cooldown -5s", "specialFlag": false },
+      { "level": 3, "description": "Targets +1", "specialFlag": true },
+      { "level": 4, "description": "Cost -25", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 38,
+    "name": "Iceberg_Lettuce",
+    "category": "Explosive",
+    "tags": ["Trap, Ice"],
+    "cost": 0,
+    "hp": 300,
+    "damage": 0,
+    "actionInterval": 0,
+    "recharge": 20,
+    "upgrades": [
+      { "level": 2, "description": "Cooldown -2s", "specialFlag": false },
+      { "level": 3, "description": "Freeze Time +2s", "specialFlag": false },
+      { "level": 4, "description": "Cost -0", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 39,
+    "name": "Bonk_Choy",
+    "category": "Melee",
+    "tatags":[],
+    "cost": 150,
+    "hp": 300,
+    "damage": 15,
+    "actionInterval": 0.25,
+    "recharge": 5,
+    "upgrades": [
+      { "level": 2, "description": "Dmg +5", "specialFlag": false },
+      { "level": 3, "description": "Atk Speed +10%", "specialFlag": false },
+      { "level": 4, "description": "HP +200", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 40,
+    "name": "Phat_Beet",
+    "category": "Melee",
+    "tags": ["AoE"],
+    "cost": 150,
+    "hp": 300,
+    "damage": 15,
+    "actionInterval": 2,
+    "recharge": 5,
+    "upgrades": [
+      { "level": 2, "description": "Dmg +10", "specialFlag": false },
+      { "level": 3, "description": "Atk Speed +10%", "specialFlag": false },
+      { "level": 4, "description": "HP +200", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 41,
+    "name": "Chomper",
+    "category": "Melee",
+    "tags": ["Insta_kill"],
+    "cost": 150,
+    "hp": 300,
+    "damage": 0,
+    "actionInterval": 40,
+    "recharge": 5,
+    "upgrades": [
+      { "level": 2, "description": "Digest -2s", "specialFlag": false },
+      { "level": 3, "description": "HP +200", "specialFlag": false },
+      { "level": 4, "description": "Digest -3s", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 42,
+    "name": "Wasabi_Whip",
+    "category": "Melee",
+    "tags": ["Fire"],
+    "cost": 150,
+    "hp": 300,
+    "damage": 40,
+    "actionInterval": 2,
+    "recharge": 5,
+    "upgrades": [
+      { "level": 2, "description": "Dmg +10", "specialFlag": false },
+      { "level": 3, "description": "Range +1 Tile", "specialFlag": true },
+      { "level": 4, "description": "HP +200", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 43,
+    "name": "Kiwibeast",
+    "category": "Melee",
+    "tags": ["AoE, Wramp_up"],
+    "cost": 175,
+    "hp": 300,
+    "damage": 15,
+    "actionInterval": 2,
+    "recharge": 5,
+    "upgrades": [
+      { "level": 2, "description": "HP +200", "specialFlag": false },
+      { "level": 3, "description": "Dmg +15", "specialFlag": false },
+      { "level": 4, "description": "Max Size +1", "specialFlag": true }
+    ]
+  },
+  {
+    "id": 44,
+    "name": "Wall_nut",
+    "category": "Wall_nut",
+    "tatags":[],
+    "cost": 50,
+    "hp": 4000,
+    "damage": 0,
+    "actionInterval": 0,
+    "recharge": 20,
+    "upgrades": [
+      { "level": 2, "description": "HP +1000", "specialFlag": false },
+      { "level": 3, "description": "Cooldown -5s", "specialFlag": false },
+      { "level": 4, "description": "HP +1500", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 45,
+    "name": "Tall_nut",
+    "category": "Wall_nut",
+    "tatags":[],
+    "cost": 125,
+    "hp": 8000,
+    "damage": 0,
+    "actionInterval": 0,
+    "recharge": 20,
+    "upgrades": [
+      { "level": 2, "description": "HP +2000", "specialFlag": false },
+      { "level": 3, "description": "Cooldown -5s", "specialFlag": false },
+      { "level": 4, "description": "HP +3000", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 46,
+    "name": "Endurian",
+    "category": "Wall_nut",
+    "tatags":[],
+    "cost": 100,
+    "hp": 3000,
+    "damage": 20,
+    "actionInterval": 0,
+    "recharge": 15,
+    "upgrades": [
+      { "level": 2, "description": "Reflect Dmg +5", "specialFlag": false },
+      { "level": 3, "description": "HP +1000", "specialFlag": false },
+      { "level": 4, "description": "Cost -25", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 47,
+    "name": "Garlic",
+    "category": "Wall_nut",
+    "tags": ["MoveZombies"],
+    "cost": 50,
+    "hp": 300,
+    "damage": 0,
+    "actionInterval": 0,
+    "recharge": 20,
+    "upgrades": [
+      { "level": 2, "description": "HP +150", "specialFlag": false },
+      { "level": 3, "description": "Cooldown -3s", "specialFlag": false },
+      { "level": 4, "description": "HP +250", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 48,
+    "name": "Sweet_Potato",
+    "category": "Wall_nut",
+    "tags": ["MoveZombies"],
+    "cost": 150,
+    "hp": 3000,
+    "damage": 0,
+    "actionInterval": 0,
+    "recharge": 20,
+    "upgrades": [
+      { "level": 2, "description": "HP +1000", "specialFlag": false },
+      { "level": 3, "description": "Cooldown -5s", "specialFlag": false },
+      { "level": 4, "description": "HP +1500", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 49,
+    "name": "Explode_O_nut",
+    "category": "Wall_nut",
+    "tags": ["Explosive"],
+    "cost": 50,
+    "hp": 4000,
+    "damage": 1800,
+    "actionInterval": 0,
+    "recharge": 20,
+    "upgrades": [
+      { "level": 2, "description": "HP +1000", "specialFlag": false },
+      { "level": 3, "description": "Explode Dmg +200", "specialFlag": false },
+      { "level": 4, "description": "Cost -25", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 50,
+    "name": "Pumpkin",
+    "category": "Wall_nut",
+    "tags": ["Stack"],
+    "cost": 150,
+    "hp": 4000,
+    "damage": 0,
+    "actionInterval": 0,
+    "recharge": 20,
+    "upgrades": [
+      { "level": 2, "description": "HP +1000", "specialFlag": false },
+      { "level": 3, "description": "Cooldown -5s", "specialFlag": false },
+      { "level": 4, "description": "HP +1500", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 51,
+    "name": "Sun_Bean",
+    "category": "Wall_nut",
+    "tags": ["Sun"],
+    "cost": 50,
+    "hp": 1000,
+    "damage": 0,
+    "actionInterval": 0,
+    "recharge": 20,
+    "upgrades": [
+      { "level": 2, "description": "Sun Drop +5", "specialFlag": false },
+      { "level": 3, "description": "HP +150", "specialFlag": false },
+      { "level": 4, "description": "Cost -25", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 52,
+    "name": "Torchwood",
+    "category": "Modifier",
+    "tags": ["Fire"],
+    "cost": 175,
+    "hp": 300,
+    "damage": 0,
+    "actionInterval": 0,
+    "recharge": 5,
+    "upgrades": [
+      { "level": 2, "description": "HP +300", "specialFlag": false },
+      { "level": 3, "description": "AoE on Death", "specialFlag": true },
+      { "level": 4, "description": "Cost -25", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 53,
+    "name": "Magnet_shroom",
+    "category": "Homing",
+    "tags": ["Shroom, Magic"],
+    "cost": 100,
+    "hp": 300,
+    "damage": 0,
+    "actionInterval": 10,
+    "recharge": 15,
+    "upgrades": [
+      { "level": 2, "description": "Range +1 Tile", "specialFlag": true },
+      { "level": 3, "description": "Cooldown -5s", "specialFlag": false },
+      { "level": 4, "description": "HP +200", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 54,
+    "name": "Hypno_shroom",
+    "category": "Modifier",
+    "tags": ["Shroom, Magic"],
+    "cost": 125,
+    "hp": 300,
+    "damage": 0,
+    "actionInterval": 0,
+    "recharge": 20,
+    "upgrades": [
+      { "level": 2, "description": "Cost -25", "specialFlag": false },
+      { "level": 3, "description": "Zombie HP Buff", "specialFlag": true },
+      { "level": 4, "description": "Zombie Dmg Buff", "specialFlag": true }
+    ]
+  },
+  {
+    "id": 55,
+    "name": "Cat_tail",
+    "category": "Homing",
+    "tatags":[],
+    "cost": 175,
+    "hp": 300,
+    "damage": 15,
+    "actionInterval": 1.5,
+    "recharge": 20,
+    "upgrades": [
+      { "level": 2, "description": "Dmg +10", "specialFlag": false },
+      { "level": 3, "description": "HP +200", "specialFlag": false },
+      { "level": 4, "description": "Cost -25", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 56,
+    "name": "Imitater",
+    "category": "Modifier",
+    "tatags":[],
+    "cost": 0,
+    "hp": 0,
+    "damage": 0,
+    "actionInterval": 0,
+    "recharge": 0,
+    "upgrades": [
+      { "level": 2, "description": "Cooldown -2s", "specialFlag": false },
+      { "level": 3, "description": "Cost -25", "specialFlag": false },
+      { "level": 4, "description": "plant food on enterance", "specialFlag": true }
+    ]
+  },
+  {
+    "id": 57,
+    "name": "Ice_shroom",
+    "category": "Explosive",
+    "tags": ["Shroom, Ice"],
+    "cost": 75,
+    "hp": 0,
+    "damage": 0,
+    "actionInterval": 0,
+    "recharge": 50,
+    "upgrades": [
+      { "level": 2, "description": "Freeze Time +2s", "specialFlag": false },
+      { "level": 3, "description": "Cooldown -5s", "specialFlag": false },
+      { "level": 4, "description": "Dmg +50", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 58,
+    "name": "Lily_Pad",
+    "category": "Modifier",
+    "tags": ["Water, Stack"],
+    "cost": 25,
+    "hp": 300,
+    "damage": 0,
+    "actionInterval": 0,
+    "recharge": 5,
+    "upgrades": [
+      { "level": 2, "description": "Cost -25", "specialFlag": false },
+      { "level": 3, "description": "HP +200", "specialFlag": false },
+      { "level": 4, "description": "Cooldown -2s", "specialFlag": false }
+    ]
+  },
+  {
+    "id": 59,
+    "name": "Hot_Potato",
+    "category": "Explosive",
+    "tags": ["Fire"],
+    "cost": 0,
+    "hp": 0,
+    "damage": 0,
+    "actionInterval": 0,
+    "recharge": 5,
+    "upgrades": [
+      { "level": 2, "description": "Cooldown -2s", "specialFlag": false },
+      { "level": 3, "description": "Melt Area 3x3", "specialFlag": true },
+      { "level": 4, "description": "Explode on Finish", "specialFlag": true }
+    ]
+  },
+  {
+    "id": 60,
+    "name": "Grave_Buster",
+    "category": "Explosive",
+    "tags": ["Insta_kill"],
+    "cost": 0,
+    "hp": 0,
+    "damage": 0,
+    "actionInterval": 0,
+    "recharge": 10,
+    "upgrades": [
+      { "level": 2, "description": "Eat Time -1s", "specialFlag": false },
+      { "level": 3, "description": "Cooldown -2s", "specialFlag": false },
+      { "level": 4, "description": "Explode on Finish", "specialFlag": true }
+    ]
+  },
+  {
+    "id": 61,
+    "name": "Enlighten_mint",
+    "category": "Sun Producer",
+    "tatags":[],
+    "cost": 0,
+    "hp": 0,
+    "damage": 0,
+    "actionInterval": 0,
+    "recharge": 85,
+    "upgrades": [
+      { "level": 2, "description": "Duration +1s", "specialFlag": false },
+      { "level": 3, "description": "Cooldown -5s", "specialFlag": false },
+      { "level": 4, "description": "reset family cooldowns", "specialFlag": true }
+    ]
+  },
+  {
+    "id": 62,
+    "name": "Appease_mint",
+    "category": "Shooter",
+    "tatags":[],
+    "cost": 0,
+    "hp": 0,
+    "damage": 0,
+    "actionInterval": 0,
+    "recharge": 85,
+    "upgrades": [
+      { "level": 2, "description": "Duration +1s", "specialFlag": false },
+      { "level": 3, "description": "Cooldown -5s", "specialFlag": false },
+      { "level": 4, "description": "reset family cooldowns", "specialFlag": true }
+    ]
+  },
+  {
+    "id": 63,
+    "name": "Arma_mint",
+    "category": "Lobber",
+    "tatags":[],
+    "cost": 0,
+    "hp": 0,
+    "damage": 0,
+    "actionInterval": 0,
+    "recharge": 85,
+    "upgrades": [
+      { "level": 2, "description": "Duration +1s", "specialFlag": false },
+      { "level": 3, "description": "Cooldown -5s", "specialFlag": false },
+      { "level": 4, "description": "reset family cooldowns", "specialFlag": true }
+    ]
+  },
+  {
+    "id": 64,
+    "name": "Bombard_mint",
+    "category": "Explosive",
+    "tatags":[],
+    "cost": 0,
+    "hp": 0,
+    "damage": 0,
+    "actionInterval": 0,
+    "recharge": 85,
+    "upgrades": [
+      { "level": 2, "description": "Duration +1s", "specialFlag": false },
+      { "level": 3, "description": "Cooldown -5s", "specialFlag": false },
+      { "level": 4, "description": "reset family cooldowns", "specialFlag": true }
+    ]
+  },
+  {
+    "id": 65,
+    "name": "Enforce_mint",
+    "category": "Melee",
+    "tatags":[],
+    "cost": 0,
+    "hp": 0,
+    "damage": 0,
+    "actionInterval": 0,
+    "recharge": 85,
+    "upgrades": [
+      { "level": 2, "description": "Duration +1s", "specialFlag": false },
+      { "level": 3, "description": "Cooldown -5s", "specialFlag": false },
+      { "level": 4, "description": "reset family cooldowns", "specialFlag": true }
+    ]
+  },
+  {
+    "id": 66,
+    "name": "Reinforce_mint",
+    "category": "Wall_nut",
+    "tatags":[],
+    "cost": 0,
+    "hp": 0,
+    "damage": 0,
+    "actionInterval": 0,
+    "recharge": 85,
+    "upgrades": [
+      { "level": 2, "description": "Duration +1s", "specialFlag": false },
+      { "level": 3, "description": "Cooldown -5s", "specialFlag": false },
+      { "level": 4, "description": "reset family cooldowns", "specialFlag": true }
+    ]
+  },
+  {
+    "id": 67,
+    "name": "Enchant_mint",
+    "category": "Modifier",
+    "tatags":[],
+    "cost": 0,
+    "hp": 0,
+    "damage": 0,
+    "actionInterval": 0,
+    "recharge": 85,
+    "upgrades": [
+      { "level": 2, "description": "Duration +1s", "specialFlag": false },
+      { "level": 3, "description": "Cooldown -5s", "specialFlag": false },
+      { "level": 4, "description": "reset family cooldowns", "specialFlag": true }
+    ]
+  },
+  {
+    "id": 68,
+    "name": "Pierce_mint",
+    "category": "Strike_through",
+    "tatags":[],
+    "cost": 0,
+    "hp": 0,
+    "damage": 0,
+    "actionInterval": 0,
+    "recharge": 85,
+    "upgrades": [
+      { "level": 2, "description": "Duration +1s", "specialFlag": false },
+      { "level": 3, "description": "Cooldown -5s", "specialFlag": false },
+      { "level": 4, "description": "reset family cooldowns", "specialFlag": true }
+    ]
+  },
+  {
+    "id": 69,
+    "name": "catTail_mint",
+    "category": "Homing",
+    "tatags":[],
+    "cost": 0,
+    "hp": 0,
+    "damage": 0,
+    "actionInterval": 0,
+    "recharge": 85,
+    "upgrades": [
+      { "level": 2, "description": "Duration +1s", "specialFlag": false },
+      { "level": 3, "description": "Cooldown -5s", "specialFlag": false },
+      { "level": 4, "description": "reset family cooldowns", "specialFlag": true }
+    ]
+  }
+]

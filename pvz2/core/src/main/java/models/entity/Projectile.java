@@ -1,4 +1,6 @@
 package models.entity;
+import com.badlogic.gdx.math.Rectangle;
+import models.factory.builder.PlantType;
 
 import models.Constants;
 import models.gamepanes.Field;
@@ -10,8 +12,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 
 
-public class Bullet implements Cloneable {
-    private BulletType type;
+public class Projectile implements Cloneable {
+    private ProjectileType type;
+    private PlantType sourcePlantType;
     private float velocityX;
     private float velocityY;
     private float width = 50;
@@ -26,8 +29,8 @@ public class Bullet implements Cloneable {
     private boolean grounded = true;
     private boolean active;
     private float poisonDamage = Constants.POISON_BASE_DAMAGE;
-    private final ArrayList<BulletType> bowling = new ArrayList<>(Arrays.asList(BulletType.ONION_1,
-            BulletType.ONION_2 , BulletType.ONION_3 , BulletType.Explosive_Onion));
+    private final ArrayList<ProjectileType> bowling = new ArrayList<>(Arrays.asList(ProjectileType.ONION_1,
+            ProjectileType.ONION_2 , ProjectileType.ONION_3 , ProjectileType.Explosive_Onion));
 
 
     /// ------------BOOLEANS------------
@@ -36,19 +39,31 @@ public class Bullet implements Cloneable {
     private boolean proved = false;
     /// for homing plantsInField of course!
     private Zombie toLockIn;
-    public void setTags(ArrayList<PlantTags> tags){
-        if(tags.contains(PlantTags.Fire)){
+    public void setTags(ArrayList<PlantTags> tags) {
+        this.tags.clear();
+        if (tags == null) {
+            return;
+        }
+
+        if (tags.contains(PlantTags.Fire)) {
             this.tags.add(Tag.FIRE);
         }
-        if(tags.contains(PlantTags.POISON)){
+        if (tags.contains(PlantTags.POISON)) {
             this.tags.add(Tag.POISON);
         }
-        if(tags.contains(PlantTags.Ice)) this.tags.add(Tag.ICE);
-        if(tags.contains(PlantTags.MAGICAL)) this.tags.add(Tag.MAGICAL);
-        if(tags.contains(PlantTags.AoE)) this.tags.add(Tag.AoE);
+        if (tags.contains(PlantTags.Ice)) {
+            this.tags.add(Tag.ICE);
+        }
+        if (tags.contains(PlantTags.MAGICAL)) {
+            this.tags.add(Tag.MAGICAL);
+        }
+        if (tags.contains(PlantTags.AoE)) {
+            this.tags.add(Tag.AoE);
+        }
     }
 
-    public Bullet(float x, float y , float velocityX ,  float velocityY,int line) {
+
+    public Projectile(float x, float y , float velocityX , float velocityY, int line) {
         this.x = x;
         this.y = y;
         this.velocityX = velocityX;
@@ -56,7 +71,7 @@ public class Bullet implements Cloneable {
         this.line = line;
     }
 
-    public Bullet(float x, float y , float velocityX , BulletType type ,  float damage
+    public Projectile(float x, float y , float velocityX , ProjectileType type , float damage
     , int line) {
         this.x = x;
         this.y = y;
@@ -66,10 +81,10 @@ public class Bullet implements Cloneable {
         this.line = line;
     }
 
-    public Bullet(float x, float y , BulletType bulletType, int line) {
+    public Projectile(float x, float y , ProjectileType projectileType, int line) {
         this.x = x;
         this.y = y;
-        this.type = bulletType;
+        this.type = projectileType;
         this.velocityX = Constants.BULLET_VELOCITY_X;
         damage = 20;
         this.line = line;
@@ -80,24 +95,27 @@ public class Bullet implements Cloneable {
         this.y = y;
     }
 
-    public Bullet(){
+    public Projectile(){
 
     }
 
-    public void run(float delta , BaseGame game){
-
-        if(!grounded){
-            velocityY -= Constants.GRAVITY * delta;
+    public void run(float delta, BaseGame game) {
+        if (pierce <= 0) {
+            dispose(game);
+            return;
         }
 
-        if(pierce <= 0) dispose(game);
-        updateLocation(delta , game);
-        if(!tags.contains(Tag.MAGICAL) && toLockIn == null) block(game);
-        if(bowling.contains(this.type)){
+        updateLocation(delta, game);
+
+        if (!tags.contains(Tag.MAGICAL) && toLockIn == null) {
+            block(game);
+        }
+
+        if (bowling.contains(this.type)) {
             bowling(game.getField());
         }
-        checkHit(game);
 
+        checkHit(game);
     }
 
     private void checkHit(BaseGame game){
@@ -168,14 +186,15 @@ public class Bullet implements Cloneable {
     }
 
     private void block(BaseGame game){
+        Rectangle bounds = new Rectangle(x , y , width, height);
         for (int i = 0; i < 5; i++) {
             for (Tile tile : game.getField().getTiles().get(i)){
-                if(overlaps(tile)){
+                if(bounds.overlaps(tile.getBounds())) {
                     if(tile.getTileType() == TileType.FROZEN && this.tags.contains(Tag.FIRE)){
                         tile.setTileType(TileType.CAVE_TILE);
                         setPierce(pierce - 1);
                     }
-                    else if(tile.getHp() >= 0){
+                    else if(tile.getHp() > 0){
                         tile.setHp(tile.getHp() - this.damage);
                         setPierce(pierce - 1);
                     }
@@ -204,15 +223,21 @@ public class Bullet implements Cloneable {
         }
         this.x += velocityX * delta;
         this.y += velocityY * delta;
-        if(!grounded){
+        if (!grounded) {
             this.velocityY -= Constants.GRAVITY * delta;
         }
-        if(this.y - line * Tile.getHeight() <= 30 && velocityY < 0){
+
+        float groundY = line * Tile.getHeight() + 30f;
+        if (!grounded && this.y <= groundY && velocityY < 0f) {
+            this.y = groundY;
+            this.velocityY = 0f;
             grounded = true;
-            if(tags.contains(Tag.AoE)){
+
+            if (tags.contains(Tag.AoE)) {
                 AoE(game);
             }
         }
+
     }
     private void setDest(){
         float dy = toLockIn.getY() - y;
@@ -320,21 +345,36 @@ public class Bullet implements Cloneable {
         this.toLockIn = toLockIn;
     }
 
-    public BulletType getType() {
+    public ProjectileType getType() {
         return type;
     }
 
-    public void setType(BulletType type) {
+    public void setType(ProjectileType type) {
         this.type = type;
     }
 
     public ArrayList<Tag> getTags() {
         return tags;
     }
+    public PlantType getSourcePlantType() {
+        return sourcePlantType;
+    }
+
+    public void setSourcePlantType(PlantType sourcePlantType) {
+        this.sourcePlantType = sourcePlantType;
+    }
+
+    public int getLine() {
+        return line;
+    }
+
+    public void setLine(int line) {
+        this.line = line;
+    }
 
     @Override
     public Object clone() throws CloneNotSupportedException {
-        Bullet clone = (Bullet) super.clone();
+        Projectile clone = (Projectile) super.clone();
 
         if (this.tags != null) {
             clone.tags = new ArrayList<>(this.tags);

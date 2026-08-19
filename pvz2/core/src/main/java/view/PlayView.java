@@ -7,6 +7,7 @@ import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.Group;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
+import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.Touchable;
 import com.badlogic.gdx.scenes.scene2d.actions.Actions;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
@@ -16,13 +17,10 @@ import com.badlogic.gdx.scenes.scene2d.ui.Stack;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
-import com.badlogic.gdx.scenes.scene2d.utils.Drawable;
 import com.badlogic.gdx.utils.Align;
-import com.badlogic.gdx.math.Interpolation;
 import com.badlogic.gdx.utils.Scaling;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
-import com.badlogic.gdx.utils.viewport.Viewport;
 
 import controllers.datacontroller.Data;
 import controllers.menus.gamecontroller.PlayMenu;
@@ -31,7 +29,6 @@ import models.User;
 import models.gameadventure.Chapters;
 import models.gameadventure.levels.Level;
 
-import pvz.libpvz.textures.ResourceIndex;
 import pvz.libpvz.textures.TextureBank;
 import pvz.skin.PvzSkin;
 
@@ -40,30 +37,55 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 
 public class PlayView extends View {
 
     // -------------------------------------------------------------------------
-    // Screen
+    // Screen configuration
     // -------------------------------------------------------------------------
 
     private static final float VIRTUAL_WIDTH = 1280f;
     private static final float VIRTUAL_HEIGHT = 720f;
 
-    private static final String ASSET_RESOLUTION = "768";
+    private static final String PVZ_ASSET_RESOLUTION = "768";
 
-    /*
-     * Order of chapters in the adventure map.
-     *
-     * Do NOT use Chapters.values() here because enum order in the project is:
-     * DarkAge, BigWaveBeach, FrozenCaves, AncientEgypt
-     *
-     * while our actual game progression is:
-     * AncientEgypt -> FrozenCaves -> BigWaveBeach -> DarkAge
-     */
+
+    // -------------------------------------------------------------------------
+    // Exact PvZ2 resource IDs
+    // -------------------------------------------------------------------------
+
+    private static final String BACKGROUND_TEXTURE =
+        "IMAGE_MAINMENU_BACKGROUND";
+
+    private static final String LOCK_TEXTURE =
+        "IMAGE_UI_LOCK_SMALL_GOLD";
+
+    private static final String LEVEL_NODE_TEXTURE =
+        "IMAGE_WORLDMAP_LEVEL_NODE_LEVEL_NODE_140X209";
+
+
+    private static final Map<Chapters, String> WORLD_TEXTURES =
+        Map.of(
+            Chapters.AncientEgypt,
+            "IMAGE_WORLDMAP_EGYPT_ISLAND3",
+
+            Chapters.FrozenCaves,
+            "IMAGE_WORLDMAP_TWISTER_ISLAND83",
+
+            Chapters.BigWaveBeach,
+            "IMAGE_WORLDMAP_BEACH_ISLAND1",
+
+            Chapters.DarkAge,
+            "IMAGE_WORLDMAP_TWISTER_ISLAND77"
+        );
+
+
+    // -------------------------------------------------------------------------
+    // Chapter order
+    // -------------------------------------------------------------------------
+
     private static final Chapters[] CHAPTER_ORDER = {
         Chapters.AncientEgypt,
         Chapters.FrozenCaves,
@@ -71,40 +93,60 @@ public class PlayView extends View {
         Chapters.DarkAge
     };
 
+
     /*
-     * Fixed slot centers.
-     *
-     * We intentionally show all four chapters at the same time instead of
-     * pushing unused worlds outside the screen.
+     * Horizontal centers of the four floating islands.
      */
-    private static final float[] WORLD_SLOT_X = {
+    private static final float[] WORLD_X = {
         165f,
         480f,
         800f,
         1115f
     };
 
+
+    // -------------------------------------------------------------------------
+    // Controller
+    // -------------------------------------------------------------------------
+
     private final PlayMenu playMenu;
 
-    private StageHolder stageHolder;
+
+    // -------------------------------------------------------------------------
+    // Scene2D
+    // -------------------------------------------------------------------------
+
+    private Stage stage;
+    private FitViewport viewport;
 
     private Skin skin;
-    private TextureBank textureBank;
+
+
+    // -------------------------------------------------------------------------
+    // PvZ assets
+    // -------------------------------------------------------------------------
+
     private FileHandle pvzAssetsRoot;
+    private TextureBank textureBank;
+
+    private TextureRegion backgroundRegion;
+    private TextureRegion lockRegion;
+    private TextureRegion levelNodeRegion;
+
+    private final Map<Chapters, TextureRegion> worldRegions =
+        new EnumMap<>(Chapters.class);
+
+
+    // -------------------------------------------------------------------------
+    // UI state
+    // -------------------------------------------------------------------------
 
     private Chapters selectedChapter;
 
     private Group worldGroup;
     private Table levelPanel;
-    private Label selectedChapterLabel;
 
-    private TextureRegion backgroundRegion;
-    private TextureRegion lockRegion;
-
-    private final Map<Chapters, TextureRegion> chapterRegions =
-        new EnumMap<>(Chapters.class);
-
-    private boolean disposed = false;
+    private boolean disposed;
 
 
     // -------------------------------------------------------------------------
@@ -114,42 +156,77 @@ public class PlayView extends View {
     public PlayView() {
         playMenu = new PlayMenu();
 
-        // View already owns "menu".
+        /*
+         * Keep View's existing menu/controller contract.
+         */
         this.menu = playMenu;
     }
 
 
     // -------------------------------------------------------------------------
-    // LibGDX Screen lifecycle
+    // Screen lifecycle
     // -------------------------------------------------------------------------
 
     @Override
     public void show() {
+
         disposed = false;
 
         skin = PvzSkin.get();
 
-        stageHolder = new StageHolder();
+        viewport =
+            new FitViewport(
+                VIRTUAL_WIDTH,
+                VIRTUAL_HEIGHT
+            );
 
-        Gdx.input.setInputProcessor(stageHolder.stage);
+        stage =
+            new Stage(viewport);
 
-        User user = App.getCurrentuser();
+        Gdx.input.setInputProcessor(stage);
 
-        if (user != null && user.getChapter() != null) {
-            selectedChapter = user.getChapter();
+
+        // ---------------------------------------------------------------------
+        // Initial selected chapter
+        // ---------------------------------------------------------------------
+
+        User user =
+            App.getCurrentuser();
+
+        if (user != null &&
+            user.getChapter() != null) {
+
+            selectedChapter =
+                user.getChapter();
+
         } else {
-            selectedChapter = Chapters.AncientEgypt;
+
+            selectedChapter =
+                Chapters.AncientEgypt;
         }
 
+
         /*
-         * Keep PlayMenu.currentChapter synchronized with the visual selection.
-         * We intentionally ignore its String output.
+         * PlayMenu keeps its own currentChapter.
+         * The String returned by changeChapter belonged to the CLI UI,
+         * therefore we simply ignore it here.
          */
-        playMenu.changeChapter(selectedChapter);
+        playMenu.changeChapter(
+            selectedChapter
+        );
+
+
+        // ---------------------------------------------------------------------
+        // Assets
+        // ---------------------------------------------------------------------
 
         initialisePvzAssets();
+        loadMenuTextures();
 
-        loadMenuAssets();
+
+        // ---------------------------------------------------------------------
+        // UI
+        // ---------------------------------------------------------------------
 
         buildUI();
     }
@@ -157,39 +234,49 @@ public class PlayView extends View {
 
     @Override
     public void render(float delta) {
-        if (disposed || stageHolder == null) {
+
+        if (disposed ||
+            stage == null) {
+
             return;
         }
 
+
         ScreenUtils.clear(
-            0.025f,
-            0.17f,
-            0.20f,
+            0.02f,
+            0.10f,
+            0.14f,
             1f
         );
 
-        /*
-         * Required by libPVZ when async atlas loads exist.
-         * Harmless for synchronously loaded regions too.
-         */
-        if (textureBank != null) {
-            textureBank.update();
-        }
 
-        if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+        if (Gdx.input.isKeyJustPressed(
+            Input.Keys.ESCAPE
+        )) {
+
             goBack();
             return;
         }
 
-        stageHolder.stage.act(delta);
-        stageHolder.stage.draw();
+
+        stage.act(delta);
+        stage.draw();
     }
 
 
     @Override
-    public void resize(int width, int height) {
-        if (stageHolder != null) {
-            stageHolder.viewport.update(width, height, true);
+    public void resize(
+        int width,
+        int height
+    ) {
+
+        if (viewport != null) {
+
+            viewport.update(
+                width,
+                height,
+                true
+            );
         }
     }
 
@@ -206,56 +293,67 @@ public class PlayView extends View {
 
     @Override
     public void hide() {
-        if (stageHolder != null &&
-            Gdx.input.getInputProcessor() == stageHolder.stage) {
+
+        if (stage != null &&
+            Gdx.input.getInputProcessor() == stage) {
 
             Gdx.input.setInputProcessor(null);
         }
 
+
         /*
-         * Game.setScreen() calls hide() while a click event may still be
-         * travelling through Scene2D.
+         * Game.setScreen() may happen inside a Scene2D ClickListener.
          *
-         * Therefore dispose on the next application tick instead of destroying
-         * the Stage in the middle of the ClickListener.
+         * Post the dispose instead of destroying the Stage while
+         * Scene2D is still dispatching the click event.
          */
         if (!disposed) {
-            Gdx.app.postRunnable(this::dispose);
+            Gdx.app.postRunnable(
+                this::dispose
+            );
         }
     }
 
 
     @Override
     public void dispose() {
+
         if (disposed) {
             return;
         }
 
         disposed = true;
 
-        if (stageHolder != null) {
-            stageHolder.stage.dispose();
-            stageHolder = null;
+
+        if (stage != null) {
+
+            stage.dispose();
+            stage = null;
         }
 
+
         if (textureBank != null) {
+
             textureBank.dispose();
             textureBank = null;
         }
 
-        chapterRegions.clear();
+
+        worldRegions.clear();
 
         backgroundRegion = null;
         lockRegion = null;
+        levelNodeRegion = null;
     }
 
 
     // -------------------------------------------------------------------------
-    // UI construction
+    // Build complete UI
     // -------------------------------------------------------------------------
 
     private void buildUI() {
-        stageHolder.stage.clear();
+
+        stage.clear();
 
         buildBackground();
         buildTopHud();
@@ -267,14 +365,25 @@ public class PlayView extends View {
     }
 
 
+    // -------------------------------------------------------------------------
+    // Background
+    // -------------------------------------------------------------------------
+
     private void buildBackground() {
-        if (backgroundRegion == null) {
-            return;
-        }
 
-        Image background = new Image(backgroundRegion);
+        Image background =
+            new Image(
+                backgroundRegion
+            );
 
-        background.setScaling(Scaling.fill);
+
+        /*
+         * Fill our virtual 1280x720 screen.
+         */
+        background.setScaling(
+            Scaling.fill
+        );
+
         background.setBounds(
             0f,
             0f,
@@ -282,317 +391,469 @@ public class PlayView extends View {
             VIRTUAL_HEIGHT
         );
 
-        background.setTouchable(Touchable.disabled);
 
-        stageHolder.stage.addActor(background);
+        /*
+         * Background must never intercept clicks.
+         */
+        background.setTouchable(
+            Touchable.disabled
+        );
+
+
+        stage.addActor(
+            background
+        );
     }
 
 
+    // -------------------------------------------------------------------------
+    // Top HUD
+    // -------------------------------------------------------------------------
+
     private void buildTopHud() {
-        Table hud = new Table();
+
+        Table hud =
+            new Table();
 
         hud.setFillParent(true);
         hud.top();
-        hud.pad(14f, 18f, 0f, 18f);
+
+        hud.pad(
+            14f,
+            18f,
+            0f,
+            18f
+        );
+
+
+        // ---------------------------------------------------------------------
+        // Back
+        // ---------------------------------------------------------------------
 
         TextButton backButton =
-            new TextButton("BACK", skin, "brown");
-
-        backButton.addListener(new ClickListener() {
-            @Override
-            public void clicked(
-                InputEvent event,
-                float x,
-                float y
-            ) {
-                goBack();
-            }
-        });
-
-        Label adventureLabel =
-            new Label(
-                "ADVENTURE",
+            new TextButton(
+                "BACK",
                 skin,
-                "big_outline"
+                "brown"
             );
 
-        User user = App.getCurrentuser();
 
-        String coinsText =
-            "COINS: " + (user == null ? 0 : user.getCoins());
-
-        String gemsText =
-            "GEMS: " + (user == null ? 0 : user.getDiamonds());
-
-        Label coins =
-            new Label(
-                coinsText,
-                skin,
-                "medium_outline"
-            );
-
-        Label gems =
-            new Label(
-                gemsText,
-                skin,
-                "medium_outline"
-            );
-
-        hud.add(backButton)
-            .width(125f)
-            .height(55f)
-            .left();
-
-        hud.add().expandX();
-
-        hud.add(adventureLabel)
-            .center()
-            .padRight(80f);
-
-        hud.add().expandX();
-
-        hud.add(coins)
-            .padRight(25f);
-
-        hud.add(gems);
-
-        stageHolder.stage.addActor(hud);
-    }
-
-
-    private void buildWorldArea() {
-        worldGroup = new Group();
-
-        worldGroup.setBounds(
-            0f,
-            245f,
-            VIRTUAL_WIDTH,
-            380f
-        );
-
-        stageHolder.stage.addActor(worldGroup);
-    }
-
-
-    private void buildLevelPanel() {
-        levelPanel = new Table();
-
-        levelPanel.setBounds(
-            145f,
-            30f,
-            990f,
-            205f
-        );
-
-        Drawable panelBackground =
-            safeDrawable(
-                "image_ui_quests_panel_edge_to_edge_ten"
-            );
-
-        if (panelBackground != null) {
-            levelPanel.setBackground(panelBackground);
-        }
-
-        levelPanel.pad(
-            12f,
-            24f,
-            18f,
-            24f
-        );
-
-        stageHolder.stage.addActor(levelPanel);
-    }
-
-
-    // -------------------------------------------------------------------------
-    // Chapter selection
-    // -------------------------------------------------------------------------
-
-    private void refreshWorlds(boolean animate) {
-        worldGroup.clearChildren();
-
-        for (int i = 0; i < CHAPTER_ORDER.length; i++) {
-
-            Chapters chapter = CHAPTER_ORDER[i];
-
-            boolean selected =
-                chapter == selectedChapter;
-
-            Table worldCard =
-                createWorldCard(
-                    chapter,
-                    selected
-                );
-
-            float width =
-                selected ? 280f : 220f;
-
-            float height =
-                selected ? 270f : 220f;
-
-            float centerX =
-                WORLD_SLOT_X[i];
-
-            float y =
-                selected ? 40f : 64f;
-
-            worldCard.setBounds(
-                centerX - width / 2f,
-                y,
-                width,
-                height
-            );
-
-            worldCard.setTransform(true);
-            worldCard.setOrigin(Align.center);
-
-            if (animate) {
-                worldCard.getColor().a = 0f;
-                worldCard.setScale(0.85f);
-
-                worldCard.addAction(
-                    Actions.parallel(
-                        Actions.fadeIn(0.22f),
-                        Actions.scaleTo(
-                            1f,
-                            1f,
-                            0.25f,
-                            Interpolation.swingOut
-                        )
-                    )
-                );
-            }
-
-            worldGroup.addActor(worldCard);
-        }
-    }
-
-
-    private Table createWorldCard(
-        Chapters chapter,
-        boolean selected
-    ) {
-        Table card = new Table();
-
-        card.setTouchable(Touchable.enabled);
-
-        TextureRegion region =
-            chapterRegions.get(chapter);
-
-        if (region != null) {
-
-            Image worldImage =
-                new Image(region);
-
-            worldImage.setScaling(Scaling.fit);
-            worldImage.setTouchable(Touchable.disabled);
-
-            card.add(worldImage)
-                .size(
-                    selected ? 225f : 175f,
-                    selected ? 185f : 145f
-                )
-                .padTop(4f)
-                .row();
-
-        } else {
-
-            /*
-             * Asset-safe fallback.
-             *
-             * This keeps the menu usable even when pvz.assets is not configured
-             * or no suitable world texture is found.
-             */
-            TextButton fallback =
-                new TextButton(
-                    getChapterShortName(chapter),
-                    skin,
-                    selected ? "green" : "brown"
-                );
-
-            fallback.setTouchable(Touchable.disabled);
-
-            card.add(fallback)
-                .size(
-                    selected ? 220f : 175f,
-                    selected ? 150f : 125f
-                )
-                .padTop(20f)
-                .row();
-        }
-
-        Label title =
-            new Label(
-                getChapterDisplayName(chapter),
-                skin,
-                selected
-                    ? "big_outline"
-                    : "medium_outline"
-            );
-
-        title.setAlignment(Align.center);
-        title.setTouchable(Touchable.disabled);
-
-        card.add(title)
-            .center()
-            .padTop(5f);
-
-        if (selected) {
-            card.row();
-
-            Label selectedText =
-                new Label(
-                    "SELECTED",
-                    skin,
-                    "secondary"
-                );
-
-            selectedText.setTouchable(
-                Touchable.disabled
-            );
-
-            card.add(selectedText)
-                .padTop(2f);
-        }
-
-        card.addListener(
+        backButton.addListener(
             new ClickListener() {
+
                 @Override
                 public void clicked(
                     InputEvent event,
                     float x,
                     float y
                 ) {
-                    selectChapter(chapter);
+
+                    goBack();
                 }
             }
         );
 
-        return card;
+
+        // ---------------------------------------------------------------------
+        // Title
+        // ---------------------------------------------------------------------
+
+        Label title =
+            new Label(
+                "ADVENTURE",
+                skin,
+                "big_outline"
+            );
+
+
+        // ---------------------------------------------------------------------
+        // User currency
+        // ---------------------------------------------------------------------
+
+        User user =
+            App.getCurrentuser();
+
+
+        int coins =
+            user == null
+                ? 0
+                : user.getCoins();
+
+
+        int gems =
+            user == null
+                ? 0
+                : user.getDiamonds();
+
+
+        Label coinsLabel =
+            new Label(
+                "COINS: " + coins,
+                skin,
+                "medium_outline"
+            );
+
+
+        Label gemsLabel =
+            new Label(
+                "GEMS: " + gems,
+                skin,
+                "medium_outline"
+            );
+
+
+        // ---------------------------------------------------------------------
+        // Layout
+        // ---------------------------------------------------------------------
+
+        hud.add(backButton)
+            .width(125f)
+            .height(55f)
+            .left();
+
+
+        hud.add()
+            .expandX();
+
+
+        hud.add(title)
+            .center();
+
+
+        hud.add()
+            .expandX();
+
+
+        hud.add(coinsLabel)
+            .padRight(25f);
+
+
+        hud.add(gemsLabel);
+
+
+        stage.addActor(hud);
+    }
+
+
+    // -------------------------------------------------------------------------
+    // World area
+    // -------------------------------------------------------------------------
+
+    private void buildWorldArea() {
+
+        worldGroup =
+            new Group();
+
+
+        worldGroup.setBounds(
+            0f,
+            230f,
+            VIRTUAL_WIDTH,
+            390f
+        );
+
+
+        stage.addActor(
+            worldGroup
+        );
+    }
+
+
+    // -------------------------------------------------------------------------
+    // Level area
+    // -------------------------------------------------------------------------
+
+    private void buildLevelPanel() {
+
+        levelPanel =
+            new Table();
+
+
+        levelPanel.setBounds(
+            230f,
+            18f,
+            820f,
+            215f
+        );
+
+
+        levelPanel.top();
+
+
+        stage.addActor(
+            levelPanel
+        );
+    }
+
+
+    // -------------------------------------------------------------------------
+    // Worlds
+    // -------------------------------------------------------------------------
+
+    private void refreshWorlds(
+        boolean animate
+    ) {
+
+        worldGroup.clearChildren();
+
+
+        for (int i = 0;
+             i < CHAPTER_ORDER.length;
+             i++) {
+
+            Chapters chapter =
+                CHAPTER_ORDER[i];
+
+
+            boolean selected =
+                chapter == selectedChapter;
+
+
+            Table world =
+                createWorldActor(
+                    chapter,
+                    selected
+                );
+
+
+            float width =
+                selected
+                    ? 290f
+                    : 225f;
+
+
+            float height =
+                selected
+                    ? 285f
+                    : 235f;
+
+
+            float x =
+                WORLD_X[i]
+                    - width / 2f;
+
+
+            float y =
+                selected
+                    ? 30f
+                    : 58f;
+
+
+            world.setBounds(
+                x,
+                y,
+                width,
+                height
+            );
+
+
+            world.setTransform(true);
+
+            world.setOrigin(
+                Align.center
+            );
+
+
+            if (animate) {
+
+                world.getColor().a =
+                    0f;
+
+                world.setScale(
+                    0.90f
+                );
+
+
+                world.addAction(
+                    Actions.parallel(
+
+                        Actions.fadeIn(
+                            0.18f
+                        ),
+
+                        Actions.scaleTo(
+                            1f,
+                            1f,
+                            0.20f
+                        )
+                    )
+                );
+            }
+
+
+            worldGroup.addActor(
+                world
+            );
+        }
+    }
+
+
+    private Table createWorldActor(
+        Chapters chapter,
+        boolean selected
+    ) {
+
+        Table world =
+            new Table();
+
+
+        world.setTouchable(
+            Touchable.enabled
+        );
+
+
+        // ---------------------------------------------------------------------
+        // Actual PvZ2 island texture
+        // ---------------------------------------------------------------------
+
+        TextureRegion region =
+            worldRegions.get(
+                chapter
+            );
+
+
+        Image island =
+            new Image(region);
+
+
+        island.setScaling(
+            Scaling.fit
+        );
+
+
+        island.setTouchable(
+            Touchable.disabled
+        );
+
+
+        float imageWidth =
+            selected
+                ? 255f
+                : 195f;
+
+
+        float imageHeight =
+            selected
+                ? 200f
+                : 155f;
+
+
+        world.add(island)
+            .size(
+                imageWidth,
+                imageHeight
+            )
+            .center()
+            .row();
+
+
+        // ---------------------------------------------------------------------
+        // Chapter name
+        // ---------------------------------------------------------------------
+
+        Label name =
+            new Label(
+                getChapterDisplayName(
+                    chapter
+                ),
+                skin,
+                selected
+                    ? "big_outline"
+                    : "medium_outline"
+            );
+
+
+        name.setAlignment(
+            Align.center
+        );
+
+
+        name.setTouchable(
+            Touchable.disabled
+        );
+
+
+        world.add(name)
+            .center()
+            .padTop(3f);
+
+
+        // ---------------------------------------------------------------------
+        // Selected marker
+        // ---------------------------------------------------------------------
+
+        if (selected) {
+
+            world.row();
+
+
+            Label selectedLabel =
+                new Label(
+                    "SELECTED",
+                    skin,
+                    "secondary"
+                );
+
+
+            selectedLabel.setTouchable(
+                Touchable.disabled
+            );
+
+
+            world.add(selectedLabel)
+                .center()
+                .padTop(2f);
+        }
+
+
+        // ---------------------------------------------------------------------
+        // Click
+        // ---------------------------------------------------------------------
+
+        world.addListener(
+            new ClickListener() {
+
+                @Override
+                public void clicked(
+                    InputEvent event,
+                    float x,
+                    float y
+                ) {
+
+                    selectChapter(
+                        chapter
+                    );
+                }
+            }
+        );
+
+
+        return world;
     }
 
 
     private void selectChapter(
         Chapters chapter
     ) {
-        if (chapter == null) {
+
+        if (chapter == null ||
+            chapter == selectedChapter) {
+
             return;
         }
 
-        if (chapter == selectedChapter) {
-            return;
-        }
 
-        selectedChapter = chapter;
+        selectedChapter =
+            chapter;
+
 
         /*
-         * Important:
-         * PlayMenu owns the actual selected chapter for play().
-         *
-         * changeChapter() returns CLI text, which the graphical View simply
-         * doesn't care about.
+         * Keep Controller synchronized.
          */
-        playMenu.changeChapter(chapter);
+        playMenu.changeChapter(
+            chapter
+        );
+
 
         refreshWorlds(true);
         refreshLevels(true);
@@ -606,28 +867,45 @@ public class PlayView extends View {
     private void refreshLevels(
         boolean animate
     ) {
+
         levelPanel.clearChildren();
 
-        selectedChapterLabel =
+
+        // ---------------------------------------------------------------------
+        // Chapter title
+        // ---------------------------------------------------------------------
+
+        Label chapterTitle =
             new Label(
-                getChapterDisplayName(selectedChapter),
+                getChapterDisplayName(
+                    selectedChapter
+                ),
                 skin,
                 "big_outline"
             );
 
-        selectedChapterLabel.setAlignment(
+
+        chapterTitle.setAlignment(
             Align.center
         );
 
-        levelPanel.add(selectedChapterLabel)
+
+        levelPanel.add(chapterTitle)
             .colspan(4)
             .expandX()
             .center()
-            .padBottom(12f)
+            .padBottom(5f)
             .row();
 
+
+        // ---------------------------------------------------------------------
+        // Get levels
+        // ---------------------------------------------------------------------
+
         ArrayList<Level> rawLevels =
-            Data.getAllLevels().get(selectedChapter);
+            Data.getAllLevels()
+                .get(selectedChapter);
+
 
         if (rawLevels == null ||
             rawLevels.isEmpty()) {
@@ -639,20 +917,27 @@ public class PlayView extends View {
                     "medium_outline"
                 );
 
+
             levelPanel.add(noLevels)
                 .colspan(4)
                 .center()
-                .padTop(20f);
+                .padTop(30f);
+
 
             return;
         }
 
+
         /*
-         * Make a copy because we don't want the View rearranging Data's own
-         * ArrayList.
+         * Copy before sorting.
+         *
+         * We don't want the View to mutate Data's original ArrayList.
          */
         List<Level> levels =
-            new ArrayList<>(rawLevels);
+            new ArrayList<>(
+                rawLevels
+            );
+
 
         levels.sort(
             Comparator.comparingInt(
@@ -660,53 +945,52 @@ public class PlayView extends View {
             )
         );
 
-        /*
-         * Project requirement: four visible stages per chapter.
-         */
-        int count =
-            Math.min(4, levels.size());
 
-        for (int i = 0; i < count; i++) {
+        int count =
+            Math.min(
+                4,
+                levels.size()
+            );
+
+
+        // ---------------------------------------------------------------------
+        // Four level nodes
+        // ---------------------------------------------------------------------
+
+        for (int i = 0;
+             i < count;
+             i++) {
 
             Level level =
                 levels.get(i);
 
+
             Actor levelActor =
-                createLevelActor(level);
-
-            levelPanel.add(levelActor)
-                .size(170f, 86f)
-                .padLeft(9f)
-                .padRight(9f);
-        }
-
-        /*
-         * Defensive fallback if data is temporarily incomplete.
-         * We still keep four visual slots.
-         */
-        for (int i = count; i < 4; i++) {
-
-            TextButton unavailable =
-                new TextButton(
-                    "LOCK",
-                    skin,
-                    "brown"
+                createLevelActor(
+                    level
                 );
 
-            unavailable.setDisabled(true);
 
-            levelPanel.add(unavailable)
-                .size(170f, 86f)
-                .padLeft(9f)
-                .padRight(9f);
+            levelPanel.add(levelActor)
+                .size(
+                    105f,
+                    150f
+                )
+                .padLeft(17f)
+                .padRight(17f);
         }
+
 
         if (animate) {
 
-            levelPanel.getColor().a = 0f;
+            levelPanel.getColor().a =
+                0f;
+
 
             levelPanel.addAction(
-                Actions.fadeIn(0.22f)
+                Actions.fadeIn(
+                    0.18f
+                )
             );
         }
     }
@@ -715,93 +999,175 @@ public class PlayView extends View {
     private Actor createLevelActor(
         Level level
     ) {
+
         boolean unlocked =
-            isLevelUnlocked(level);
-
-        boolean current =
-            isCurrentLevel(level);
-
-        Stack stack = new Stack();
-
-        stack.setTouchable(Touchable.enabled);
-        stack.setTransform(true);
-        stack.setOrigin(Align.center);
-
-        TextButton button =
-            new TextButton(
-                unlocked
-                    ? String.valueOf(level.getId())
-                    : "",
-                skin,
-                unlocked
-                    ? "green"
-                    : "brown"
+            isLevelUnlocked(
+                level
             );
 
-        /*
-         * The Stack handles clicks.
-         * Button is visual only here.
-         */
-        button.setTouchable(
+
+        boolean current =
+            isCurrentLevel(
+                level
+            );
+
+
+        Stack stack =
+            new Stack();
+
+
+        stack.setTouchable(
+            Touchable.enabled
+        );
+
+
+        stack.setTransform(true);
+
+        stack.setOrigin(
+            Align.center
+        );
+
+
+        // ---------------------------------------------------------------------
+        // Real PvZ2 level node texture
+        // ---------------------------------------------------------------------
+
+        Image node =
+            new Image(
+                levelNodeRegion
+            );
+
+
+        node.setScaling(
+            Scaling.fit
+        );
+
+
+        node.setTouchable(
             Touchable.disabled
         );
 
-        stack.add(button);
 
+        /*
+         * Locked nodes appear slightly darker.
+         */
         if (!unlocked) {
 
-            if (lockRegion != null) {
+            node.setColor(
+                0.58f,
+                0.58f,
+                0.58f,
+                1f
+            );
+        }
 
-                Table lockHolder =
-                    new Table();
 
-                lockHolder.setTouchable(
-                    Touchable.disabled
+        stack.add(node);
+
+
+        // ---------------------------------------------------------------------
+        // Node content
+        // ---------------------------------------------------------------------
+
+        if (unlocked) {
+
+            Table numberHolder =
+                new Table();
+
+
+            numberHolder.setTouchable(
+                Touchable.disabled
+            );
+
+
+            Label number =
+                new Label(
+                    String.valueOf(
+                        level.getId()
+                    ),
+                    skin,
+                    "big_outline"
                 );
 
-                Image lock =
-                    new Image(lockRegion);
 
-                lock.setScaling(
-                    Scaling.fit
+            number.setAlignment(
+                Align.center
+            );
+
+
+            number.setTouchable(
+                Touchable.disabled
+            );
+
+
+            numberHolder.add(number)
+                .center()
+                .padTop(3f);
+
+
+            stack.add(
+                numberHolder
+            );
+
+
+        } else {
+
+            Table lockHolder =
+                new Table();
+
+
+            lockHolder.setTouchable(
+                Touchable.disabled
+            );
+
+
+            Image lock =
+                new Image(
+                    lockRegion
                 );
 
-                lock.setTouchable(
-                    Touchable.disabled
+
+            lock.setScaling(
+                Scaling.fit
+            );
+
+
+            lock.setTouchable(
+                Touchable.disabled
+            );
+
+
+            lockHolder.add(lock)
+                .size(
+                    38f,
+                    38f
                 );
 
-                lockHolder.add(lock)
-                    .size(45f, 45f);
 
-                stack.add(lockHolder);
+            stack.add(
+                lockHolder
+            );
+        }
 
-            } else {
 
-                Table lockHolder =
-                    new Table();
+        // ---------------------------------------------------------------------
+        // Current level indicator
+        // ---------------------------------------------------------------------
 
-                Label lockText =
-                    new Label(
-                        "LOCK",
-                        skin,
-                        "medium_outline"
-                    );
-
-                lockText.setTouchable(
-                    Touchable.disabled
-                );
-
-                lockHolder.add(lockText);
-
-                stack.add(lockHolder);
-            }
-
-        } else if (current) {
+        if (current &&
+            unlocked) {
 
             Table currentHolder =
                 new Table();
 
+
             currentHolder.bottom();
+
+
+            currentHolder.setTouchable(
+                Touchable.disabled
+            );
+
 
             Label currentLabel =
                 new Label(
@@ -810,41 +1176,57 @@ public class PlayView extends View {
                     "secondary"
                 );
 
+
             currentLabel.setTouchable(
                 Touchable.disabled
             );
 
-            currentHolder.add(currentLabel)
-                .padBottom(3f);
 
-            currentHolder.setTouchable(
-                Touchable.disabled
+            currentHolder.add(
+                    currentLabel
+                )
+                .padBottom(5f);
+
+
+            stack.add(
+                currentHolder
             );
-
-            stack.add(currentHolder);
         }
+
+
+        // ---------------------------------------------------------------------
+        // Click
+        // ---------------------------------------------------------------------
 
         stack.addListener(
             new ClickListener() {
+
                 @Override
                 public void clicked(
                     InputEvent event,
                     float x,
                     float y
                 ) {
+
                     if (!unlocked) {
-                        playLockedAnimation(stack);
+
+                        playLockedAnimation(
+                            stack
+                        );
+
                         return;
                     }
 
+
                     /*
-                     * PlayMenu performs:
+                     * PlayMenu itself:
                      *
-                     * - finding the Level
-                     * - unlock validation
-                     * - changing the Screen to GameView
+                     * 1. finds Level
+                     * 2. checks unlock state
+                     * 3. creates GameView
+                     * 4. changes the current Screen
                      *
-                     * String return value is intentionally ignored.
+                     * Its returned String is only legacy CLI output.
                      */
                     playMenu.play(
                         level.getId()
@@ -853,15 +1235,22 @@ public class PlayView extends View {
             }
         );
 
+
         return stack;
     }
 
 
+    // -------------------------------------------------------------------------
+    // Progression
+    // -------------------------------------------------------------------------
+
     private boolean isLevelUnlocked(
         Level level
     ) {
+
         User user =
             App.getCurrentuser();
+
 
         if (user == null ||
             level == null) {
@@ -869,8 +1258,9 @@ public class PlayView extends View {
             return false;
         }
 
+
         /*
-         * Exactly the same progression rule currently used by PlayMenu.
+         * Same rule currently used by PlayMenu.
          */
         return user.getLevelsPassed()
             >= level.getId() - 1;
@@ -880,8 +1270,10 @@ public class PlayView extends View {
     private boolean isCurrentLevel(
         Level level
     ) {
+
         User user =
             App.getCurrentuser();
+
 
         if (user == null ||
             level == null) {
@@ -889,30 +1281,41 @@ public class PlayView extends View {
             return false;
         }
 
-        return user.getChapter()
-            == selectedChapter
 
-            && user.getLevelId()
-            == level.getId();
+        return
+            user.getChapter()
+                == selectedChapter
+
+                &&
+
+                user.getLevelId()
+                    == level.getId();
     }
 
+
+    // -------------------------------------------------------------------------
+    // Locked node feedback
+    // -------------------------------------------------------------------------
 
     private void playLockedAnimation(
         Actor actor
     ) {
+
         actor.clearActions();
+
 
         actor.addAction(
             Actions.sequence(
+
                 Actions.scaleTo(
-                    0.92f,
-                    0.92f,
-                    0.07f
+                    0.90f,
+                    0.90f,
+                    0.06f
                 ),
 
                 Actions.scaleTo(
-                    1.05f,
-                    1.05f,
+                    1.06f,
+                    1.06f,
                     0.07f
                 ),
 
@@ -931,700 +1334,264 @@ public class PlayView extends View {
     // -------------------------------------------------------------------------
 
     private void goBack() {
+
         /*
-         * PlayMenu.exitMenu() already changes screen to HomeView.
-         * Its String output belonged to the CLI version.
+         * PlayMenu.exitMenu() performs the actual navigation.
          */
         playMenu.exitMenu();
     }
 
 
     // -------------------------------------------------------------------------
-    // PvZ assets
+    // PvZ asset loading
     // -------------------------------------------------------------------------
 
     private void initialisePvzAssets() {
+
         pvzAssetsRoot =
             findPvzAssetsRoot();
 
+
         if (pvzAssetsRoot == null) {
 
-            Gdx.app.error(
-                "PlayView",
-                "PVZ asset directory was not found. " +
-                    "Use -Dpvz.assets=<path-to-extracted-pvz-assets>"
-            );
-
-            return;
-        }
-
-        try {
-
-            textureBank =
-                new TextureBank(
-                    ASSET_RESOLUTION,
-                    pvzAssetsRoot
-                );
-
-            Gdx.app.log(
-                "PlayView",
-                "PVZ assets loaded from: " +
-                    pvzAssetsRoot.path()
-            );
-
-        } catch (Exception e) {
-
-            textureBank = null;
-
-            Gdx.app.error(
-                "PlayView",
-                "Failed to initialise TextureBank",
-                e
+            throw new IllegalStateException(
+                "Could not find the extracted PvZ2 Assets folder. " +
+                    "Expected repo/Assets next to repo/pvz2, " +
+                    "or set -Dpvz.assets=<path>."
             );
         }
+
+
+        textureBank =
+            new TextureBank(
+                PVZ_ASSET_RESOLUTION,
+                pvzAssetsRoot
+            );
+
+
+        Gdx.app.log(
+            "PlayView",
+            "PVZ assets: "
+                + pvzAssetsRoot
+                .file()
+                .getAbsolutePath()
+        );
     }
 
 
+    /*
+     * Our repository layout is:
+     *
+     * repo/
+     * ├── Assets/
+     * └── pvz2/
+     *     └── assets/  <- Gradle desktop working directory
+     *
+     * Therefore:
+     *
+     * ../../Assets
+     *
+     * is the normal development path.
+     *
+     * ../Assets and Assets are included only because IDEs can use a
+     * different working directory.
+     */
     private FileHandle findPvzAssetsRoot() {
 
-        List<FileHandle> roots =
-            new ArrayList<>();
+        // ---------------------------------------------------------------------
+        // Explicit override
+        // ---------------------------------------------------------------------
 
         String configured =
             System.getProperty(
                 "pvz.assets"
             );
 
+
         if (configured != null &&
             !configured.isBlank()) {
 
-            roots.add(
+            FileHandle root =
                 new FileHandle(
                     new File(configured)
-                )
-            );
-        }
+                );
 
-        /*
-         * Useful development fallbacks.
-         */
-        roots.add(
-            new FileHandle(
-                new File("Assets")
-            )
-        );
 
-        roots.add(
-            new FileHandle(
-                new File("pvz-assets")
-            )
-        );
-
-        roots.add(
-            Gdx.files.internal(
-                "pvz-assets"
-            )
-        );
-
-        for (FileHandle candidate : roots) {
-
-            FileHandle resolved =
-                resolveAssetRoot(candidate);
-
-            if (resolved != null) {
-                return resolved;
+            if (isPvzAssetsRoot(root)) {
+                return root;
             }
         }
 
-        return null;
-    }
 
+        // ---------------------------------------------------------------------
+        // Project development layouts
+        // ---------------------------------------------------------------------
 
-    private FileHandle resolveAssetRoot(
-        FileHandle root
-    ) {
-        if (root == null ||
-            !root.exists()) {
-
-            return null;
-        }
-
-        if (isPvzAssetRoot(root)) {
-            return root;
-        }
-
-        /*
-         * Common archive layouts.
-         */
-        String[] possibleChildren = {
-            "Base Assets",
-            "base assets",
-            "BaseAssets",
-            "pvz-assets",
-            "assets"
+        String[] candidates = {
+            "../../Assets",
+            "../Assets",
+            "Assets"
         };
 
-        for (String childName
-            : possibleChildren) {
 
-            FileHandle child =
-                root.child(childName);
+        for (String path :
+            candidates) {
 
-            if (isPvzAssetRoot(child)) {
-                return child;
+            FileHandle root =
+                new FileHandle(
+                    new File(path)
+                );
+
+
+            if (isPvzAssetsRoot(root)) {
+
+                return root;
             }
         }
 
-        /*
-         * One-level automatic search, so the downloaded archive does not have
-         * to match an exact folder name.
-         */
-        try {
-
-            for (FileHandle child
-                : root.list()) {
-
-                if (child.isDirectory() &&
-                    isPvzAssetRoot(child)) {
-
-                    return child;
-                }
-            }
-
-        } catch (Exception ignored) {
-        }
 
         return null;
     }
 
 
-    private boolean isPvzAssetRoot(
+    private boolean isPvzAssetsRoot(
         FileHandle root
     ) {
+
         if (root == null ||
-            !root.exists()) {
+            !root.exists() ||
+            !root.isDirectory()) {
 
             return false;
         }
 
-        boolean hasResources =
+
+        boolean resources =
             root.child(
                 "resources.json"
             ).exists()
 
-                || root.child(
-                "RESOURCES.json"
-            ).exists();
+                ||
 
-        boolean hasAtlases =
+                root.child(
+                    "RESOURCES.json"
+                ).exists();
+
+
+        boolean atlases =
             root.child(
                 "atlases"
             ).exists()
 
-                || root.child(
-                "ATLASES"
-            ).exists();
+                ||
 
-        return hasResources &&
-            hasAtlases;
+                root.child(
+                    "ATLASES"
+                ).exists();
+
+
+        return resources &&
+            atlases;
     }
 
 
-    private void loadMenuAssets() {
-        if (textureBank == null) {
-            return;
-        }
+    // -------------------------------------------------------------------------
+    // Exact texture loading
+    // -------------------------------------------------------------------------
+
+    private void loadMenuTextures() {
+
+        /*
+         * No searching.
+         * No ResourceIndex iteration.
+         * No guessing.
+         *
+         * These are the exact resource IDs found using the PvZ Asset Browser.
+         */
 
         backgroundRegion =
-            findWorldMapBackground();
-
-        lockRegion =
-            findLockRegion();
-
-        for (Chapters chapter
-            : CHAPTER_ORDER) {
-
-            TextureRegion region =
-                findChapterRegion(chapter);
-
-            if (region != null) {
-                chapterRegions.put(
-                    chapter,
-                    region
-                );
-            }
-        }
-    }
-
-
-    // -------------------------------------------------------------------------
-    // Asset discovery
-    // -------------------------------------------------------------------------
-
-    private TextureRegion findChapterRegion(
-        Chapters chapter
-    ) {
-        if (textureBank == null) {
-            return null;
-        }
-
-        String[] chapterTokens =
-            getChapterAssetTokens(chapter);
-
-        ResourceIndex index =
-            textureBank.resourceIndex();
-
-        String bestId = null;
-        int bestScore =
-            Integer.MIN_VALUE;
-
-        /*
-         * Pass 1:
-         * Require the candidate to look like a world-map asset.
-         *
-         * This prevents something delightful like using a frozen zombie's
-         * detached head as the Frozen Caves chapter icon.
-         */
-        for (boolean requireWorldHint
-            : new boolean[]{true, false}) {
-
-            bestId = null;
-            bestScore =
-                Integer.MIN_VALUE;
-
-            for (String id
-                : index.imageIds()) {
-
-                ResourceIndex.ImageEntry entry =
-                    index.image(id);
-
-                if (entry == null) {
-                    continue;
-                }
-
-                String haystack =
-                    (
-                        id + " " +
-                            entry.path
-                    ).toUpperCase(
-                        Locale.ROOT
-                    );
-
-                boolean chapterMatch =
-                    false;
-
-                int score = 0;
-
-                for (String token
-                    : chapterTokens) {
-
-                    if (haystack.contains(token)) {
-
-                        chapterMatch = true;
-
-                        score +=
-                            token.length() >= 8
-                                ? 80
-                                : 45;
-                    }
-                }
-
-                if (!chapterMatch) {
-                    continue;
-                }
-
-                boolean worldHint =
-                    containsAny(
-                        haystack,
-                        "WORLD",
-                        "MAP",
-                        "ISLAND",
-                        "CHAPTER",
-                        "LEVELSELECT",
-                        "LEVEL_SELECT",
-                        "TIMELINE"
-                    );
-
-                if (requireWorldHint &&
-                    !worldHint) {
-
-                    continue;
-                }
-
-                if (worldHint) {
-                    score += 90;
-                }
-
-                if (containsAny(
-                    haystack,
-                    "ICON",
-                    "SELECT",
-                    "WORLDKEY",
-                    "WORLDMAP"
-                )) {
-                    score += 25;
-                }
-
-                if (containsAny(
-                    haystack,
-                    "ZOMBIE",
-                    "PLANT",
-                    "SEED",
-                    "PACKET",
-                    "CARD",
-                    "PROJECTILE",
-                    "PARTICLE"
-                )) {
-                    score -= 180;
-                }
-
-                if (entry.aw >= 100 &&
-                    entry.ah >= 100) {
-
-                    score += 25;
-                }
-
-                if (entry.aw >= 150 &&
-                    entry.aw <= 900 &&
-                    entry.ah >= 120 &&
-                    entry.ah <= 900) {
-
-                    score += 15;
-                }
-
-                float ratio =
-                    entry.ah == 0
-                        ? 0f
-                        : (float) entry.aw /
-                        entry.ah;
-
-                if (ratio >= 0.55f &&
-                    ratio <= 2.0f) {
-
-                    score += 10;
-                }
-
-                if (score > bestScore) {
-                    bestScore = score;
-                    bestId = id;
-                }
-            }
-
-            if (bestId != null) {
-                break;
-            }
-        }
-
-        if (bestId == null) {
-
-            Gdx.app.log(
-                "PlayView",
-                "No world asset found for " +
-                    chapter
+            requireRegion(
+                BACKGROUND_TEXTURE
             );
 
-            return null;
-        }
 
-        Gdx.app.log(
-            "PlayView",
-            chapter +
-                " world resource: " +
-                bestId
-        );
-
-        return textureBank.region(
-            bestId
-        );
-    }
+        lockRegion =
+            requireRegion(
+                LOCK_TEXTURE
+            );
 
 
-    private TextureRegion findWorldMapBackground() {
-        if (textureBank == null) {
-            return null;
-        }
+        levelNodeRegion =
+            requireRegion(
+                LEVEL_NODE_TEXTURE
+            );
 
-        ResourceIndex index =
-            textureBank.resourceIndex();
 
-        String bestId = null;
-        int bestScore =
-            Integer.MIN_VALUE;
+        for (Chapters chapter :
+            CHAPTER_ORDER) {
 
-        for (String id
-            : index.imageIds()) {
-
-            ResourceIndex.ImageEntry entry =
-                index.image(id);
-
-            if (entry == null) {
-                continue;
-            }
-
-            String haystack =
-                (
-                    id + " " +
-                        entry.path
-                ).toUpperCase(
-                    Locale.ROOT
+            String resourceId =
+                WORLD_TEXTURES.get(
+                    chapter
                 );
 
-            int score = 0;
 
-            if (containsAny(
-                haystack,
-                "WORLDMAP",
-                "WORLD_MAP",
-                "LEVELSELECT",
-                "LEVEL_SELECT"
-            )) {
-                score += 100;
-            }
-
-            if (containsAny(
-                haystack,
-                "BACKGROUND",
-                "_BG",
-                "BACKDROP"
-            )) {
-                score += 70;
-            }
-
-            if (containsAny(
-                haystack,
-                "MAP",
-                "WORLD"
-            )) {
-                score += 25;
-            }
-
-            if (containsAny(
-                haystack,
-                "ZOMBIE",
-                "PLANT",
-                "CARD",
-                "PACKET",
-                "ICON",
-                "BUTTON"
-            )) {
-                score -= 130;
-            }
-
-            if (entry.aw >= 600) {
-                score += 35;
-            }
-
-            if (entry.ah >= 300) {
-                score += 25;
-            }
-
-            float ratio =
-                entry.ah == 0
-                    ? 0f
-                    : (float) entry.aw /
-                    entry.ah;
-
-            if (ratio >= 1.4f) {
-                score += 25;
-            }
-
-            if (score > bestScore) {
-                bestScore = score;
-                bestId = id;
-            }
-        }
-
-        /*
-         * Avoid loading some random asset when no candidate looked remotely
-         * like a background.
-         */
-        if (bestId == null ||
-            bestScore < 80) {
-
-            return null;
-        }
-
-        Gdx.app.log(
-            "PlayView",
-            "World map background: " +
-                bestId
-        );
-
-        return textureBank.region(
-            bestId
-        );
-    }
-
-
-    private TextureRegion findLockRegion() {
-        if (textureBank == null) {
-            return null;
-        }
-
-        ResourceIndex index =
-            textureBank.resourceIndex();
-
-        String bestId = null;
-        int bestScore =
-            Integer.MIN_VALUE;
-
-        for (String id
-            : index.imageIds()) {
-
-            ResourceIndex.ImageEntry entry =
-                index.image(id);
-
-            if (entry == null) {
-                continue;
-            }
-
-            String haystack =
-                (
-                    id + " " +
-                        entry.path
-                ).toUpperCase(
-                    Locale.ROOT
+            TextureRegion region =
+                requireRegion(
+                    resourceId
                 );
 
-            if (!haystack.contains("LOCK")) {
-                continue;
-            }
 
-            int score = 60;
-
-            if (haystack.contains("UNLOCK")) {
-                score -= 150;
-            }
-
-            if (containsAny(
-                haystack,
-                "UI",
-                "LEVEL",
-                "WORLD",
-                "MAP"
-            )) {
-                score += 45;
-            }
-
-            if (containsAny(
-                haystack,
-                "ICON",
-                "PADLOCK"
-            )) {
-                score += 30;
-            }
-
-            if (entry.aw >= 20 &&
-                entry.aw <= 250 &&
-                entry.ah >= 20 &&
-                entry.ah <= 250) {
-
-                score += 25;
-            }
-
-            if (score > bestScore) {
-                bestScore = score;
-                bestId = id;
-            }
+            worldRegions.put(
+                chapter,
+                region
+            );
         }
-
-        if (bestId == null) {
-            return null;
-        }
-
-        Gdx.app.log(
-            "PlayView",
-            "Lock resource: " +
-                bestId
-        );
-
-        return textureBank.region(
-            bestId
-        );
     }
 
 
-    private String[] getChapterAssetTokens(
-        Chapters chapter
+    /*
+     * Fail fast when an ID is wrong instead of silently showing
+     * a blank/fallback UI.
+     *
+     * Since these IDs come directly from Asset Browser, a null result means
+     * either:
+     *
+     * 1. wrong Assets directory
+     * 2. wrong resource ID
+     * 3. incompatible asset dump
+     */
+    private TextureRegion requireRegion(
+        String resourceId
     ) {
-        return switch (chapter) {
 
-            case AncientEgypt ->
-                new String[]{
-                    "ANCIENTEGYPT",
-                    "ANCIENT_EGYPT",
-                    "ANCIENT EGYPT",
-                    "EGYPT"
-                };
+        TextureRegion region =
+            textureBank.region(
+                resourceId
+            );
 
-            case FrozenCaves ->
-                new String[]{
-                    "FROZENCAVES",
-                    "FROZEN_CAVES",
-                    "FROZEN CAVES",
-                    "FROZEN",
-                    "ICEAGE",
-                    "ICE_AGE",
-                    "FROSTBITE"
-                };
 
-            case BigWaveBeach ->
-                new String[]{
-                    "BIGWAVEBEACH",
-                    "BIG_WAVE_BEACH",
-                    "BIG WAVE BEACH",
-                    "BEACH",
-                    "BIGWAVE"
-                };
+        if (region == null) {
 
-            case DarkAge ->
-                new String[]{
-                    "DARKAGE",
-                    "DARK_AGE",
-                    "DARK AGE",
-                    "DARKAGES",
-                    "DARK_AGES"
-                };
-        };
+            throw new IllegalStateException(
+                "PvZ texture not found: "
+                    + resourceId
+            );
+        }
+
+
+        return region;
     }
 
 
     // -------------------------------------------------------------------------
-    // Helpers
+    // Chapter text
     // -------------------------------------------------------------------------
-
-    private boolean containsAny(
-        String text,
-        String... tokens
-    ) {
-        if (text == null) {
-            return false;
-        }
-
-        for (String token : tokens) {
-            if (text.contains(token)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-
-    private Drawable safeDrawable(
-        String name
-    ) {
-        try {
-            return skin.getDrawable(name);
-        } catch (Exception ignored) {
-            return null;
-        }
-    }
-
 
     private String getChapterDisplayName(
         Chapters chapter
     ) {
+
         return switch (chapter) {
 
             case AncientEgypt ->
@@ -1639,50 +1606,5 @@ public class PlayView extends View {
             case DarkAge ->
                 "DARK AGES";
         };
-    }
-
-
-    private String getChapterShortName(
-        Chapters chapter
-    ) {
-        return switch (chapter) {
-
-            case AncientEgypt ->
-                "EGYPT";
-
-            case FrozenCaves ->
-                "FROZEN";
-
-            case BigWaveBeach ->
-                "BEACH";
-
-            case DarkAge ->
-                "DARK";
-        };
-    }
-
-
-    // -------------------------------------------------------------------------
-    // Stage + Viewport holder
-    // -------------------------------------------------------------------------
-
-    private static final class StageHolder {
-
-        private final Viewport viewport;
-        private final com.badlogic.gdx.scenes.scene2d.Stage stage;
-
-        private StageHolder() {
-
-            viewport =
-                new FitViewport(
-                    VIRTUAL_WIDTH,
-                    VIRTUAL_HEIGHT
-                );
-
-            stage =
-                new com.badlogic.gdx.scenes.scene2d.Stage(
-                    viewport
-                );
-        }
     }
 }

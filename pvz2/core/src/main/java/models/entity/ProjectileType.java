@@ -1,6 +1,6 @@
 package models.entity;
 
-public enum BulletType {
+public enum ProjectileType {
 
 
 

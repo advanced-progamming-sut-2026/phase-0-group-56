@@ -4,6 +4,7 @@ import commands.GameCommands;
 import controllers.Start.PlantSelection;
 import controllers.datacontroller.SeedPackage;
 import controllers.observer.WizardObserver;
+import models.App;
 import models.gameadventure.*;
 //import models.collection.ZombieRegistry;
 import models.gameadventure.levels.Level;
@@ -35,6 +36,10 @@ public class BaseGame implements Game {
         this.plantFoodsCount = plantFoodsCount;
     }
 
+    public ChapterSpecialEvent getEvent() {
+        return event;
+    }
+
 
 
     protected Field field ;
@@ -45,7 +50,7 @@ public class BaseGame implements Game {
     protected Wave currentWave;
     protected Wave previousWave;
     protected ArrayList<Zombie> zombies = new ArrayList<>(); ///combination of current wave and next wave
-    protected ArrayList<Bullet>  bullets =  new ArrayList<>();
+    protected ArrayList<Projectile> projectiles =  new ArrayList<>();
     protected ArrayList<Sun> suns =  new ArrayList<>();
     protected GameCommands startGameCommand;
     protected ChapterSpecialEvent event;
@@ -66,7 +71,7 @@ public class BaseGame implements Game {
     public void setState(GameState state) { this.state = state; }
     public int getSunCount() { return sunCount; }
     public void setSunCount(int sunCount) { this.sunCount = sunCount; }
-    public ArrayList<Bullet> getBullets() { return bullets; }
+    public ArrayList<Projectile> getBullets() { return projectiles; }
     public ArrayList<Sun> getSuns() { return suns; }
     public Wave getCurrentWave() { return currentWave; }
     public Field getField() { return field; }
@@ -116,7 +121,7 @@ public class BaseGame implements Game {
                 output.append(result.message());
             }
             if(event!=null){
-               // event.run(this , delta);
+               event.run(this , delta);
             }
 
 
@@ -181,6 +186,10 @@ public class BaseGame implements Game {
         gridController.updateItems();
 
         for (Zombie zombie : zombies) {
+            if (event instanceof Tornado tornado && tornado.isCarrying(zombie)) {
+                continue;
+               }
+
             if (zombie.isDead()) {
                 SunRobbingAbility sun = zombie.getAbility(SunRobbingAbility.class);
                 if (sun != null && sun.getStolenSun() > 0) {
@@ -241,12 +250,12 @@ public class BaseGame implements Game {
             currentWave = waves.get(waveID);
             zombies.addAll(currentWave.getZombies());
             waveID += 1;
-         /* event = switch (App.getCurrentuser().getChapter()){
+         event = switch (App.getCurrentuser().getChapter()){
                case AncientEgypt -> new Tornado(this);
                case FrozenCaves -> new IcyWind(this);
                case BigWaveBeach -> new Water(this);
                default -> new GraveSpawner(this);
-            };*/
+            };
            return new Result(true , setTheWaveZombies(waveID == waves.size()) , null);
         }
         return new  Result(false, null,null);

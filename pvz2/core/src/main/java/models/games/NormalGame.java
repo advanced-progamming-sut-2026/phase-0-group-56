@@ -56,19 +56,34 @@ public class NormalGame extends BaseGame{
         finalWave.setId(wavesCount);
         finalWave.setCost(waves.getLast().getCost() * 2);
         finalWave.initWave(zombies);
+        waves.add(finalWave);
     }
 
+    protected void updateProjectiles(float delta) {
+        ArrayList<Projectile> snapshot = new ArrayList<>(projectiles);
+
+        for (Projectile projectile : snapshot) {
+            if (projectile != null && projectiles.contains(projectile)) {
+                projectile.run(delta, this);
+            }
+        }
+
+        float margin = 300f;
+        float maxX = 9f * Tile.getWidth() + margin;
+        float maxY = 5f * Tile.getHeight() + margin;
+
+        projectiles.removeIf(projectile ->
+            projectile == null
+                || projectile.getX() < -margin
+                || projectile.getX() > maxX
+                || projectile.getY() < -margin
+                || projectile.getY() > maxY
+        );
+    }
 
     @Override
     public String playGame(float delta) {
-        Iterator<Bullet> iterator = bullets.iterator();
-        while (iterator.hasNext()){
-            Bullet bullet = iterator.next();
-            bullet.run(delta , this);
-            if(bullet.getPierce() <= 0){
-                iterator.remove();
-            }
-        }
+        updateProjectiles(delta);
         mawners(delta);
         return super.playGame(delta);
     }

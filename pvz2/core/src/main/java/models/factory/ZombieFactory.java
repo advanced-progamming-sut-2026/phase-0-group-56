@@ -150,7 +150,7 @@ public class ZombieFactory {
         // ====== 20. HUNTER ======
         if (type.equals("hunter") || type.equals("ZombieIceAgeHunter")) {
             Zombie z = new Zombie(type, type, row, 700, 100, -60f, 500, 32, 95);
-            z.addAbility(new BulletAbility(BulletType.ICE, 2.0f, 4.0f));
+            z.addAbility(new BulletAbility(ProjectileType.ICE, 2.0f, 4.0f));
             return z;
         }
 
@@ -178,7 +178,7 @@ public class ZombieFactory {
         // ====== 24. OCTOPUS ======
         if (type.equals("octopus") || type.equals("ZombieBeachOctopus")) {
             Zombie z = new Zombie(type, type, row, 910, 100, -60f, 900, 32, 95);
-            z.addAbility(new BulletAbility(BulletType.ICE, 2.0f, 4.0f));
+            z.addAbility(new BulletAbility(ProjectileType.ICE, 2.0f, 4.0f));
             return z;
         }
 

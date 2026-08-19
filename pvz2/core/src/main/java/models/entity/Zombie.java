@@ -98,10 +98,10 @@ public class Zombie extends Entity{
         return Collections.unmodifiableList(bulletObservers);
     }
 
-    public void notifyBulletObservers(Bullet bullet) {
+    public void notifyBulletObservers(Projectile projectile) {
         for (BulletObserver observer : bulletObservers) {
-            observer.onBulletHit(this, bullet);
-            if (!bullet.isActive()) {
+            observer.onBulletHit(this, projectile);
+            if (!projectile.isActive()) {
                 break;
             }
         }
@@ -126,7 +126,7 @@ public class Zombie extends Entity{
             return;
         }
 
-        move();
+        move(deltaTime);
 
 
             eatTimer += deltaTime;
@@ -187,13 +187,13 @@ public class Zombie extends Entity{
     }
 
     // ====== CORE METHODS ======
-    public void move() {
+    public void move(float delta) {
         if (dead) return;
         if (passThroughObserver != null && passThroughObserver.canPassThrough(this, null)) {
-            x += getActualSpeed() * movingDirection();
+            x += getActualSpeed() * movingDirection() * delta / 100;
             return;
         }
-        x += getActualSpeed() * movingDirection();
+        x += getActualSpeed() * movingDirection() * delta / 100;
         int newTile = (int) ((x - 100) / 50);
         if (newTile < 0) newTile = 0;
         if (newTile > 8) newTile = 8;

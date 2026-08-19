@@ -17,10 +17,12 @@ public class Main extends Game {
 
     @Override
     public void create() {
+        System.out.println("Kobe Bryant");
         batch = new SpriteBatch();
         image = new Texture("libgdx.png");
+        Data.loadPlantsFromJson();
+        Data.loadLevelsFromJson();
         new App(this);
-        Data.deserializeUser();
         Data.setUp();
 
     }

@@ -1,8 +1,8 @@
 package controllers.observer;
 
 import models.entity.Zombie;
-import models.entity.Bullet;
+import models.entity.Projectile;
 
 public interface BulletObserver {
-    void onBulletHit(Zombie zombie, Bullet bullet);
+    void onBulletHit(Zombie zombie, Projectile projectile);
 }

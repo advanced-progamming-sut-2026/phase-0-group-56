@@ -10,9 +10,9 @@ import java.util.Iterator;
 public class Homing implements Skill{
     public enum Type{RANDOM,CLOSEST}
     Type type = Type.CLOSEST;
-    private BulletType bullet;
+    private ProjectileType bullet;
     public int targetCount = 1;
-    public Homing(BulletType bullet , Type type ){
+    public Homing(ProjectileType bullet , Type type ){
         this.bullet = bullet;
     }
 
@@ -47,16 +47,16 @@ public class Homing implements Skill{
     public ArrayList<Zombie> random(Plant plant, BaseGame game, int numbers) {
         java.util.ArrayList<Zombie> targets =  Skill.super.random(plant, game, targetCount);
         for (Zombie x : targets){
-            Bullet bullet = new Bullet(plant.getX() + plant.getWidth() ,
+            Projectile projectile = new Projectile(plant.getX() + plant.getWidth() ,
                 plant.getY() + plant.getHeight() * 0.8f , this.bullet,plant.getLine());
-        bullet.setToLockIn(x);
+        projectile.setToLockIn(x);
         float dx = x.getX() - plant.getX();
         float dy = x.getY() - plant.getY();
-        bullet.setVelocityX(Constants.MAGICAL_BULLET_VELOCITY);
-        bullet.setVelocityY(Constants.MAGICAL_BULLET_VELOCITY * dy / dx);
-        bullet.getTags().add(Bullet.Tag.HOMING);
-        bullet.getTags().add(Bullet.Tag.MAGICAL);
-        game.getBullets().add(bullet);
+        projectile.setVelocityX(Constants.MAGICAL_BULLET_VELOCITY);
+        projectile.setVelocityY(Constants.MAGICAL_BULLET_VELOCITY * dy / dx);
+        projectile.getTags().add(Projectile.Tag.HOMING);
+        projectile.getTags().add(Projectile.Tag.MAGICAL);
+        game.getBullets().add(projectile);
         }
         return null;
 
@@ -73,16 +73,16 @@ public class Homing implements Skill{
             }
         }
 
-        Bullet bullet = new Bullet(plant.getX() + plant.getWidth() ,
+        Projectile projectile = new Projectile(plant.getX() + plant.getWidth() ,
                 plant.getY() + plant.getHeight() * 0.8f , this.bullet,plant.getLine());
-        bullet.setToLockIn(curr);
+        projectile.setToLockIn(curr);
         float dx = curr.getX() - plant.getX();
         float dy = curr.getY() - plant.getY();
-        bullet.setVelocityX(Constants.MAGICAL_BULLET_VELOCITY);
-        bullet.setVelocityY(Constants.MAGICAL_BULLET_VELOCITY * dy / dx);
-        bullet.getTags().add(Bullet.Tag.HOMING);
-        bullet.getTags().add(Bullet.Tag.MAGICAL);
-        game.getBullets().add(bullet);
+        projectile.setVelocityX(Constants.MAGICAL_BULLET_VELOCITY);
+        projectile.setVelocityY(Constants.MAGICAL_BULLET_VELOCITY * dy / dx);
+        projectile.getTags().add(Projectile.Tag.HOMING);
+        projectile.getTags().add(Projectile.Tag.MAGICAL);
+        game.getBullets().add(projectile);
     }
 
 

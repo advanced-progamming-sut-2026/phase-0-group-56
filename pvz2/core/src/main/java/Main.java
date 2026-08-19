@@ -15,8 +15,7 @@ public class Main{
         Data.deserializeUser();
         Data.setUp();
         Data.loadPlantsFromJson();
-        MiniGameLevelManager.loadLevelsFromFile("minigames.json");
-        MiniGameLevelManager.loadLevelsFromFile("minigames.json");
+        Data.loadLevelsFromJson();
         while (App.getScreen() != null) {
 
         }

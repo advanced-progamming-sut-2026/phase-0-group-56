@@ -6,13 +6,13 @@ import models.games.BaseGame;
 
 public class BulletAbility implements Ability {
 
-    private final BulletType bulletType;
+    private final ProjectileType projectileType;
     private final float cooldown;
     private final float range;
     private float timer;
 
-    public BulletAbility(BulletType bulletType, float cooldown, float range) {
-        this.bulletType = bulletType;
+    public BulletAbility(ProjectileType projectileType, float cooldown, float range) {
+        this.projectileType = projectileType;
         this.cooldown = cooldown;
         this.range = range;
         this.timer = 0;
@@ -28,16 +28,16 @@ public class BulletAbility implements Ability {
         if (isHypnotized) {
             Zombie target = game.findNearestZombie(zombie, range);
             if (target == null) return;
-            Bullet bullet = new Bullet(zombie.getX(), zombie.getY(), bulletType,zombie.getLine());
-            bullet.setToLockIn(target);
-            game.getBullets().add(bullet);
+            Projectile projectile = new Projectile(zombie.getX(), zombie.getY(), projectileType,zombie.getLine());
+            projectile.setToLockIn(target);
+            game.getBullets().add(projectile);
         } else {
             Plant target = game.findTargetPlant(zombie, range);
             if (target == null) return;
-            Bullet bullet = new Bullet(zombie.getX(), zombie.getY(), bulletType
+            Projectile projectile = new Projectile(zombie.getX(), zombie.getY(), projectileType
             , zombie.getLine());
-            bullet.setToLockIn(null);
-            game.getBullets().add(bullet);
+            projectile.setToLockIn(null);
+            game.getBullets().add(projectile);
         }
 
         timer = cooldown;
