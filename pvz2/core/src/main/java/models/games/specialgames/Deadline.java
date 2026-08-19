@@ -11,10 +11,19 @@ import models.utils.Result;
 import java.util.ArrayList;
 
 public class Deadline extends NormalGame implements SpecialGame {
-    private int deadLine;
+    private final int deadLine;
+
     public Deadline(Chapters chapter, Level level) {
         super(chapter, level);
         deadLine = Constants.DEAD_LINE_TILE_INDEX + level.getId();
+    }
+
+    /**
+     * Last column zombies are allowed to enter before the challenge is lost.
+     * The renderer draws the visual marker on the right edge of this column.
+     */
+    public int getDeadLine() {
+        return deadLine;
     }
 
     @Override
@@ -24,21 +33,19 @@ public class Deadline extends NormalGame implements SpecialGame {
 
     @Override
     public void attack() {
-
     }
 
     @Override
     public Result check_endGame() {
         for (Zombie z : zombies) {
-            if(z.getTileIndex() <= deadLine){
-                return new Result(true , "Loss" , null);
+            if (z.getTileIndex() <= deadLine) {
+                return new Result(true, "Loss", null);
             }
         }
-        return new Result(false , null, null);
+        return new Result(false, null, null);
     }
 
     @Override
     public void endGame() {
-
     }
 }

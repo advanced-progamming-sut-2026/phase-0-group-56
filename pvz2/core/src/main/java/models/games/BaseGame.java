@@ -235,7 +235,7 @@ public class BaseGame implements Game {
 
     @Override
     public boolean plant(String plantName, int x, int y) {
-        return "";
+        return true;
     }
 
 

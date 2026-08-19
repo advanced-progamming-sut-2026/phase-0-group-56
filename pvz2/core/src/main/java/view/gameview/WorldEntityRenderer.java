@@ -32,6 +32,8 @@ public final class WorldEntityRenderer implements Disposable {
     private SunRenderer sunRenderer;
     private MowerRenderer mowerRenderer;
     private ChapterElementRenderer chapterElementRenderer;
+    private SpecialGameElementRenderer specialGameElementRenderer;
+
 
     public WorldEntityRenderer(
         Viewport worldViewport,
@@ -65,6 +67,7 @@ public final class WorldEntityRenderer implements Disposable {
         // Layer order is intentional:
         // map -> chapter ground/water -> plants -> chapter foreground -> suns.
         initialiseChapterBackground(pvzAssetsRoot, sharedTextureBank);
+        initialiseSpecialGameElements(sharedTextureBank);
         initialisePlants(pvzAssetsRoot);
         initialiseMowers(pvzAssetsRoot, sharedTextureBank);
         initialiseChapterForeground();
@@ -118,6 +121,41 @@ public final class WorldEntityRenderer implements Disposable {
             );
         }
     }
+
+    private void initialiseSpecialGameElements(TextureBank sharedTextureBank) {
+                if (sharedTextureBank == null
+                        || !SpecialGameElementRenderer.supports(controller.getGame())) {
+                        return;
+                    }
+
+                    try {
+                        specialGameElementRenderer = new SpecialGameElementRenderer(
+                                sharedTextureBank
+                                );
+
+                            SpecialGameElementLayer specialLayer = new SpecialGameElementLayer(
+                                controller,
+                                specialGameElementRenderer
+                                );
+                        specialLayer.setBounds(
+                                pitchBounds.x,
+                                pitchBounds.y,
+                                pitchBounds.width,
+                             pitchBounds.height
+                                );
+
+                            // Added before PlantLayer, therefore protected tiles and the
+                                // deadline marker stay on the lawn instead of covering plants.
+                                    stage.addActor(specialLayer);
+                    } catch (RuntimeException e) {
+                        specialGameElementRenderer = null;
+                     Gdx.app.error(
+                            TAG,
+                                "Failed to initialise special-game visuals.",
+                                e
+                                );
+                    }
+           }
 
 
 
@@ -308,6 +346,8 @@ public final class WorldEntityRenderer implements Disposable {
             mowerRenderer = null;
         }
         // SunRenderer does not own sharedTextureBank.
+               specialGameElementRenderer = null; // shared TextureBank is owned by GameView
+
         sunRenderer = null;
     }
 }

@@ -10,6 +10,7 @@ import pvz.skin.PvzSkin;
 
 public class Main{
     private static String COMMAND = "java \"-Dpvz.assets=.\\Assets\" -jar browser.jar";
+
     public static void main(String[] args) {
 
         Data.deserializeUser();
