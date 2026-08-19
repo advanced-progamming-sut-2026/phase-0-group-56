@@ -93,23 +93,23 @@ public class VaseBraker extends BaseGame {
     }
 
     @Override
-    public String plant(String plantName, int x, int y) {
+    public boolean plant(String plantName, int x, int y) {
         try {
             PlantType type = PlantType.valueOf(plantName);
             if(!seedPackages.containsKey(type)){
-                return "There is no seed packets of this plant!";
+                return false;
             }
             Tile tile = field.getTileByCoordinats(x, y);
-            if(!tile.isEmpty() || !tile.isPlantable()) return "Cannot plant here.";
+            if(!tile.isEmpty() || !tile.isPlantable()) return false;
             Plant plant = plantFactory.createPlant(type);
             plant.setTileIndex(x);
             plant.setLine(y);
             tile.setEmpty(false);
             plantsInField.add(plant);
-            return "Plant" + plantName + " planted ";
+            return true;
 
         }catch (IllegalArgumentException e){
-            return "There is no such plant";
+            return false;
         }
     }
 

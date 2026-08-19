@@ -210,6 +210,7 @@ public class BaseGame implements Game {
                }
 
             if (zombie.isDead()) {
+                System.out.println("zombie died at (" + zombie.getX() + ", " + zombie.getY() + ")");
                 SunRobbingAbility sun = zombie.getAbility(SunRobbingAbility.class);
                 if (sun != null && sun.getStolenSun() > 0) {
                     int released = sun.getStolenSun() / 2;

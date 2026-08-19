@@ -66,7 +66,7 @@ public class ConveyorBelt extends NormalGame implements SpecialGame {
     }
 
     @Override
-    public String plant(String plantName, int x, int y) {
+    public boolean plant(String plantName, int x, int y) {
         try {
             PlantType type = PlantType.valueOf(plantName.toUpperCase());
             if(belt.contains(type)){
@@ -78,11 +78,11 @@ public class ConveyorBelt extends NormalGame implements SpecialGame {
                 Tile tile = this.field.getTileByCoordinats(x,y);
                 tile.setEmpty(true);
                 this.plantsInField.add(plant);
-            return "Planted " + type.name() + " successfully";
+            return true;
             }
-            else return "We don't have this plant on the belt now.";
+            else return false;
         }catch (Exception e){
-            return "No plant found with name " + plantName;
+            return false;
         }
     }
 

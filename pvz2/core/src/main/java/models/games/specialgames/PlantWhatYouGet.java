@@ -54,17 +54,17 @@ public class PlantWhatYouGet extends NormalGame implements SpecialGame {
     }
 
     @Override
-    public String plant(String plantName, int x, int y) {
-        if(selectionFinished) return "Yo What? Wanna plant? Lol , you idiot , you're fucked up.";
+    public boolean plant(String plantName, int x, int y) {
+        if(selectionFinished) return false;
         try {
             PlantBuilder builder = new PlantBuilder();
             PlantType type = PlantType.valueOf(plantName);
             if(!availablePlants.containsKey(type)){
-                return "Plant is not in the slots.";
+                return false;
             }
             float cost = availablePlants.get(type).getCost();
             if(sunCount < cost){
-                return "Not enough suns to plant " + plantName;
+                return false;
             }
             sunCount -= (int) cost;
             Plant plant = builder.build(type);
@@ -73,9 +73,9 @@ public class PlantWhatYouGet extends NormalGame implements SpecialGame {
             plantsInField.add(plant);
             Tile tile = field.getTileByCoordinats(x, y);
             tile.setEmpty(true);
-            return "Plant " + type +" planted at (" + x + ", " + y + ")" + "and cost you " + cost + " suns.";
+            return true;
         }catch (IllegalArgumentException e){
-            return ("Invalid PlantType");
+            return false;
         }
     }
 

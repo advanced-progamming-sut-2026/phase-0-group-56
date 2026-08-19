@@ -28,7 +28,7 @@ public class VaseBreakerController implements Controller{
         return "";
     }
 
-    public String plant(String plantNamt , int x , int y){
+    public boolean plant(String plantNamt , int x , int y){
         return game.plant(plantNamt, x, y);
     }
 

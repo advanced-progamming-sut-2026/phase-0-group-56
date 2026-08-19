@@ -72,21 +72,21 @@ public class GameController implements Controller, Menu {
     // GUI-facing gameplay API
     // -------------------------------------------------------------------------
 
-    public String plant(PlantType type, int x, int y) {
+    public boolean plant(PlantType type, int x, int y) {
         if (type == null) {
-            return "Plant not found.";
+            return false;
         }
         return plant(type.name(), x, y);
     }
 
-    public String plant(String name, int x, int y) {
+    public boolean plant(String name, int x, int y) {
         if (game.getState() != BaseGame.GameState.PLAYING) {
-            return "The game is not running.";
+            return false;
         }
 
         PlantType type = parsePlantType(name);
         if (type == null) {
-            return "Plant not found.";
+            return false;
         }
 
         // ConveyorBelt owns availability itself; it does not use SeedPackage cooldowns.
@@ -96,15 +96,15 @@ public class GameController implements Controller, Menu {
 
         SeedPackage packet = game.getAvailable_plants().get(type);
         if (packet == null) {
-            return "This plant is not selected.";
+            return false;
         }
 
         if (!packet.isAvailable()) {
-            return type.name() + " is still recharging.";
+            return false;
         }
 
         int before = game.getPlantsInField().size();
-        String result = game.plant(type.name(), x, y);
+        boolean result = game.plant(type.name(), x, y);
         int after = game.getPlantsInField().size();
 
         /*

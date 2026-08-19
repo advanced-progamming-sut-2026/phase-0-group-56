@@ -532,7 +532,8 @@ public final class GameView extends View {
                 }
 
                 int before = controller.getGame().getPlantsInField().size();
-                String result = controller.plant(type, column, row);
+                boolean couldPlant = controller.plant(type, column, row);
+                String result = couldPlant ? "Planted successfully." : "Plant failed.";
                 int after = controller.getGame().getPlantsInField().size();
 
                 toolsStack.setStatus(result);

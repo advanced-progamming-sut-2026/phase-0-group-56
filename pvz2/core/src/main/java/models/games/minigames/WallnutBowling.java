@@ -44,16 +44,16 @@ public class WallnutBowling extends NormalGame {
     }
 
     @Override
-    public String plant(String plantName, int x, int y) {
-        if(x >= Constants.WALLNUT_LIMIT_LINE) return "You can't plant after limit line!";
+    public boolean plant(String plantName, int x, int y) {
+        if(x >= Constants.WALLNUT_LIMIT_LINE) return false;
         if(plantName.equals("Wallnut") && belt.contains(plantName)){
             nuts.add(makeNut(false , x ,y));
         }
         else if(plantName.equals("Explod'O nut") && belt.contains(plantName)){
             nuts.add(makeNut(true , x ,y));
         }
-        else return "Come on man open your eyes.";
-        return "Suiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii , bowling on It's wayyyyy";
+        else return false;
+        return true;
     }
 
     private BowlingNut makeNut(boolean explosive , int x , int y) {

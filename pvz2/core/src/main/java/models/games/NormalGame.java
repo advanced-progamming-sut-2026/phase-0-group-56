@@ -16,6 +16,7 @@ import java.util.Iterator;
 
 public class NormalGame extends BaseGame{
 
+    public NormalGame(){}
 public NormalGame(Chapters chapters, Level level){
     this.chapter = chapters;
     this.level = level;

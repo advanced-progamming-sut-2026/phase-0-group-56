@@ -31,11 +31,11 @@ public class WallnutController implements Controller{
     private void endGame(){
         App.setScreen(new TravelLogView());
     }
-    public String plant(String name , int x , int y) {
+    public boolean plant(String name , int x , int y) {
         try {
             return game.plant(name ,  x , y);
         }catch (Exception e){
-            return "Name of the plant is not correct.";
+            return false;
         }
     }
 
