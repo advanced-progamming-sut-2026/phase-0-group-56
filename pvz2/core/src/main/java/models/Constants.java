@@ -3,6 +3,7 @@ package models;
 import models.entity.Entity;
 
 public class Constants {
+    public final static int PROTECTED_SEEDS_COUNT = 3;
         public final static float GRAVITY = 300;
     public final static float LOBBER_BULLET_VELOCITY_X = 100;
     public final static float BULLET_VELOCITY_X = 120;

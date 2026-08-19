@@ -3,12 +3,18 @@ package models.games.specialgames;
 import models.Constants;
 import models.entity.Zombie;
 import models.factory.builder.PlantType;
+import models.gameadventure.Chapters;
+import models.gameadventure.levels.Level;
 import models.games.NormalGame;
 import models.utils.Result;
 
 import java.util.ArrayList;
 
 public class Deadline extends NormalGame implements SpecialGame {
+    public Deadline(Chapters chapter, Level level) {
+        super(chapter, level);
+    }
+
     @Override
     public ArrayList<PlantType> filterPlants() {
         return null;

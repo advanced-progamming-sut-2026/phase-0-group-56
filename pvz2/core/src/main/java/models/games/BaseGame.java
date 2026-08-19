@@ -4,7 +4,6 @@ import commands.GameCommands;
 import controllers.Start.PlantSelection;
 import controllers.datacontroller.SeedPackage;
 import controllers.observer.WizardObserver;
-import models.App;
 import models.gameadventure.*;
 //import models.collection.ZombieRegistry;
 import models.gameadventure.levels.Level;
@@ -41,7 +40,8 @@ public class BaseGame implements Game {
     }
 
 
-
+    protected Chapters chapter;
+    protected Level level;
     protected Field field ;
     protected ArrayList<Wave> waves = new ArrayList<>();
     protected ArrayList<Plant> plantsInField = new  ArrayList<>();
@@ -234,7 +234,7 @@ public class BaseGame implements Game {
     }
 
     @Override
-    public String plant(String plantName, int x, int y) {
+    public boolean plant(String plantName, int x, int y) {
         return "";
     }
 
@@ -269,7 +269,7 @@ public class BaseGame implements Game {
             currentWave = waves.get(waveID);
             zombies.addAll(currentWave.getZombies());
             waveID += 1;
-         event = switch (App.getCurrentuser().getChapter()){
+         event = switch (chapter){
                case AncientEgypt -> new Tornado(this);
                case FrozenCaves -> new IcyWind(this);
                case BigWaveBeach -> new Water(this);

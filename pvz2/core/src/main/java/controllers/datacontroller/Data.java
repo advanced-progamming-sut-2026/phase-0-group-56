@@ -177,7 +177,7 @@ public class Data {
 
             Gdx.app.log(
                 "Data",
-                "Levels loaded successfully! Total chapters: " + allLevels.size()
+                "Levels loaded successfully! Total chapter: " + allLevels.size()
             );
 
         } catch (Exception e) {

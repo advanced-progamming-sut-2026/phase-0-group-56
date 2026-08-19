@@ -16,6 +16,10 @@ import java.util.Iterator;
 
 public class NormalGame extends BaseGame{
 
+public NormalGame(Chapters chapters, Level level){
+    this.chapter = chapters;
+    this.level = level;
+}
     @Override
     public void initGame(Chapters chapter , Level level) {
         waves = new  ArrayList<>();
@@ -88,23 +92,23 @@ public class NormalGame extends BaseGame{
     }
 
     @Override
-    public String plant(String plantName, int x, int y) {
+    public boolean plant(String plantName, int x, int y) {
         String name = plantName.replaceAll(" " , "_").toUpperCase();
         Result findPlant = plantAvailable(name);
         if(!findPlant.success()){
-            return findPlant.message();
+            return false;
         }
         try {
             if(availablePlants.get(findPlant.plantType()).getCost() > sunCount){
-                return "Can't plant , not enough suns.";
+                return false;
             }
         }catch (Exception e){
-            return "This plant , you haven't selected!\n - Yoda";
+            return false;
         }
 
             Plant newPlant = plantFactory.createPlant(findPlant.plantType());
         if(!isEmpty(newPlant ,x, y)) {
-            return "The coordination is not empty or plantable.";
+            return false;
         }
         plantsInField.add(newPlant);
         Tile tile = field.getTiles().get(y).get(x);
@@ -121,8 +125,7 @@ public class NormalGame extends BaseGame{
             seedPackage.setBoost(false);
         }
         this.sunCount -= (int) availablePlants.get(findPlant.plantType()).getCost();
-        return "New plant : " + findPlant.plantType().name() + " planted successfully at coordination :" +
-                " ( " + x + "," + y + ")";
+        return true;
     }
 
     protected Result plantAvailable(String plantName) {
