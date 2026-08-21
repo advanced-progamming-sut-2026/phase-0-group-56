@@ -4,6 +4,7 @@ import controllers.datacontroller.Data;
 import controllers.datacontroller.SeedPackage;
 import controllers.menus.Menu;
 import models.App;
+import models.QuestGameSession;
 import models.User;
 import models.entity.*;
 import models.entity.Projectile;
@@ -41,6 +42,7 @@ public class GameController implements Controller, Menu {
     private final BaseGame game;
     private final Level level;
     private final Chapters chapter;
+    private final QuestGameSession questSession;
 
     public GameController(Chapters chapter, Level level) {
         if (chapter == null) {
@@ -66,6 +68,7 @@ public class GameController implements Controller, Menu {
         };
 
         game.initGame(chapter, level);
+        questSession = new QuestGameSession(game, chapter, level);
     }
 
     // -------------------------------------------------------------------------
@@ -89,23 +92,27 @@ public class GameController implements Controller, Menu {
             return "Plant not found.";
         }
 
-        // ConveyorBelt owns availability itself; it does not use SeedPackage cooldowns.
-        if (game instanceof ConveyorBelt) {
-            return game.plant(type.name(), x, y);
-        }
+        boolean conveyorBelt = game instanceof ConveyorBelt;
 
-        SeedPackage packet = game.getAvailable_plants().get(type);
-        if (packet == null) {
-            return "This plant is not selected.";
-        }
+        if (!conveyorBelt) {
+            SeedPackage packet = game.getAvailable_plants().get(type);
+            if (packet == null) {
+                return "This plant is not selected.";
+            }
 
-        if (!packet.isAvailable()) {
-            return type.name() + " is still recharging.";
+            if (!packet.isAvailable()) {
+                return type.name() + " is still recharging.";
+            }
         }
 
         int before = game.getPlantsInField().size();
         String result = game.plant(type.name(), x, y);
         int after = game.getPlantsInField().size();
+
+        if (after > before) {
+            Plant placedPlant = game.findByCoordinates(x, y);
+            questSession.onPlantPlaced(placedPlant);
+        }
 
         /*
          * SeedPackage stores the remaining cooldown rather than its original maximum.
@@ -113,7 +120,7 @@ public class GameController implements Controller, Menu {
          * recreating the selected package is the safest controller-level reset without
          * changing model classes.
          */
-        if (after > before) {
+        if (!conveyorBelt && after > before) {
             SeedPackage recharged = game.getSelection().selectPlant(type.name());
             if (recharged != null) {
                 game.getAvailable_plants().put(type, recharged);
@@ -169,9 +176,7 @@ public class GameController implements Controller, Menu {
 
         game.setSunCount(game.getSunCount() + sun.getPrice());
 
-        if (App.getCurrentuser() != null) {
-            App.getCurrentuser().updateQuestProgress("COLLECT_SUN", sun.getPrice());
-        }
+        questSession.onSunCollected(sun.getPrice());
 
         int price = sun.getPrice();
         iterator.remove();
@@ -332,6 +337,7 @@ public class GameController implements Controller, Menu {
         }
 
         game.setState(BaseGame.GameState.PLAYING);
+        questSession.onGameStarted();
         return "Game started.";
     }
 
@@ -345,7 +351,9 @@ public class GameController implements Controller, Menu {
             return "";
         }
 
+        questSession.beforeUpdate();
         String log = game.playGame(delta);
+        questSession.afterUpdate(delta);
         Result endResult = game.check_endGame();
 
         if (endResult.success() && "Loss".equals(endResult.message())) {
@@ -354,6 +362,7 @@ public class GameController implements Controller, Menu {
         }
 
         if (game.isWon()) {
+            questSession.onGameWon();
             end();
             return "Level completed.";
         }
