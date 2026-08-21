@@ -4,6 +4,7 @@ import models.entity.ZombieRegistry;
 import models.factory.builder.PlantType;
 import models.gameadventure.Chapters;
 import models.gameadventure.levels.Level;
+import models.utils.CredentialHasher;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -161,7 +162,7 @@ public class User implements Serializable, QuestObserver {
 
     public void setSecurityQuestion(int questionNumber, String answer) {
         this.securityQuestionNumber = questionNumber;
-        this.securityAnswer = answer;
+        this.securityAnswer = CredentialHasher.hash(normalizeSecurityAnswer(answer));
     }
 
     public int getSecurityQuestionNumber() {
@@ -169,7 +170,18 @@ public class User implements Serializable, QuestObserver {
     }
 
     public boolean checkSecurityAnswer(String answer) {
-        return securityAnswer != null && securityAnswer.equals(answer);
+        String normalizedAnswer = normalizeSecurityAnswer(answer);
+        boolean matches = CredentialHasher.matches(normalizedAnswer, securityAnswer);
+
+        if (matches && !CredentialHasher.isSha256Hash(securityAnswer)) {
+            securityAnswer = CredentialHasher.hash(normalizedAnswer);
+        }
+
+        return matches;
+    }
+
+    private String normalizeSecurityAnswer(String answer) {
+        return answer == null ? "" : answer.trim();
     }
 
     public int getVaseBreaker() {
