@@ -130,7 +130,7 @@ public class ShopView extends View {
             table,
             "RANDOM SEED PACKETS",
             "1000 COINS",
-            "Receive 5 random seed packets.",
+            "Receive 5 seed packets for one random unlocked plant.",
             () ->
                 confirmPurchase(
                     "Random Seed Packets",
@@ -194,10 +194,21 @@ public class ShopView extends View {
             user.getUnlockedPlants()
         ) {
 
-            names.add(
-                type.name()
-            );
+            if (
+                type != null
+                    && type
+                    != PlantType.MARIGOLD
+            ) {
+
+                names.add(
+                    type.name()
+                );
+            }
         }
+
+        names.sort(
+            String.CASE_INSENSITIVE_ORDER
+        );
 
         if (names.isEmpty()) {
             names.add("PEASHOOTER");
@@ -378,9 +389,6 @@ public class ShopView extends View {
                         "Error:"
                     )
                 ) {
-
-                    Data.saveUser();
-
                     content
                         .clearChildren();
 
