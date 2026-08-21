@@ -9,20 +9,19 @@ import com.badlogic.gdx.utils.Align;
 
 import controllers.datacontroller.Data;
 import controllers.menus.secondarymenus.TravelLog;
+import models.App;
 import models.Quest;
 import models.User;
 
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
 public class TravelLogView extends View {
 
-    private String selectedCategory =
-        "ALL";
+    private String selectedCategory = "ALL";
 
     public TravelLogView() {
         menu = new TravelLog();
+        App.setCurrentmenu(menu);
     }
 
     @Override
@@ -36,15 +35,11 @@ public class TravelLogView extends View {
     }
 
     @Override
-    protected void buildContent(
-        Table table
-    ) {
-
+    protected void buildContent(Table table) {
         User user =
             Data.getCurrentUser();
 
         if (user == null) {
-
             table.add(
                 mediumTitle(
                     "PLEASE LOG IN"
@@ -59,14 +54,17 @@ public class TravelLogView extends View {
                 "TRAVEL LOG"
             );
 
-        heading.setAlignment(
-            Align.center
-        );
+        heading.setAlignment(Align.center);
 
         table.add(heading)
             .padTop(4f)
-            .padBottom(12f)
+            .padBottom(10f)
             .row();
+
+        buildQuestSummary(
+            table,
+            user
+        );
 
         buildTabs(table);
 
@@ -75,24 +73,64 @@ public class TravelLogView extends View {
                 selectedCategory
             )
         ) {
-
-            buildMinigameSection(
-                table
-            );
-
+            buildMinigameSection(table);
             return;
         }
 
-        buildQuestList(
-            table,
-            user
-        );
+        buildQuestList(table);
     }
 
-    private void buildTabs(
-        Table table
+    private void buildQuestSummary(
+        Table table,
+        User user
     ) {
+        int inProgress = 0;
+        int claimable = 0;
+        int claimed = 0;
 
+        for (
+            Quest quest :
+            user.getActiveQuests()
+        ) {
+            if (quest == null) {
+                continue;
+            }
+
+            if (quest.isRewardClaimed()) {
+                claimed++;
+            } else if (quest.isClaimable()) {
+                claimable++;
+            } else {
+                inProgress++;
+            }
+        }
+
+        Table summaryPanel =
+            pvzInnerPanel();
+
+        Label summary =
+            secondaryLabel(
+                "IN PROGRESS: "
+                    + inProgress
+                    + "    |    READY TO CLAIM: "
+                    + claimable
+                    + "    |    CLAIMED: "
+                    + claimed
+            );
+
+        summary.setAlignment(Align.center);
+
+        summaryPanel.add(summary)
+            .width(720f)
+            .center();
+
+        table.add(summaryPanel)
+            .width(800f)
+            .padBottom(12f)
+            .row();
+    }
+
+    private void buildTabs(Table table) {
         Table tabPanel =
             pvzInnerPanel();
 
@@ -104,11 +142,7 @@ public class TravelLogView extends View {
             "MINIGAMES"
         };
 
-        for (
-            String category :
-            categories
-        ) {
-
+        for (String category : categories) {
             TextButton button;
 
             if (
@@ -116,26 +150,16 @@ public class TravelLogView extends View {
                     selectedCategory
                 )
             ) {
-
                 button =
                     purpleButton(
                         category,
-                        () -> {
-                        }
+                        null
                     );
-
             } else {
-
                 button =
                     brownButton(
                         category,
-                        () -> {
-
-                            selectedCategory =
-                                category;
-
-                            rebuild();
-                        }
+                        () -> selectCategory(category)
                     );
             }
 
@@ -150,62 +174,28 @@ public class TravelLogView extends View {
             .row();
     }
 
-    private void buildQuestList(
-        Table table,
-        User user
+    private void selectCategory(
+        String category
     ) {
+        selectedCategory = category;
 
-        List<Quest> quests =
-            new ArrayList<>(
-                user.getActiveQuests()
-            );
-
-        quests.sort(
-            Comparator
-                .comparingInt(
-                    Quest::getPriority
-                )
-                .reversed()
-                .thenComparing(
-                    Quest::getQuestName
-                )
+        ((TravelLog) menu).changePage(
+            category
         );
 
-        boolean any =
-            false;
+        rebuild();
+    }
 
-        for (
-            Quest quest :
-            quests
-        ) {
-
-            if (
-                !"ALL".equals(
+    private void buildQuestList(
+        Table table
+    ) {
+        List<Quest> quests =
+            ((TravelLog) menu)
+                .getSortedQuests(
                     selectedCategory
-                )
-                    &&
-                    !selectedCategory
-                        .equalsIgnoreCase(
-                            quest.getCategory()
-                        )
-            ) {
-                continue;
-            }
+                );
 
-            any = true;
-
-            table.add(
-                    buildQuestCard(
-                        quest
-                    )
-                )
-                .width(940f)
-                .pad(7f)
-                .row();
-        }
-
-        if (!any) {
-
+        if (quests.isEmpty()) {
             Table emptyPanel =
                 pvzPanel();
 
@@ -214,9 +204,7 @@ public class TravelLogView extends View {
                     "NO QUESTS IN THIS CATEGORY"
                 );
 
-            empty.setAlignment(
-                Align.center
-            );
+            empty.setAlignment(Align.center);
 
             emptyPanel.add(empty)
                 .width(600f)
@@ -225,33 +213,50 @@ public class TravelLogView extends View {
             table.add(emptyPanel)
                 .width(700f)
                 .padTop(30f);
+
+            return;
+        }
+
+        for (Quest quest : quests) {
+            table.add(
+                    buildQuestCard(quest)
+                )
+                .width(940f)
+                .pad(7f)
+                .row();
         }
     }
 
     private Table buildQuestCard(
         Quest quest
     ) {
+        Table card = pvzPanel();
 
-        Table card =
-            pvzPanel();
-
-        String state =
-            quest.isDone()
-                ? "DONE"
-                : quest
-                .getPriorityName();
+        String titleText =
+            quest.getQuestName()
+                + "  ["
+                + quest.getPriorityName()
+                + "]";
 
         Label questName =
-            mediumTitle(
-                quest.getQuestName()
-                    + "  ["
-                    + state
-                    + "]"
-            );
+            mediumTitle(titleText);
 
         card.add(questName)
             .left()
             .growX()
+            .padBottom(6f)
+            .row();
+
+        Label status =
+            secondaryLabel(
+                "STATUS: "
+                    + quest.getStatusText()
+                    + "    |    CATEGORY: "
+                    + quest.getCategory()
+            );
+
+        card.add(status)
+            .left()
             .padBottom(8f)
             .row();
 
@@ -274,15 +279,9 @@ public class TravelLogView extends View {
             );
 
         ProgressBar progress =
-            new ProgressBar(
-                0f,
+            createProgressBar(
                 target,
-                1f,
-                false,
-                skin,
                 quest.isDone()
-                    ? "xp_green"
-                    : "xp_teal"
             );
 
         progress.setValue(
@@ -299,29 +298,25 @@ public class TravelLogView extends View {
             .padBottom(9f)
             .row();
 
-        String progressText =
-            (int) quest.getProgress()
-                + " / "
-                + (int) quest.getTarget();
-
-        String reward =
-            "REWARD: "
-                + quest.getRewardAmount()
-                + " "
-                + quest.getRewardType();
-
-        Table footer =
-            new Table();
+        Table footer = new Table();
 
         Label progressLabel =
             secondaryLabel(
                 "PROGRESS: "
-                    + progressText
+                    + (int) quest.getProgress()
+                    + " / "
+                    + (int) quest.getTarget()
+                    + "  ("
+                    + (int) quest.getProgressPercent()
+                    + "%)"
             );
 
         Label rewardLabel =
             secondaryLabel(
-                reward
+                "REWARD: "
+                    + quest.getRewardAmount()
+                    + " "
+                    + quest.getRewardType()
             );
 
         footer.add(progressLabel)
@@ -334,35 +329,96 @@ public class TravelLogView extends View {
             .right();
 
         card.add(footer)
-            .width(820f);
+            .width(820f)
+            .padBottom(8f)
+            .row();
+
+        if (quest.isClaimable()) {
+            TextButton claimButton =
+                greenButton(
+                    "CLAIM REWARD",
+                    () -> claimReward(quest)
+                );
+
+            card.add(claimButton)
+                .width(260f)
+                .height(50f)
+                .right();
+        } else if (quest.isRewardClaimed()) {
+            Label claimedLabel =
+                secondaryLabel(
+                    "REWARD CLAIMED"
+                );
+
+            claimedLabel.setAlignment(
+                Align.center
+            );
+
+            card.add(claimedLabel)
+                .width(260f)
+                .height(40f)
+                .right();
+        }
 
         return card;
     }
 
-    /*
-     * ============================================================
-     * MINIGAMES
-     * ============================================================
-     */
+    private ProgressBar createProgressBar(
+        float target,
+        boolean completed
+    ) {
+        String style =
+            completed
+                ? "xp_green"
+                : "xp_teal";
+
+        try {
+            return new ProgressBar(
+                0f,
+                target,
+                1f,
+                false,
+                skin,
+                style
+            );
+        } catch (Exception exception) {
+            return new ProgressBar(
+                0f,
+                target,
+                1f,
+                false,
+                skin
+            );
+        }
+    }
+
+    private void claimReward(
+        Quest quest
+    ) {
+        String result =
+            ((TravelLog) menu)
+                .claimReward(quest);
+
+        rebuild();
+        refreshResourceLabels();
+        showMessage(result);
+    }
 
     private void buildMinigameSection(
         Table table
     ) {
-
         Table descriptionPanel =
             pvzInnerPanel();
 
         Label description =
             wrappedLabel(
                 "Choose one of the mandatory minigames. "
-                    + "The gameplay views can be connected here when their "
-                    + "graphical implementations are finished.",
+                    + "Their graphical gameplay connections "
+                    + "will be completed in phase two.",
                 720f
             );
 
-        description.setAlignment(
-            Align.center
-        );
+        description.setAlignment(Align.center);
 
         descriptionPanel.add(description)
             .width(720f);
@@ -380,9 +436,7 @@ public class TravelLogView extends View {
                 "MINIGAMES"
             );
 
-        title.setAlignment(
-            Align.center
-        );
+        title.setAlignment(Align.center);
 
         minigames.add(title)
             .colspan(3)
@@ -394,8 +448,7 @@ public class TravelLogView extends View {
                     "VASE BREAKER",
                     () ->
                         showMessage(
-                            "Vase Breaker view exists, "
-                                + "but its phase-2 graphical gameplay still needs to be wired here."
+                            "Vase Breaker gameplay will be connected in phase two."
                         )
                 )
             )
@@ -408,8 +461,7 @@ public class TravelLogView extends View {
                     "WALL-NUT BOWLING",
                     () ->
                         showMessage(
-                            "Wall-nut Bowling view exists, "
-                                + "but its phase-2 graphical gameplay still needs to be wired here."
+                            "Wall-nut Bowling gameplay will be connected in phase two."
                         )
                 )
             )
@@ -422,7 +474,7 @@ public class TravelLogView extends View {
                     "I, ZOMBIE",
                     () ->
                         showMessage(
-                            "I, Zombie gameplay screen is not present in the current repository yet."
+                            "I, Zombie gameplay will be connected in phase two."
                         )
                 )
             )
@@ -435,13 +487,12 @@ public class TravelLogView extends View {
     }
 
     private void rebuild() {
+        if (content == null) {
+            return;
+        }
 
         content.clearChildren();
-
-        buildContent(
-            content
-        );
-
+        buildContent(content);
         refreshResourceLabels();
     }
 }
