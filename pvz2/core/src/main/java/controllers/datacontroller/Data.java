@@ -24,6 +24,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Locale;
 
@@ -40,6 +41,7 @@ public class Data {
 
     private static HashMap<PlantType, PlantData> plants = new HashMap<>();
     private static HashMap<Chapters, ArrayList<Level>> allLevels = new HashMap<>();
+    private static HashMap<Integer, Level> levelsById = new HashMap<>();
 
     private Data() {
     }
@@ -101,6 +103,15 @@ public class Data {
         deserializeUser();
         currentUser = null;
         tempUser = null;
+
+        boolean progressMigrated = false;
+        for (User user : allUsers) {
+            progressMigrated |= LevelProgressService.normalizeUserProgress(user);
+        }
+
+        if (progressMigrated) {
+            saveUser();
+        }
 
         for (User user : allUsers) {
             if (user != null && user.isStayLoggedIn()) {
@@ -233,6 +244,7 @@ public class Data {
         if (!file.exists()) {
             Gdx.app.error("Data", "levels.json not found in assets folder.");
             allLevels = new HashMap<>();
+            levelsById = new HashMap<>();
             return;
         }
 
@@ -244,41 +256,131 @@ public class Data {
                 json.fromJson(ArrayList.class, Level.class, file);
 
             HashMap<Chapters, ArrayList<Level>> loadedLevels = new HashMap<>();
+            HashMap<Integer, Level> loadedLevelsById = new HashMap<>();
 
             if (levelsList != null) {
                 for (Level level : levelsList) {
-                    addLoadedLevel(loadedLevels, level);
+                    addLoadedLevel(loadedLevels, loadedLevelsById, level);
                 }
             }
 
+            for (ArrayList<Level> chapterLevels : loadedLevels.values()) {
+                chapterLevels.sort(Comparator.comparingInt(Level::getId));
+            }
+
+            validateLevelSequence(loadedLevelsById);
+
             allLevels = loadedLevels;
+            levelsById = loadedLevelsById;
 
             Gdx.app.log(
                 "Data",
                 "Levels loaded successfully. Chapters: " + allLevels.size()
+                    + ", levels: " + levelsById.size()
             );
         } catch (Exception exception) {
             allLevels = new HashMap<>();
+            levelsById = new HashMap<>();
             Gdx.app.error("Data", "Error reading levels.json.", exception);
         }
     }
 
     private static void addLoadedLevel(
         HashMap<Chapters, ArrayList<Level>> loadedLevels,
+        HashMap<Integer, Level> loadedLevelsById,
         Level level
     ) {
-        if (level == null || level.getChapters() == null) {
-            Gdx.app.error("Data", "Skipping a level with no chapter.");
+        String validationError = getLevelValidationError(level);
+        if (validationError != null) {
+            Gdx.app.error("Data", "Skipping invalid level: " + validationError);
+            return;
+        }
+
+        if (loadedLevelsById.containsKey(level.getId())) {
+            Gdx.app.error(
+                "Data",
+                "Skipping duplicate level id: " + level.getId()
+            );
             return;
         }
 
         Chapters chapter = level.getChapters();
         loadedLevels.putIfAbsent(chapter, new ArrayList<>());
         loadedLevels.get(chapter).add(level);
+        loadedLevelsById.put(level.getId(), level);
+    }
+
+    private static String getLevelValidationError(Level level) {
+        if (level == null) {
+            return "level entry is null";
+        }
+        if (level.getId() <= 0) {
+            return "id must be positive";
+        }
+        if (level.getChapters() == null) {
+            return "level " + level.getId() + " has no chapter";
+        }
+        if (level.getLevelType() == null || level.getLevelType().isBlank()) {
+            return "level " + level.getId() + " has no type";
+        }
+        if (level.getWaves() <= 0) {
+            return "level " + level.getId() + " must have at least one wave";
+        }
+        if (level.getBaseHardness() <= 0f) {
+            return "level " + level.getId() + " has invalid base hardness";
+        }
+        return null;
+    }
+
+    private static void validateLevelSequence(
+        HashMap<Integer, Level> loadedLevelsById
+    ) {
+        if (loadedLevelsById.isEmpty()) {
+            Gdx.app.error("Data", "No valid levels were loaded from levels.json.");
+            return;
+        }
+
+        int highestId = 0;
+        for (Integer id : loadedLevelsById.keySet()) {
+            highestId = Math.max(highestId, id);
+        }
+
+        for (int id = 1; id <= highestId; id++) {
+            if (!loadedLevelsById.containsKey(id)) {
+                Gdx.app.error("Data", "Missing level id in sequence: " + id);
+            }
+        }
     }
 
     public static HashMap<Chapters, ArrayList<Level>> getAllLevels() {
         return allLevels;
+    }
+
+    public static ArrayList<Level> getLevelsForChapter(Chapters chapter) {
+        if (chapter == null) {
+            return new ArrayList<>();
+        }
+
+        ArrayList<Level> chapterLevels = allLevels.get(chapter);
+        return chapterLevels == null
+            ? new ArrayList<>()
+            : new ArrayList<>(chapterLevels);
+    }
+
+    public static Level getLevelById(int levelId) {
+        return levelsById.get(levelId);
+    }
+
+    public static int getHighestLevelId() {
+        int highestId = 0;
+        for (Integer id : levelsById.keySet()) {
+            highestId = Math.max(highestId, id);
+        }
+        return highestId;
+    }
+
+    public static boolean hasLevelsLoaded() {
+        return !levelsById.isEmpty();
     }
 
     public static void setCurrentUser(User user) {
