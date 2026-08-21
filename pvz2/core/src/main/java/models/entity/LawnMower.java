@@ -1,6 +1,7 @@
 package models.entity;
 
 import models.Constants;
+import models.QuestProgress;
 import models.gamepanes.Tile;
 import models.games.BaseGame;
 
@@ -19,18 +20,10 @@ public class LawnMower extends Entity {
     public LawnMower(int line) {
         this.line = line;
         this.tileIndex = 0;
-
         this.width = Tile.getWidth();
         this.height = Tile.getHeight();
-
-        /*
-         * The mower starts at the left edge of the lawn.
-         * Keeping x at zero also makes sure it activates before a zombie
-         * reaches the game's loss boundary.
-         */
         this.x = 0f;
         this.y = line * Tile.getHeight();
-
         this.stateTime = 0f;
     }
 
@@ -50,20 +43,12 @@ public class LawnMower extends Entity {
     private String updateIdle(float delta, BaseGame game) {
         stateTime += delta;
 
-        Zombie triggeringZombie = findCollidingZombie(game);
-
-        if (triggeringZombie == null) {
+        if (findCollidingZombie(game) == null) {
             return null;
         }
 
         state = State.RUNNING;
         stateTime = 0f;
-
-        /*
-         * Kill every zombie currently touching the mower.
-         * This prevents the triggering zombie from surviving for one
-         * additional frame.
-         */
         killCollidingZombies(game);
 
         return "Lawn mower activated at line " + line + ".";
@@ -75,7 +60,8 @@ public class LawnMower extends Entity {
 
         killCollidingZombies(game);
 
-        float boardRightEdge = Tile.getWidth() * BOARD_COLUMN_COUNT;
+        float boardRightEdge =
+            Tile.getWidth() * BOARD_COLUMN_COUNT;
 
         if (x >= boardRightEdge) {
             state = State.USED;
@@ -89,7 +75,8 @@ public class LawnMower extends Entity {
         }
 
         for (Zombie zombie : game.getZombies()) {
-            if (canHit(zombie) && Constants.overlap(zombie, this)) {
+            if (canHit(zombie)
+                && Constants.overlap(zombie, this)) {
                 return zombie;
             }
         }
@@ -103,7 +90,8 @@ public class LawnMower extends Entity {
         }
 
         for (Zombie zombie : game.getZombies()) {
-            if (canHit(zombie) && Constants.overlap(zombie, this)) {
+            if (canHit(zombie)
+                && Constants.overlap(zombie, this)) {
                 killZombie(zombie);
             }
         }
@@ -111,7 +99,7 @@ public class LawnMower extends Entity {
 
     private boolean canHit(Zombie zombie) {
         return zombie != null
-            && zombie.isAlive()
+            && !zombie.isDead()
             && zombie.getHp() > 0
             && zombie.getLine() == line;
     }
@@ -120,6 +108,12 @@ public class LawnMower extends Entity {
         zombie.setHurt(true);
         zombie.setHp(0);
         zombie.setAlive(false);
+        zombie.die();
+
+        QuestProgress.add(
+            "LAWNMOWER_KILL",
+            1
+        );
     }
 
     public State getState() {
