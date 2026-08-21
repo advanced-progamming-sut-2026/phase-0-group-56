@@ -58,6 +58,7 @@ public final class PlantRenderer implements Disposable {
      * fail to compile.
      */
     private static final Map<String, String> ASSET_ALIASES = Map.ofEntries(
+        Map.entry("TWIN_SUNFLOWER", "SUNFLOWER_TWIN"),
         Map.entry("ROTOBAGA", "ROTORUTABAGA"),
         Map.entry("MEGA_GATLING_PEA", "MEGAGATLING"),
         Map.entry("ICEBERG_LETTUCE", "ICEBURG"),

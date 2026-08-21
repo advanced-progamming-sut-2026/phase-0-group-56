@@ -1,43 +1,75 @@
 package view.gameview;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.graphics.g2d.Batch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.math.Rectangle;
+import com.badlogic.gdx.utils.Disposable;
 import models.entity.Plant;
 import models.games.BaseGame;
 import models.games.specialgames.Deadline;
 import models.games.specialgames.SaveOurSeeds;
+import pvz.libpvz.pam.ClipRef;
+import pvz.libpvz.pam.PamPlayer;
 import pvz.libpvz.textures.TextureBank;
+
+import java.util.List;
+import java.util.Locale;
 
 /**
  * Draws world-space visuals that belong to special level rules rather than to
  * normal entities. It deliberately does not own the shared TextureBank.
  */
-public final class SpecialGameElementRenderer {
+public final class SpecialGameElementRenderer implements Disposable {
     private static final String TAG = "SpecialGameElementRenderer";
 
     private static final int COLUMN_COUNT = 9;
     private static final int ROW_COUNT = 5;
 
-    private static final String PROTECTED_TILE_ID =
-        "IMAGE_BACKGROUNDS_PROTECT_TILE_PROTECT_TILE_112X125";
+    private static final String PROTECTED_TILE_PAM =
+        "768/INITIAL/BACKGROUNDS/PROTECT_TILE/PROTECT_TILE.PAM";
     private static final String DEADLINE_ID =
         "IMAGE_ZOMBIE_ZOMBIE_FUTURE_VET_FLAG_ZOMBIE_FUTURE_VET_FLAG_29X200";
 
-    private final TextureRegion protectedTileRegion;
+    private final FileHandle pamRoot;
+    private final PamPlayer pamPlayer;
     private final TextureRegion deadlineRegion;
 
-    public SpecialGameElementRenderer(TextureBank textureBank) {
+    private ClipRef protectedTileClip;
+    private Rectangle protectedTileBounds;
+    private float animationTime;
+    private boolean protectedTileLoading;
+    private boolean protectedTileMissing;
+    private boolean disposed;
+
+    public SpecialGameElementRenderer(
+        FileHandle assetsRoot,
+        TextureBank textureBank
+    ) {
+        if (assetsRoot == null || !assetsRoot.exists()) {
+            throw new IllegalArgumentException("assetsRoot must exist");
+        }
         if (textureBank == null) {
             throw new IllegalArgumentException("textureBank cannot be null");
         }
 
-        protectedTileRegion = safeRegion(textureBank, PROTECTED_TILE_ID);
+        FileHandle explicitPamFolder = assetsRoot.child("pam");
+        pamRoot = explicitPamFolder.exists() && explicitPamFolder.isDirectory()
+            ? explicitPamFolder
+            : assetsRoot.child("IMAGES");
+        pamPlayer = new PamPlayer(textureBank, assetsRoot);
         deadlineRegion = safeRegion(textureBank, DEADLINE_ID);
     }
 
     public static boolean supports(BaseGame game) {
         return game instanceof SaveOurSeeds || game instanceof Deadline;
+    }
+
+    public void update(float delta) {
+        if (!disposed) {
+            animationTime += Math.max(0f, delta);
+        }
     }
 
     public void render(
@@ -48,7 +80,8 @@ public final class SpecialGameElementRenderer {
         float lawnWidth,
         float lawnHeight
     ) {
-        if (batch == null
+        if (disposed
+            || batch == null
             || game == null
             || lawnWidth <= 0f
             || lawnHeight <= 0f) {
@@ -90,7 +123,8 @@ public final class SpecialGameElementRenderer {
         float cellWidth,
         float cellHeight
     ) {
-        if (protectedTileRegion == null) {
+        if (protectedTileClip == null || protectedTileBounds == null) {
+            requestProtectedTile();
             return;
         }
 
@@ -105,17 +139,113 @@ public final class SpecialGameElementRenderer {
                 continue;
             }
 
-            float x = lawnX + col * cellWidth;
-            float y = lawnY + row * cellHeight;
+            float centerX = lawnX + (col + 0.5f) * cellWidth;
+            float centerY = lawnY + (row + 0.5f) * cellHeight;
+            float sourceWidth = Math.max(1f, protectedTileBounds.width);
+            float sourceHeight = Math.max(1f, protectedTileBounds.height);
+            float scale = Math.min(
+                cellWidth / sourceWidth,
+                cellHeight / sourceHeight
+            );
 
-            batch.draw(
-                protectedTileRegion,
-                x,
-                y,
-                cellWidth,
-                cellHeight
+            pamPlayer.draw(
+                batch,
+                protectedTileClip,
+                animationTime,
+                centerX,
+                centerY,
+                scale,
+                scale,
+                true
             );
         }
+    }
+
+    private void requestProtectedTile() {
+        if (disposed
+            || protectedTileClip != null
+            || protectedTileLoading
+            || protectedTileMissing) {
+            return;
+        }
+
+        if (pamRoot == null
+            || !pamRoot.exists()
+            || !pamRoot.child(PROTECTED_TILE_PAM).exists()) {
+            protectedTileMissing = true;
+            Gdx.app.error(TAG, "PAM not found: " + PROTECTED_TILE_PAM);
+            return;
+        }
+
+        protectedTileLoading = true;
+        pamPlayer.loadAsync(PROTECTED_TILE_PAM, this::onProtectedTileLoaded);
+    }
+
+    private void onProtectedTileLoaded() {
+        try {
+            if (disposed) {
+                return;
+            }
+
+            List<String> clips = pamPlayer.clips(PROTECTED_TILE_PAM);
+            String clipName = chooseClip(clips);
+            if (clipName == null) {
+                protectedTileMissing = true;
+                Gdx.app.error(TAG, "PAM has no clips: " + PROTECTED_TILE_PAM);
+                return;
+            }
+
+            ClipRef clip = pamPlayer.getClip(PROTECTED_TILE_PAM, clipName);
+            Rectangle bounds = pamPlayer.bounds(PROTECTED_TILE_PAM, clipName);
+            if (clip == null || bounds == null) {
+                protectedTileMissing = true;
+                Gdx.app.error(
+                    TAG,
+                    "Could not resolve clip/bounds: "
+                        + PROTECTED_TILE_PAM
+                        + " / "
+                        + clipName
+                );
+                return;
+            }
+
+            protectedTileClip = clip;
+            protectedTileBounds = new Rectangle(bounds);
+        } catch (RuntimeException exception) {
+            protectedTileMissing = true;
+            Gdx.app.error(TAG, "Failed to load PAM: " + PROTECTED_TILE_PAM, exception);
+        } finally {
+            protectedTileLoading = false;
+        }
+    }
+
+    private static String chooseClip(List<String> clips) {
+        if (clips == null || clips.isEmpty()) {
+            return null;
+        }
+
+        String[] preferred = {"animation", "anim", "idle", "loop", "default"};
+        for (String candidate : preferred) {
+            for (String clip : clips) {
+                if (clip != null && clip.equalsIgnoreCase(candidate)) {
+                    return clip;
+                }
+            }
+        }
+
+        for (String clip : clips) {
+            if (clip == null) {
+                continue;
+            }
+            String normalized = clip.toLowerCase(Locale.ROOT);
+            if (normalized.contains("idle")
+                || normalized.contains("loop")
+                || normalized.contains("animation")) {
+                return clip;
+            }
+        }
+
+        return clips.get(0);
     }
 
     private void renderDeadline(
@@ -163,5 +293,13 @@ public final class SpecialGameElementRenderer {
             Gdx.app.error(TAG, "Failed to load texture resource: " + resourceId, exception);
             return null;
         }
+    }
+
+    @Override
+    public void dispose() {
+        disposed = true;
+        protectedTileClip = null;
+        protectedTileBounds = null;
+        // PamPlayer shares the TextureBank owned by GameView.
     }
 }

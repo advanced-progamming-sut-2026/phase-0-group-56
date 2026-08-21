@@ -2,6 +2,7 @@ package models.gameadventure;
 
 import models.Constants;
 import models.entity.Zombie;
+import models.gamepanes.Tile;
 import models.games.BaseGame;
 
 import java.util.ArrayList;
@@ -80,7 +81,12 @@ public class Tornado implements ChapterSpecialEvent {
                 continue;
             }
 
-            float destinationX = 100f + destinationColumn * 50f;
+            // All entity/projectile coordinates are expressed in Tile units.
+            // The previous legacy 100 + column * 50 conversion did not match
+            // the current 82px-wide model tiles, so collision and rendering
+            // disagreed about where a carried zombie actually was.
+            float tileWidth = Math.max(1f, Tile.getWidth());
+            float destinationX = destinationColumn * tileWidth;
             float nextX = zombie.getX() - movement;
 
             if (nextX <= destinationX) {
@@ -90,6 +96,8 @@ public class Tornado implements ChapterSpecialEvent {
                 carriedZombies.remove(i);
             } else {
                 zombie.setX(nextX);
+                int currentColumn = (int) Math.floor(nextX / tileWidth);
+                zombie.setTileIndex(Math.max(0, Math.min(8, currentColumn)));
             }
         }
 

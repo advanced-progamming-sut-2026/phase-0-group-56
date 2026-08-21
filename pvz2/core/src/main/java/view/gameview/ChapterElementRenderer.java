@@ -282,20 +282,9 @@ public final class ChapterElementRenderer implements Disposable {
                 continue;
             }
 
-            /*
-             * Zombie.move() maps model X to a tile with: (x - 100) / 50.
-             * Using the same conversion here keeps the event visual aligned with
-             * the model even though the Scene2D lawn can have any pixel size.
-             */
-            float modelColumn = (zombie.getX() - 100f) / 50f;
-
-            // Do not pin an off-screen tornado to the lawn edge. It becomes visible
-            // naturally once the carried zombie reaches the playable area.
-            if (modelColumn < -1.25f || modelColumn > COLUMN_COUNT + 1.25f) {
-                continue;
-            }
-
-            float centerX = lawnX + (modelColumn + 0.5f) * cellWidth;
+            float tileWidth = Math.max(1f, Tile.getWidth());
+            float modelCenterX = zombie.getX() + zombie.getWidth() * 0.5f;
+            float centerX = lawnX + (modelCenterX / tileWidth) * cellWidth;
             float centerY = lawnY + (row + 0.5f) * cellHeight;
 
             drawPamFit(

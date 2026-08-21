@@ -198,6 +198,12 @@ public class BaseGame implements Game {
     @Override
     public void updateZombies(float delta) {
         for (Zombie zombie : zombies) {
+            // Tornado owns the position of carried zombies until it drops them.
+            // Running Zombie.update() here as well makes the zombie walk ahead of
+            // the sandstorm and lets its abilities act while it is still carried.
+            if (event instanceof Tornado tornado && tornado.isCarrying(zombie)) {
+                continue;
+            }
             zombie.update(delta, this);
         }
         gridController.checkAndAttachZombies(zombies);
@@ -205,10 +211,6 @@ public class BaseGame implements Game {
         updateMowers(delta);
 
         for (Zombie zombie : zombies) {
-            if (event instanceof Tornado tornado && tornado.isCarrying(zombie)) {
-                continue;
-               }
-
             if (zombie.isDead()) {
                 System.out.println("zombie died at (" + zombie.getX() + ", " + zombie.getY() + ")");
                 SunRobbingAbility sun = zombie.getAbility(SunRobbingAbility.class);
@@ -504,4 +506,3 @@ public class BaseGame implements Game {
         return day;
     }
 }
-
