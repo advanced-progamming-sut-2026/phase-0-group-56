@@ -10,7 +10,6 @@ import com.badlogic.gdx.utils.viewport.Viewport;
 
 import controllers.menus.gamecontroller.GameController;
 import models.entity.Sun;
-import models.entity.Zombie;
 import models.factory.builder.PlantType;
 import models.games.BaseGame;
 import pvz.libpvz.textures.TextureBank;
@@ -32,9 +31,8 @@ public final class WorldEntityRenderer implements Disposable {
     private PlantRenderer plantRenderer;
     private SunRenderer sunRenderer;
     private MowerRenderer mowerRenderer;
+    private ZombieRenderer zombieRenderer;
     private ChapterElementRenderer chapterElementRenderer;
-    private SpecialGameElementRenderer specialGameElementRenderer;
-
 
     public WorldEntityRenderer(
         Viewport worldViewport,
@@ -66,13 +64,52 @@ public final class WorldEntityRenderer implements Disposable {
         this.stage = new Stage(worldViewport);
 
         // Layer order is intentional:
-        // map -> chapter ground/water -> plants -> chapter foreground -> suns.
+        // map -> chapter ground/water -> plants -> zombies -> mowers
+        // -> chapter foreground -> suns.
         initialiseChapterBackground(pvzAssetsRoot, sharedTextureBank);
-        initialiseSpecialGameElements(sharedTextureBank);
         initialisePlants(pvzAssetsRoot);
+        initialiseZombies(pvzAssetsRoot, sharedTextureBank);
         initialiseMowers(pvzAssetsRoot, sharedTextureBank);
         initialiseChapterForeground();
         initialiseSuns(sharedTextureBank, sunFallback);
+    }
+
+    private void initialiseZombies(
+        FileHandle pvzAssetsRoot,
+        TextureBank sharedTextureBank
+    ) {
+        if (pvzAssetsRoot == null || sharedTextureBank == null) {
+            Gdx.app.log(
+                TAG,
+                "Zombie rendering disabled because extracted PVZ assets are unavailable."
+            );
+            return;
+        }
+
+        try {
+            zombieRenderer = new ZombieRenderer(
+                pvzAssetsRoot,
+                sharedTextureBank
+            );
+
+            ZombieLayer zombieLayer = new ZombieLayer(
+                controller,
+                zombieRenderer
+            );
+            zombieLayer.setBounds(
+                pitchBounds.x,
+                pitchBounds.y,
+                pitchBounds.width,
+                pitchBounds.height
+            );
+            stage.addActor(zombieLayer);
+        } catch (RuntimeException exception) {
+            if (zombieRenderer != null) {
+                zombieRenderer.dispose();
+                zombieRenderer = null;
+            }
+            Gdx.app.error(TAG, "Failed to initialise zombie rendering.", exception);
+        }
     }
 
 
@@ -122,41 +159,6 @@ public final class WorldEntityRenderer implements Disposable {
             );
         }
     }
-
-    private void initialiseSpecialGameElements(TextureBank sharedTextureBank) {
-                if (sharedTextureBank == null
-                        || !SpecialGameElementRenderer.supports(controller.getGame())) {
-                        return;
-                    }
-
-                    try {
-                        specialGameElementRenderer = new SpecialGameElementRenderer(
-                                sharedTextureBank
-                                );
-
-                            SpecialGameElementLayer specialLayer = new SpecialGameElementLayer(
-                                controller,
-                                specialGameElementRenderer
-                                );
-                        specialLayer.setBounds(
-                                pitchBounds.x,
-                                pitchBounds.y,
-                                pitchBounds.width,
-                             pitchBounds.height
-                                );
-
-                            // Added before PlantLayer, therefore protected tiles and the
-                                // deadline marker stay on the lawn instead of covering plants.
-                                    stage.addActor(specialLayer);
-                    } catch (RuntimeException e) {
-                        specialGameElementRenderer = null;
-                     Gdx.app.error(
-                            TAG,
-                                "Failed to initialise special-game visuals.",
-                                e
-                                );
-                    }
-           }
 
 
 
@@ -295,7 +297,6 @@ public final class WorldEntityRenderer implements Disposable {
             chapterElementRenderer.update(animationDelta);
         }
 
-
         stage.act(delta);
         stage.draw();
     }
@@ -329,9 +330,6 @@ public final class WorldEntityRenderer implements Disposable {
         }
     }
 
-    public PlantRenderer getPlantRenderer() {
-                return plantRenderer;
-            }
     @Override
     public void dispose() {
         stage.dispose();
@@ -350,9 +348,12 @@ public final class WorldEntityRenderer implements Disposable {
             mowerRenderer.dispose();
             mowerRenderer = null;
         }
-        // SunRenderer does not own sharedTextureBank.
-               specialGameElementRenderer = null; // shared TextureBank is owned by GameView
 
+        if (zombieRenderer != null) {
+            zombieRenderer.dispose();
+            zombieRenderer = null;
+        }
+        // SunRenderer does not own sharedTextureBank.
         sunRenderer = null;
     }
 }

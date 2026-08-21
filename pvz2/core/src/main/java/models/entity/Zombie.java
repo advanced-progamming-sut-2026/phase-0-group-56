@@ -240,7 +240,7 @@ public class Zombie extends Entity{
         if(plant != null && !this.type.equals("dodo"))
             return;
 
-        x += getActualSpeed() * movingDirection() * deltaTime / 60;
+        x += getActualSpeed() * movingDirection() * deltaTime /15;
         int newTile = (int) (x/ 100);
         if (newTile < 0) newTile = 0;
         if (newTile > 8) newTile = 8;

@@ -1,6 +1,7 @@
 package models.games;
 
 import controllers.datacontroller.SeedPackage;
+import models.App;
 import models.gameadventure.Chapters;
 import models.gameadventure.levels.Level;
 import models.entity.*;
@@ -121,6 +122,9 @@ public NormalGame(Chapters chapters, Level level){
         newPlant.setLine(y);
         newPlant.setTileIndex(x);
         SeedPackage seedPackage = availablePlants.get(findPlant.plantType());
+        if(App.getCurrentuser().getBoostList().contains(seedPackage.getPlant())){
+            seedPackage.setBoost(true);
+        }
         if(seedPackage.getBoost()){
             newPlant.setPlantFood(true);
             seedPackage.setBoost(false);
