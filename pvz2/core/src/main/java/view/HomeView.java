@@ -170,6 +170,22 @@ public class HomeView extends View {
 
         infoPanel.add(progress)
             .width(700f)
+            .center()
+            .padBottom(5f)
+            .row();
+
+        Label debugStatus =
+            secondaryLabel(
+                "DEBUG MODE: "
+                    + (user.isDebugMode() ? "ON" : "OFF")
+                    + "  |  RESOURCE CHEATS: "
+                    + (user.isDebugMode() ? "AVAILABLE" : "HIDDEN")
+            );
+
+        debugStatus.setAlignment(Align.center);
+
+        infoPanel.add(debugStatus)
+            .width(700f)
             .center();
 
         table.add(infoPanel)

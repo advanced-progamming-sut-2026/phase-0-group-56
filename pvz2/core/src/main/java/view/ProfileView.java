@@ -45,10 +45,15 @@ public class ProfileView extends View {
             return;
         }
 
+        String nickname = safeValue(
+            user.getNickname(),
+            user.getName(),
+            "PLAYER"
+        );
+
         Label player =
             mediumTitle(
-                user.getNickname()
-                    .toUpperCase()
+                nickname.toUpperCase()
             );
 
         player.setAlignment(
@@ -66,19 +71,19 @@ public class ProfileView extends View {
         addInfo(
             info,
             "USERNAME",
-            user.getName()
+            safeValue(user.getName(), "UNKNOWN")
         );
 
         addInfo(
             info,
             "NICKNAME",
-            user.getNickname()
+            safeValue(user.getNickname(), "NOT SET")
         );
 
         addInfo(
             info,
             "EMAIL",
-            user.getEmail()
+            safeValue(user.getEmail(), "NOT SET")
         );
 
         addInfo(
@@ -301,13 +306,8 @@ public class ProfileView extends View {
 
                         showMessage(result);
 
-                        if (
-                            !result.startsWith(
-                                "Error:"
-                            )
-                        ) {
-
-                            refreshResourceLabels();
+                        if (!result.startsWith("Error:")) {
+                            reloadProfile();
                         }
                     }
                 )
@@ -441,6 +441,10 @@ public class ProfileView extends View {
                                 );
 
                         showMessage(result);
+
+                        if (!result.startsWith("Error:")) {
+                            reloadProfile();
+                        }
                     }
                 )
             )
@@ -455,5 +459,25 @@ public class ProfileView extends View {
         content.clearChildren();
         buildContent(content);
         refreshResourceLabels();
+    }
+
+    private static String safeValue(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private static String safeValue(
+        String value,
+        String secondary,
+        String fallback
+    ) {
+        if (value != null && !value.isBlank()) {
+            return value;
+        }
+
+        if (secondary != null && !secondary.isBlank()) {
+            return secondary;
+        }
+
+        return fallback;
     }
 }
