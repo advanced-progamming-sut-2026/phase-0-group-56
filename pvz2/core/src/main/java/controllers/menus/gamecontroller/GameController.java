@@ -1,6 +1,7 @@
 package controllers.menus.gamecontroller;
 
 import controllers.datacontroller.Data;
+import controllers.datacontroller.LevelProgressService;
 import controllers.datacontroller.SeedPackage;
 import controllers.menus.Menu;
 import models.App;
@@ -368,29 +369,12 @@ public class GameController implements Controller, Menu {
             return;
         }
 
-        if (chapter == user.getChapter() && level.getId() == user.getLevelId()) {
-            user.setLevelId(user.getLevelId() + 1);
-            user.setLevelsPassed(user.getLevelsPassed() + 1);
-
-            for (PlantType type : level.getUnlockingPlants()) {
-                user.getUnlockedPlants().add(type);
-                user.getLevels().put(type, 1);
-                user.getUnreadNews().add(
-                    "Congratulations, you've unlocked a new plant: " + type.name()
-                );
-            }
-        }
-
-        if (user.getLevelId() == 5) {
-            user.setLevelId(1);
-            Chapters newChapter = switch (user.getChapter()) {
-                case AncientEgypt -> Chapters.FrozenCaves;
-                case FrozenCaves -> Chapters.BigWaveBeach;
-                case BigWaveBeach -> Chapters.DarkAge;
-                default -> user.getChapter();
-            };
-            user.setChapter(newChapter);
-        }
+        /*
+         * Level ids are global (1..16).  Keep all unlock, chapter-transition
+         * and replay protection in one service instead of maintaining a
+         * second, chapter-local counter here.
+         */
+        LevelProgressService.completeLevel(user, chapter, level);
 
         Data.saveUser();
         App.setScreen(new PlayView());
