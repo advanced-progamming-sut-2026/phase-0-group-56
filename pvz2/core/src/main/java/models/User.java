@@ -4,8 +4,10 @@ import models.entity.ZombieRegistry;
 import models.factory.builder.PlantType;
 import models.gameadventure.Chapters;
 import models.gameadventure.levels.Level;
+import models.utils.CredentialHasher;
 
 import java.io.Serializable;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -61,6 +63,8 @@ public class User implements Serializable, QuestObserver {
     private ArrayList<PlantType> boostList;
 
     private ArrayList<models.Quest> activeQuests;
+    private String questDailyDate = "";
+    private int questCatalogVersion;
     private ZombieRegistry zombieRegistry;
     private GreenHouse greenHouse;
 
@@ -94,7 +98,9 @@ public class User implements Serializable, QuestObserver {
         }
 
         this.greenHouse = new GreenHouse(this);
-        this.activeQuests = models.QuestCatalog.createDefaultQuests();
+        this.activeQuests = models.QuestCatalog.createDefaultQuests(this);
+        this.questDailyDate = LocalDate.now().toString();
+        this.questCatalogVersion = models.QuestCatalog.CURRENT_VERSION;
     }
 
     @Override
@@ -112,15 +118,46 @@ public class User implements Serializable, QuestObserver {
     }
 
     public ArrayList<models.Quest> getActiveQuests() {
-        // Migrates old saves that had only the two hard-coded placeholder quests.
-        if (activeQuests == null || activeQuests.size() < 10) {
-            activeQuests = models.QuestCatalog.createDefaultQuests();
+        if (activeQuests == null) {
+            activeQuests = new ArrayList<>();
         }
         return activeQuests;
     }
 
     public void resetQuestsForTesting() {
-        activeQuests = models.QuestCatalog.createDefaultQuests();
+        activeQuests = models.QuestCatalog.createDefaultQuests(this);
+        questDailyDate = LocalDate.now().toString();
+        questCatalogVersion = models.QuestCatalog.CURRENT_VERSION;
+    }
+
+    ArrayList<models.Quest> getStoredActiveQuests() {
+        return activeQuests;
+    }
+
+    void setStoredActiveQuests(ArrayList<models.Quest> quests) {
+        activeQuests = quests == null
+            ? new ArrayList<>()
+            : quests;
+    }
+
+    public String getQuestDailyDate() {
+        return questDailyDate == null
+            ? ""
+            : questDailyDate;
+    }
+
+    public void setQuestDailyDate(String date) {
+        questDailyDate = date == null
+            ? ""
+            : date;
+    }
+
+    public int getQuestCatalogVersion() {
+        return questCatalogVersion;
+    }
+
+    public void setQuestCatalogVersion(int version) {
+        questCatalogVersion = Math.max(0, version);
     }
 
     public String getName() {
@@ -161,7 +198,7 @@ public class User implements Serializable, QuestObserver {
 
     public void setSecurityQuestion(int questionNumber, String answer) {
         this.securityQuestionNumber = questionNumber;
-        this.securityAnswer = answer;
+        this.securityAnswer = CredentialHasher.hash(normalizeSecurityAnswer(answer));
     }
 
     public int getSecurityQuestionNumber() {
@@ -169,7 +206,18 @@ public class User implements Serializable, QuestObserver {
     }
 
     public boolean checkSecurityAnswer(String answer) {
-        return securityAnswer != null && securityAnswer.equals(answer);
+        String normalizedAnswer = normalizeSecurityAnswer(answer);
+        boolean matches = CredentialHasher.matches(normalizedAnswer, securityAnswer);
+
+        if (matches && !CredentialHasher.isSha256Hash(securityAnswer)) {
+            securityAnswer = CredentialHasher.hash(normalizedAnswer);
+        }
+
+        return matches;
+    }
+
+    private String normalizeSecurityAnswer(String answer) {
+        return answer == null ? "" : answer.trim();
     }
 
     public int getVaseBreaker() {

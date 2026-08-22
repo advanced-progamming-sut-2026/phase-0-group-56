@@ -6,105 +6,179 @@ import com.badlogic.gdx.utils.Json;
 import models.App;
 import models.User;
 import models.factory.builder.PlantType;
-import models.gameadventure.*;
-import models.gameadventure.levels.*;
-import view.*;
+import models.gameadventure.Chapters;
+import models.gameadventure.levels.Level;
+import view.HomeView;
+import view.LogInView;
+import view.SignUpView;
 
-import java.io.*;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Locale;
 
 public class Data {
-    private static final String USERS_FILE = "users_data.dat";
+    private static final String SAVE_DIRECTORY_NAME = ".pvz2-group-56";
+    private static final String USERS_FILE_NAME = "users_data.dat";
+    private static final String USERS_BACKUP_FILE_NAME = "users_data.bak";
+    private static final String USERS_TEMP_FILE_NAME = "users_data.tmp";
+    private static final String LEGACY_USERS_FILE_NAME = "users_data.dat";
+
     private static ArrayList<User> allUsers = new ArrayList<>();
-    private static User currentUser = null;
-    private static User tempUser = null;
+    private static User currentUser;
+    private static User tempUser;
+
     private static HashMap<PlantType, PlantData> plants = new HashMap<>();
     private static HashMap<Chapters, ArrayList<Level>> allLevels = new HashMap<>();
+    private static HashMap<Integer, Level> levelsById = new HashMap<>();
 
-    public static void saveUser() {
-        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(USERS_FILE))) {
-            oos.writeObject(allUsers);
-        } catch (IOException e) {
-            e.printStackTrace();
+    private Data() {
+    }
+
+    public static synchronized void saveUser() {
+        Path saveDirectory = getSaveDirectory();
+        Path usersFile = saveDirectory.resolve(USERS_FILE_NAME);
+        Path backupFile = saveDirectory.resolve(USERS_BACKUP_FILE_NAME);
+        Path temporaryFile = saveDirectory.resolve(USERS_TEMP_FILE_NAME);
+
+        try {
+            Files.createDirectories(saveDirectory);
+            writeUsersToFile(temporaryFile);
+
+            if (Files.exists(usersFile)) {
+                Files.copy(
+                    usersFile,
+                    backupFile,
+                    StandardCopyOption.REPLACE_EXISTING
+                );
+            }
+
+            replaceFile(temporaryFile, usersFile);
+            logInfo("User data saved successfully. Users: " + allUsers.size());
+        } catch (IOException exception) {
+            deleteTemporaryFile(temporaryFile);
+            logError("Could not save user data.", exception);
         }
     }
 
-    @SuppressWarnings("unchecked")
-    public static void deserializeUser() {
-        File userFile = new File(USERS_FILE);
+    public static synchronized void deserializeUser() {
+        allUsers = new ArrayList<>();
 
-        if (!userFile.exists()) {
-            allUsers = new ArrayList<>();
+        Path saveDirectory = getSaveDirectory();
+        Path usersFile = saveDirectory.resolve(USERS_FILE_NAME);
+        Path backupFile = saveDirectory.resolve(USERS_BACKUP_FILE_NAME);
+        Path legacyFile = Path.of(LEGACY_USERS_FILE_NAME);
+
+        if (loadUsersFromFile(usersFile)) {
             return;
         }
 
-        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(userFile))) {
-            allUsers = (ArrayList<User>) ois.readObject();
-        } catch (Exception e) {
-            System.err.println("Warning: Could not load user data or file is corrupted. Starting fresh.");
-            allUsers = new ArrayList<>();
+        if (loadUsersFromFile(backupFile)) {
+            restorePrimaryFile(backupFile, usersFile);
+            return;
         }
+
+        if (loadUsersFromFile(legacyFile)) {
+            logInfo("Legacy user data was found and loaded.");
+            saveUser();
+            return;
+        }
+
+        allUsers = new ArrayList<>();
+        logInfo("No saved users were found. Starting with an empty user list.");
     }
 
     public static void setUp() {
-        User testUser = new User("LeBron", "passhash", "LeBron", "LeBron", "LeBron");
-        testUser.setLevelId(1);
-        testUser.setLevelsPassed(5);
-        currentUser = testUser;
-        App.setScreen(new PlayView());
+        deserializeUser();
+        currentUser = null;
+        tempUser = null;
 
-        /*
+        boolean progressMigrated = false;
+        for (User user : allUsers) {
+            progressMigrated |= LevelProgressService.normalizeUserProgress(user);
+        }
+
+        if (progressMigrated) {
+            saveUser();
+        }
+
+        for (User user : allUsers) {
+            if (user != null && user.isStayLoggedIn()) {
+                currentUser = user;
+                App.setScreen(new HomeView());
+                logInfo("Automatically logged in user: " + user.getName());
+                return;
+            }
+        }
+
         if (allUsers.isEmpty()) {
             App.setScreen(new SignUpView());
         } else {
-            for (User user : allUsers) {
-                if (user.isStayLoggedIn()) {
-                    currentUser = user;
-                    App.setScreen(new HomeView());
-                    return;
-                }
-            }
+            App.setScreen(new LogInView());
         }
-        App.setScreen(new SignUpView());
-        */
     }
 
     public static void addUser(User user) {
+        if (user == null || user.getName() == null || user.getName().isBlank()) {
+            return;
+        }
+
+        if (isUsernameExists(user.getName())) {
+            return;
+        }
+
         allUsers.add(user);
         saveUser();
     }
 
     public static boolean isUsernameExists(String username) {
+        if (username == null || username.isBlank()) {
+            return false;
+        }
+
         for (User user : allUsers) {
-            if (user.getName().equalsIgnoreCase(username)) {
+            if (user != null
+                && user.getName() != null
+                && user.getName().equalsIgnoreCase(username)) {
                 return true;
             }
         }
+
         return false;
     }
 
     public static User getUserByUsername(String username) {
+        if (username == null || username.isBlank()) {
+            return null;
+        }
+
         for (User user : allUsers) {
-            if (user.getName().equalsIgnoreCase(username)) {
+            if (user != null
+                && user.getName() != null
+                && user.getName().equalsIgnoreCase(username)) {
                 return user;
             }
         }
+
         return null;
     }
 
-    /**
-     * Loads plants.json using PlantData's custom LibGDX Json reader.
-     *
-     * PlantData handles the legacy tag format and the description/effect mismatch.
-     * This method only has to normalize the human-readable plant name to PlantType.
-     */
     public static void loadPlantsFromJson() {
         FileHandle file = Gdx.files.internal("plants.json");
 
         if (!file.exists()) {
-            Gdx.app.error("Data", "plants.json not found in assets folder!");
+            Gdx.app.error("Data", "plants.json not found in assets folder.");
             plants = new HashMap<>();
             return;
         }
@@ -118,30 +192,38 @@ public class Data {
 
             HashMap<PlantType, PlantData> loadedPlants = new HashMap<>();
 
-            for (PlantData plant : plantsList) {
-                if (plant == null || plant.getName() == null || plant.getName().isBlank()) {
-                    Gdx.app.error("Data", "Skipping plant with missing name in plants.json");
-                    continue;
-                }
-
-                try {
-                    PlantType type = parsePlantType(plant.getName());
-                    loadedPlants.put(type, plant);
-                } catch (IllegalArgumentException e) {
-                    Gdx.app.error(
-                        "Data",
-                        "Unknown PlantType for plants.json name: " + plant.getName(),
-                        e
-                    );
+            if (plantsList != null) {
+                for (PlantData plant : plantsList) {
+                    addLoadedPlant(loadedPlants, plant);
                 }
             }
 
             plants = loadedPlants;
             Gdx.app.log("Data", "Plants loaded successfully: " + plants.size());
-
-        } catch (Exception e) {
+        } catch (Exception exception) {
             plants = new HashMap<>();
-            Gdx.app.error("Data", "Error reading plants.json", e);
+            Gdx.app.error("Data", "Error reading plants.json.", exception);
+        }
+    }
+
+    private static void addLoadedPlant(
+        HashMap<PlantType, PlantData> loadedPlants,
+        PlantData plant
+    ) {
+        if (plant == null || plant.getName() == null || plant.getName().isBlank()) {
+            Gdx.app.error("Data", "Skipping plant with a missing name.");
+            return;
+        }
+
+        try {
+            PlantType type = parsePlantType(plant.getName());
+            loadedPlants.put(type, plant);
+        } catch (IllegalArgumentException exception) {
+            Gdx.app.error(
+                "Data",
+                "Unknown PlantType in plants.json: " + plant.getName(),
+                exception
+            );
         }
     }
 
@@ -160,7 +242,9 @@ public class Data {
         FileHandle file = Gdx.files.internal("levels.json");
 
         if (!file.exists()) {
-            Gdx.app.error("Data", "levels.json not found in assets folder!");
+            Gdx.app.error("Data", "levels.json not found in assets folder.");
+            allLevels = new HashMap<>();
+            levelsById = new HashMap<>();
             return;
         }
 
@@ -168,27 +252,135 @@ public class Data {
             Json json = new Json();
             json.setIgnoreUnknownFields(true);
 
-            ArrayList<Level> levelsList = json.fromJson(ArrayList.class, Level.class, file);
+            ArrayList<Level> levelsList =
+                json.fromJson(ArrayList.class, Level.class, file);
 
-            allLevels = new HashMap<>();
-            for (Level level : levelsList) {
-                Chapters chapter = level.getChapters();
-                allLevels.putIfAbsent(chapter, new ArrayList<>());
-                allLevels.get(chapter).add(level);
+            HashMap<Chapters, ArrayList<Level>> loadedLevels = new HashMap<>();
+            HashMap<Integer, Level> loadedLevelsById = new HashMap<>();
+
+            if (levelsList != null) {
+                for (Level level : levelsList) {
+                    addLoadedLevel(loadedLevels, loadedLevelsById, level);
+                }
             }
+
+            for (ArrayList<Level> chapterLevels : loadedLevels.values()) {
+                chapterLevels.sort(Comparator.comparingInt(Level::getId));
+            }
+
+            validateLevelSequence(loadedLevelsById);
+
+            allLevels = loadedLevels;
+            levelsById = loadedLevelsById;
 
             Gdx.app.log(
                 "Data",
-                "Levels loaded successfully! Total chapter: " + allLevels.size()
+                "Levels loaded successfully. Chapters: " + allLevels.size()
+                    + ", levels: " + levelsById.size()
             );
+        } catch (Exception exception) {
+            allLevels = new HashMap<>();
+            levelsById = new HashMap<>();
+            Gdx.app.error("Data", "Error reading levels.json.", exception);
+        }
+    }
 
-        } catch (Exception e) {
-            Gdx.app.error("Data", "Error reading levels.json", e);
+    private static void addLoadedLevel(
+        HashMap<Chapters, ArrayList<Level>> loadedLevels,
+        HashMap<Integer, Level> loadedLevelsById,
+        Level level
+    ) {
+        String validationError = getLevelValidationError(level);
+        if (validationError != null) {
+            Gdx.app.error("Data", "Skipping invalid level: " + validationError);
+            return;
+        }
+
+        if (loadedLevelsById.containsKey(level.getId())) {
+            Gdx.app.error(
+                "Data",
+                "Skipping duplicate level id: " + level.getId()
+            );
+            return;
+        }
+
+        Chapters chapter = level.getChapters();
+        loadedLevels.putIfAbsent(chapter, new ArrayList<>());
+        loadedLevels.get(chapter).add(level);
+        loadedLevelsById.put(level.getId(), level);
+    }
+
+    private static String getLevelValidationError(Level level) {
+        if (level == null) {
+            return "level entry is null";
+        }
+        if (level.getId() <= 0) {
+            return "id must be positive";
+        }
+        if (level.getChapters() == null) {
+            return "level " + level.getId() + " has no chapter";
+        }
+        if (level.getLevelType() == null || level.getLevelType().isBlank()) {
+            return "level " + level.getId() + " has no type";
+        }
+        if (level.getWaves() <= 0) {
+            return "level " + level.getId() + " must have at least one wave";
+        }
+        if (level.getBaseHardness() <= 0f) {
+            return "level " + level.getId() + " has invalid base hardness";
+        }
+        return null;
+    }
+
+    private static void validateLevelSequence(
+        HashMap<Integer, Level> loadedLevelsById
+    ) {
+        if (loadedLevelsById.isEmpty()) {
+            Gdx.app.error("Data", "No valid levels were loaded from levels.json.");
+            return;
+        }
+
+        int highestId = 0;
+        for (Integer id : loadedLevelsById.keySet()) {
+            highestId = Math.max(highestId, id);
+        }
+
+        for (int id = 1; id <= highestId; id++) {
+            if (!loadedLevelsById.containsKey(id)) {
+                Gdx.app.error("Data", "Missing level id in sequence: " + id);
+            }
         }
     }
 
     public static HashMap<Chapters, ArrayList<Level>> getAllLevels() {
         return allLevels;
+    }
+
+    public static ArrayList<Level> getLevelsForChapter(Chapters chapter) {
+        if (chapter == null) {
+            return new ArrayList<>();
+        }
+
+        ArrayList<Level> chapterLevels = allLevels.get(chapter);
+        return chapterLevels == null
+            ? new ArrayList<>()
+            : new ArrayList<>(chapterLevels);
+    }
+
+    public static Level getLevelById(int levelId) {
+        return levelsById.get(levelId);
+    }
+
+    public static int getHighestLevelId() {
+        int highestId = 0;
+        for (Integer id : levelsById.keySet()) {
+            highestId = Math.max(highestId, id);
+        }
+        return highestId;
+    }
+
+    public static boolean hasLevelsLoaded() {
+        return !levelsById.isEmpty();
     }
 
     public static void setCurrentUser(User user) {
@@ -216,12 +408,154 @@ public class Data {
     }
 
     public static void setPlants(HashMap<PlantType, PlantData> plants) {
-        Data.plants = plants;
+        if (plants == null) {
+            Data.plants = new HashMap<>();
+        } else {
+            Data.plants = plants;
+        }
     }
 
     public void saveGame() {
+        saveUser();
     }
 
     public void deserializeGame() {
+        deserializeUser();
+    }
+
+    private static Path getSaveDirectory() {
+        String userHome = System.getProperty("user.home", ".");
+        return Path.of(userHome, SAVE_DIRECTORY_NAME);
+    }
+
+    private static void writeUsersToFile(Path path) throws IOException {
+        try (
+            FileOutputStream fileOutput = new FileOutputStream(path.toFile());
+            BufferedOutputStream bufferedOutput =
+                new BufferedOutputStream(fileOutput);
+            ObjectOutputStream objectOutput =
+                new ObjectOutputStream(bufferedOutput)
+        ) {
+            objectOutput.writeObject(allUsers);
+            objectOutput.flush();
+            bufferedOutput.flush();
+            fileOutput.getFD().sync();
+        }
+    }
+
+    private static boolean loadUsersFromFile(Path path) {
+        if (!Files.isRegularFile(path)) {
+            return false;
+        }
+
+        try (
+            FileInputStream fileInput = new FileInputStream(path.toFile());
+            BufferedInputStream bufferedInput =
+                new BufferedInputStream(fileInput);
+            ObjectInputStream objectInput =
+                new ObjectInputStream(bufferedInput)
+        ) {
+            Object savedObject = objectInput.readObject();
+
+            if (!(savedObject instanceof ArrayList<?> savedUsers)) {
+                throw new IOException("The save file does not contain a user list.");
+            }
+
+            ArrayList<User> loadedUsers = convertToUsers(savedUsers);
+            allUsers = loadedUsers;
+
+            logInfo(
+                "User data loaded from " + path.toAbsolutePath()
+                    + ". Users: " + allUsers.size()
+            );
+
+            return true;
+        } catch (IOException | ClassNotFoundException exception) {
+            logError("Could not load user data from " + path.toAbsolutePath(), exception);
+            return false;
+        }
+    }
+
+    private static ArrayList<User> convertToUsers(
+        ArrayList<?> savedUsers
+    ) throws IOException {
+        ArrayList<User> loadedUsers = new ArrayList<>();
+
+        for (Object savedUser : savedUsers) {
+            if (!(savedUser instanceof User user)) {
+                throw new IOException("The save file contains an invalid user entry.");
+            }
+
+            loadedUsers.add(user);
+        }
+
+        return loadedUsers;
+    }
+
+    private static void replaceFile(
+        Path temporaryFile,
+        Path usersFile
+    ) throws IOException {
+        try {
+            Files.move(
+                temporaryFile,
+                usersFile,
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING
+            );
+        } catch (AtomicMoveNotSupportedException exception) {
+            Files.move(
+                temporaryFile,
+                usersFile,
+                StandardCopyOption.REPLACE_EXISTING
+            );
+        }
+    }
+
+    private static void restorePrimaryFile(
+        Path backupFile,
+        Path usersFile
+    ) {
+        try {
+            Files.createDirectories(usersFile.getParent());
+
+            Files.copy(
+                backupFile,
+                usersFile,
+                StandardCopyOption.REPLACE_EXISTING
+            );
+
+            logInfo("The primary user file was restored from its backup.");
+        } catch (IOException exception) {
+            logError("Could not restore the primary user file.", exception);
+        }
+    }
+
+    private static void deleteTemporaryFile(Path temporaryFile) {
+        try {
+            Files.deleteIfExists(temporaryFile);
+        } catch (IOException exception) {
+            logError("Could not delete the temporary save file.", exception);
+        }
+    }
+
+    private static void logInfo(String message) {
+        if (Gdx.app != null) {
+            Gdx.app.log("Data", message);
+        } else {
+            System.out.println("[Data] " + message);
+        }
+    }
+
+    private static void logError(
+        String message,
+        Throwable throwable
+    ) {
+        if (Gdx.app != null) {
+            Gdx.app.error("Data", message, throwable);
+        } else {
+            System.err.println("[Data] " + message);
+            throwable.printStackTrace();
+        }
     }
 }

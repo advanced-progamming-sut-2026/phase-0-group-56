@@ -6,30 +6,18 @@ import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.utils.Align;
 
-import controllers.datacontroller.Data;
 import controllers.menus.secondarymenus.LeaderBoard;
 import models.User;
 
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
 public class LeaderBoardView extends View {
 
-    private SortColumn sortColumn =
-        SortColumn.SCORE;
+    private LeaderBoard.SortCriterion sortColumn =
+        LeaderBoard.SortCriterion.SCORE;
 
     private boolean descending =
         true;
-
-    private enum SortColumn {
-        USERNAME,
-        PROGRESS,
-        MINIGAMES,
-        DAILY_QUESTS,
-        OTHER_QUESTS,
-        SCORE
-    }
 
     public LeaderBoardView() {
         menu = new LeaderBoard();
@@ -85,20 +73,14 @@ public class LeaderBoardView extends View {
             .padBottom(16f)
             .row();
 
+        LeaderBoard controller =
+            (LeaderBoard) menu;
+
         List<User> users =
-            new ArrayList<>(
-                Data.getAllUsers()
+            controller.getSortedUsers(
+                sortColumn,
+                descending
             );
-
-        Comparator<User> comparator =
-            buildComparator();
-
-        if (descending) {
-            comparator =
-                comparator.reversed();
-        }
-
-        users.sort(comparator);
 
         Table outerPanel =
             pvzPanel();
@@ -109,42 +91,42 @@ public class LeaderBoardView extends View {
         addHeader(
             board,
             "USERNAME",
-            SortColumn.USERNAME,
+            LeaderBoard.SortCriterion.USERNAME,
             145f
         );
 
         addHeader(
             board,
             "PROGRESS",
-            SortColumn.PROGRESS,
+            LeaderBoard.SortCriterion.PROGRESS,
             185f
         );
 
         addHeader(
             board,
             "MINIGAMES",
-            SortColumn.MINIGAMES,
+            LeaderBoard.SortCriterion.MINIGAMES,
             120f
         );
 
         addHeader(
             board,
             "DAILY Q",
-            SortColumn.DAILY_QUESTS,
+            LeaderBoard.SortCriterion.DAILY_QUESTS,
             105f
         );
 
         addHeader(
             board,
             "OTHER Q",
-            SortColumn.OTHER_QUESTS,
+            LeaderBoard.SortCriterion.OTHER_QUESTS,
             105f
         );
 
         addHeader(
             board,
             "MEOWPOINT",
-            SortColumn.SCORE,
+            LeaderBoard.SortCriterion.SCORE,
             125f
         );
 
@@ -179,7 +161,7 @@ public class LeaderBoardView extends View {
 
                 addCell(
                     board,
-                    user.getLastProgressText(),
+                    controller.getProgressText(user),
                     185f
                 );
 
@@ -227,48 +209,10 @@ public class LeaderBoardView extends View {
             .padTop(8f);
     }
 
-    private Comparator<User>
-    buildComparator() {
-
-        return switch (sortColumn) {
-
-            case USERNAME ->
-                Comparator.comparing(
-                    User::getName,
-                    String.CASE_INSENSITIVE_ORDER
-                );
-
-            case PROGRESS ->
-                Comparator.comparingInt(
-                    User::getLevelsPassed
-                );
-
-            case MINIGAMES ->
-                Comparator.comparingInt(
-                    User::getMinigamesWon
-                );
-
-            case DAILY_QUESTS ->
-                Comparator.comparingInt(
-                    User::getDailyQuestsCompleted
-                );
-
-            case OTHER_QUESTS ->
-                Comparator.comparingInt(
-                    User::getOtherQuestsCompleted
-                );
-
-            case SCORE ->
-                Comparator.comparingInt(
-                    User::getHighestScore
-                );
-        };
-    }
-
     private void addHeader(
         Table table,
         String title,
-        SortColumn column,
+        LeaderBoard.SortCriterion column,
         float width
     ) {
 

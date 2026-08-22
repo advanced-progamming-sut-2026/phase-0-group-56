@@ -8,9 +8,9 @@ import com.badlogic.gdx.utils.Align;
 import controllers.datacontroller.Data;
 import controllers.menus.secondarymenus.News;
 import models.App;
+import models.NewsItem;
 import models.User;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class NewsView extends View {
@@ -58,20 +58,9 @@ public class NewsView extends View {
             .padBottom(16f)
             .row();
 
-        List<String> all =
-            new ArrayList<>();
-
-        for (String message :
-            user.getUnreadNews()) {
-
-            all.add("[NEW] " + message);
-        }
-
-        for (String message :
-            user.getReadNews()) {
-
-            all.add(message);
-        }
+        News controller = (News) menu;
+        List<NewsItem> all =
+            controller.getAllNewsItems();
 
         if (all.isEmpty()) {
 
@@ -98,20 +87,56 @@ public class NewsView extends View {
             return;
         }
 
-        for (String message : all) {
+        for (NewsItem item : all) {
 
             Table card =
                 pvzInnerPanel();
 
+            Table meta = new Table();
+
+            Label date =
+                secondaryLabel(
+                    item.getDate()
+                );
+
+            meta.add(date)
+                .left()
+                .expandX();
+
+            if (item.isUnread()) {
+                Label badge =
+                    secondaryLabel("NEW");
+
+                meta.add(badge)
+                    .right();
+            }
+
+            Label title =
+                mediumTitle(
+                    item.getTitle()
+                );
+
             Label body =
                 wrappedLabel(
-                    message,
+                    item.getBody(),
                     700f
                 );
 
             body.setAlignment(
                 Align.left
             );
+
+            card.add(meta)
+                .width(700f)
+                .growX()
+                .row();
+
+            card.add(title)
+                .width(700f)
+                .left()
+                .padTop(8f)
+                .padBottom(8f)
+                .row();
 
             card.add(body)
                 .width(700f)
@@ -131,20 +156,30 @@ public class NewsView extends View {
                         () -> {
 
                             String result =
-                                ((News) menu)
-                                    .ShowNews();
+                                controller
+                                    .markAllAsRead();
 
-                            showMessage(result);
+                            if (result.startsWith("Error:")) {
+                                showMessage(result);
+                                return;
+                            }
 
-                            App.setScreen(
-                                new NewsView()
-                            );
+                            reloadWithMessage(result);
                         }
                     )
                 )
                 .width(280f)
                 .height(56f)
                 .padTop(18f);
+        }
+    }
+
+    private void reloadWithMessage(String message) {
+        NewsView refreshed = new NewsView();
+        App.setScreen(refreshed);
+
+        if (refreshed.stage != null) {
+            refreshed.showMessage(message);
         }
     }
 }

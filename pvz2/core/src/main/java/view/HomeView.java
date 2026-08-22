@@ -14,6 +14,7 @@ public class HomeView extends View {
 
     public HomeView() {
         menu = new Home();
+        App.setCurrentmenu(menu);
     }
 
     @Override
@@ -22,253 +23,223 @@ public class HomeView extends View {
     }
 
     @Override
-    protected void buildContent(
-        Table table
-    ) {
-
-        User user =
-            Data.getCurrentUser();
+    protected void buildContent(Table table) {
+        User user = Data.getCurrentUser();
 
         if (user == null) {
-
-            buildNoUserScreen(
-                table
-            );
-
+            buildNoUserScreen(table);
             return;
         }
 
-        /*
-         * Welcome text
-         */
+        String nickname = user.getNickname();
+
+        if (nickname == null || nickname.isBlank()) {
+            nickname = user.getName();
+        }
+
+        if (nickname == null || nickname.isBlank()) {
+            nickname = "PLAYER";
+        }
+
         Label welcome =
             mediumTitle(
-                "WELCOME, "
-                    + user.getNickname()
-                    .toUpperCase()
-                    + "!"
+                "WELCOME, " + nickname.toUpperCase() + "!"
             );
 
-        welcome.setAlignment(
-            Align.center
-        );
+        welcome.setAlignment(Align.center);
 
         table.add(welcome)
             .center()
-            .padTop(10f)
-            .padBottom(18f)
+            .padTop(8f)
+            .padBottom(12f)
             .row();
 
-        /*
-         * Main PvZ-style panel
-         */
-        Table mainPanel =
-            pvzPanel();
+        Table mainPanel = pvzPanel();
 
-        /*
-         * Buttons inside the main panel.
-         */
         TextButton adventure =
             greenButton(
                 "ADVENTURE",
-                () ->
-                    App.setScreen(
-                        new PlayView()
-                    )
+                () -> openMenu("Adventure menu")
             );
 
         TextButton collection =
             greenButton(
                 "COLLECTION",
-                () ->
-                    App.setScreen(
-                        new CollectionView()
-                    )
+                () -> openMenu("Collection menu")
             );
 
-        int unread =
-            user
-                .getUnreadNews()
-                .size();
+        int unreadNews = user.getUnreadNews().size();
 
         String newsText =
-            unread > 0
-                ? "NEWS  (" + unread + " NEW)"
+            unreadNews > 0
+                ? "NEWS  (" + unreadNews + " NEW)"
                 : "NEWS";
 
         TextButton news =
             greenButton(
                 newsText,
-                () ->
-                    App.setScreen(
-                        new NewsView()
-                    )
+                () -> openMenu("News menu")
             );
 
         TextButton profile =
             greenButton(
                 "PROFILE",
-                () ->
-                    App.setScreen(
-                        new ProfileView()
-                    )
+                () -> openMenu("Profile menu")
             );
 
         TextButton settings =
             brownButton(
                 "SETTINGS",
-                () ->
-                    App.setScreen(
-                        new SettingsView()
-                    )
+                () -> openMenu("Settings menu")
             );
 
         TextButton leaderboard =
             purpleButton(
                 "LEADERBOARD",
-                () ->
-                    App.setScreen(
-                        new LeaderBoardView()
-                    )
+                () -> openMenu("Leaderboard menu")
             );
 
         TextButton quests =
             purpleButton(
                 "TRAVEL LOG / QUESTS",
-                () ->
-                    App.setScreen(
-                        new TravelLogView()
-                    )
+                () -> openMenu("Travel Log menu")
             );
 
         TextButton greenhouse =
             greenButton(
                 "GREENHOUSE",
-                () ->
-                    App.setScreen(
-                        new GreenHouseView()
-                    )
+                () -> openMenu("Greenhouse menu")
             );
 
-        /*
-         * Consistent sizing for every button.
-         */
+        TextButton shop =
+            greenButton(
+                "SHOP",
+                () -> openMenu("Shop menu")
+            );
+
+        TextButton wallet =
+            purpleButton(
+                "WALLET",
+                () -> openMenu("Wallet menu")
+            );
+
         mainPanel.defaults()
             .width(310f)
-            .height(62f)
-            .pad(
-                10f,
-                14f,
-                10f,
-                14f
-            );
+            .height(56f)
+            .pad(7f, 12f, 7f, 12f);
 
-        /*
-         * Row 1
-         */
         mainPanel.add(adventure);
         mainPanel.add(collection);
         mainPanel.row();
 
-        /*
-         * Row 2
-         */
         mainPanel.add(news);
         mainPanel.add(profile);
         mainPanel.row();
 
-        /*
-         * Row 3
-         */
         mainPanel.add(settings);
         mainPanel.add(leaderboard);
         mainPanel.row();
 
-        /*
-         * Row 4
-         */
         mainPanel.add(quests);
         mainPanel.add(greenhouse);
+        mainPanel.row();
+
+        mainPanel.add(shop);
+        mainPanel.add(wallet);
         mainPanel.row();
 
         table.add(mainPanel)
             .width(760f)
             .center()
-            .padBottom(18f)
+            .padBottom(12f)
             .row();
 
-        /*
-         * Small bottom information panel.
-         */
-        Table infoPanel =
-            pvzInnerPanel();
+        Table infoPanel = pvzInnerPanel();
 
-        Label info =
+        Label progress =
             secondaryLabel(
-                "Choose a menu to continue your adventure."
+                "CURRENT PROGRESS: "
+                    + user.getLastProgressText()
+                    + "  |  COMPLETED LEVELS: "
+                    + user.getLevelsPassed()
+                    + "  |  DIFFICULTY: "
+                    + user.getDifficultyLevel()
             );
 
-        info.setAlignment(
-            Align.center
-        );
+        progress.setAlignment(Align.center);
 
-        infoPanel.add(info)
-            .width(520f)
+        infoPanel.add(progress)
+            .width(700f)
             .center();
 
         table.add(infoPanel)
-            .width(600f)
+            .width(760f)
             .center()
-            .padBottom(18f)
+            .padBottom(12f)
             .row();
 
-        /*
-         * Logout button.
-         */
+        Table accountActions = new Table();
+
         TextButton logout =
             brownButton(
                 "LOG OUT",
-                this::logout
+                this::confirmLogout
             );
 
-        table.add(logout)
-            .width(240f)
-            .height(54f)
+        TextButton exitGame =
+            brownButton(
+                "EXIT GAME",
+                this::confirmExit
+            );
+
+        accountActions.add(logout)
+            .width(230f)
+            .height(52f)
+            .padRight(12f);
+
+        accountActions.add(exitGame)
+            .width(230f)
+            .height(52f)
+            .padLeft(12f);
+
+        table.add(accountActions)
             .center()
-            .padBottom(10f);
+            .padBottom(8f);
     }
 
-    private void logout() {
+    private void openMenu(String menuName) {
+        String result = menu.ChangeMenu(menuName);
 
+        if (result != null && result.startsWith("Error")) {
+            showMessage(result);
+        }
+    }
+
+    private void confirmLogout() {
         showConfirmation(
             "Log Out",
-            "Are you sure you want to log out?",
-            () -> {
-
-                ((Home) menu).LogOut();
-
-                App.setScreen(
-                    new SignUpView()
-                );
-            }
+            "Are you sure you want to log out of this account?",
+            () -> ((Home) menu).LogOut()
         );
     }
 
-    private void buildNoUserScreen(
-        Table table
-    ) {
+    private void confirmExit() {
+        showConfirmation(
+            "Exit Game",
+            "Your progress will be saved before closing the game. Continue?",
+            () -> menu.exitMenu()
+        );
+    }
 
-        Table panel =
-            pvzPanel();
+    private void buildNoUserScreen(Table table) {
+        Table panel = pvzPanel();
 
         Label warning =
             mediumTitle(
                 "NO USER IS LOGGED IN"
             );
 
-        warning.setAlignment(
-            Align.center
-        );
+        warning.setAlignment(Align.center);
 
         panel.add(warning)
             .width(500f)
@@ -282,9 +253,7 @@ public class HomeView extends View {
                 500f
             );
 
-        description.setAlignment(
-            Align.center
-        );
+        description.setAlignment(Align.center);
 
         panel.add(description)
             .width(500f)
@@ -295,10 +264,7 @@ public class HomeView extends View {
         panel.add(
                 greenButton(
                     "GO TO LOGIN",
-                    () ->
-                        App.setScreen(
-                            new LogInView()
-                        )
+                    () -> App.setScreen(new LogInView())
                 )
             )
             .width(230f)

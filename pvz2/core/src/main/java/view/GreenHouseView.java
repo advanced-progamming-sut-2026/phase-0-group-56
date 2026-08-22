@@ -308,8 +308,7 @@ public class GreenHouseView extends View {
                     showMessage(
                         controller.collect(
                             x,
-                            y,
-                            false
+                            y
                         )
                     );
 
@@ -333,8 +332,7 @@ public class GreenHouseView extends View {
                 showMessage(
                     controller.forceGrow(
                         x,
-                        y,
-                        cost
+                        y
                     )
                 );
 
@@ -344,9 +342,6 @@ public class GreenHouseView extends View {
     }
 
     private void reloadGreenhouse() {
-
-        Data.saveUser();
-
         content.clearChildren();
 
         buildContent(content);
