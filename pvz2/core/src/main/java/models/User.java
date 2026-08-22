@@ -105,9 +105,7 @@ public class User implements Serializable, QuestObserver {
 
     @Override
     public void updateQuestProgress(String action, int amount) {
-        for (models.Quest quest : getActiveQuests()) {
-            quest.updateQuestProgress(action, amount);
-        }
+        QuestProgress.add(action, amount);
     }
 
     public ZombieRegistry getZombieRegistry() {

@@ -127,11 +127,9 @@ public final class QuestGameSession {
     }
 
     public void onPlantPlaced(Plant plant) {
-        if (cheatUsed || plant == null) {
+        if (cheatUsed || plant == null || !observedPlants.add(plant)) {
             return;
         }
-
-        observedPlants.add(plant);
 
         if (plant.getLine() >= 0 && plant.getLine() < ROW_COUNT) {
             plantedRows[plant.getLine()] = true;
