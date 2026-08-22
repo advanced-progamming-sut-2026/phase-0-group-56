@@ -27,7 +27,7 @@ public class PlantBuilder {
         plant.setWidth(Tile.getWidth());
         plant.setHeight(Tile.getHeight());
         plant.setType(plantType);
-        int level = App.getCurrentuser().getLevels().get(plantType);
+        int level = PlantLevel.current(plantType);
         plant.setHp(upgradedHP(plantType , level));
         plant.setDamage(upgradedDamage(plantType , level));
         plant.setActionInterval(upgradedSpeed(plantType , level));
@@ -48,7 +48,7 @@ public class PlantBuilder {
 
 
     private void upgradeEffect(){
-        int level = App.getCurrentuser().getLevels().get(plant.getType());
+        int level = PlantLevel.current(plant.getType());
         plant.setHp(upgradedHP(plant.getType() , level));
         plant.setDamage(upgradedDamage(plant.getType() , level));
 
@@ -58,7 +58,7 @@ public class PlantBuilder {
     }
 
     private void explodeOnFinish(){
-        for (int i = 2 ; i <= App.getCurrentuser().getLevels().get(plant.getType()); i++){
+        for (int i = 2; i <= PlantLevel.current(plant.getType()); i++) {
             if(Data.getPlants().get(plant.getType()).getUpgrades().get(i - 2)
                     .getEffect().matches("Explode on Finish")){
                 plant.getTags().add(PlantTags.EXPLOSIVE);
@@ -67,7 +67,7 @@ public class PlantBuilder {
     }
 
     private void plantFoodFromStart(){
-        for (int i = 2 ; i <= App.getCurrentuser().getLevels().get(plant.getType()); i++){
+        for (int i = 2; i <= PlantLevel.current(plant.getType()); i++) {
             if(Data.getPlants().get(plant.getType()).getUpgrades().get(i - 2)
             .getEffect().matches("Plant Food From Start")){
                 plant.setPlantFood(true);

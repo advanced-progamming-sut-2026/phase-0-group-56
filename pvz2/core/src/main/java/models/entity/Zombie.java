@@ -155,17 +155,16 @@ public class Zombie extends Entity{
         }
 
         eatTimer += deltaTime;
-        Plant plant = null;
-        if (eatTimer >= eatCooldown) {
-            eatTimer = 0;
-             plant = game.findTargetPlant(this , this.tileIndex);
-            if (plant != null) {
-                attack(plant , game);
-                return;
-                // don't move while eating
+        Plant plant = game.findTargetPlant(this, Tile.getWidth() * 0.72f);
+        if (plant != null) {
+            if (eatTimer >= eatCooldown) {
+                eatTimer = 0;
+                attack(plant, game);
             }
+            move(deltaTime, game, plant);
+            return;
         }
-        move(deltaTime , game , plant);
+        move(deltaTime, game, null);
     }
 
     // ====== EFFECTS ======
@@ -286,28 +285,29 @@ public class Zombie extends Entity{
 
     public void die() {
         dead = true;
+        models.User user = App.getCurrentuser();
         int random = (int)(Math.random() * 100);
-        if( random <= 10){
+        if (user != null && random <= 10) {
             int rand = random % 3;
             if(rand == 0) {
-                App.getCurrentuser().addCoins(50);
+                user.addCoins(50);
                 System.out.println("mara koshti but this 50 coins for you , be kind");
             }
             else if(rand == 1) {
-                App.getCurrentuser().addDiamonds(1);
+                user.addDiamonds(1);
                 System.out.println("mara koshti but this diamond for you , be kind");
             }
             else {
-                App.getCurrentuser().addUnlockedPots(1);
+                user.addUnlockedPots(1);
                 System.out.println("mara koshti but this pot for you , nahali beneshan be yade man");
             }
         }
-        else if(random <=  15){
-            App.getCurrentuser().addPlantFoods(1);
+        else if (user != null && random <= 15) {
+            user.addPlantFoods(1);
             System.out.println("mara koshti bedoon sabr, but eat this food patiently ");
         }
-        if (App.getCurrentuser() != null) {
-            App.getCurrentuser().updateQuestProgress("KILL_ZOMBIE", 1);
+        if (user != null) {
+            user.updateQuestProgress("KILL_ZOMBIE", 1);
         }
     }
 
@@ -402,12 +402,8 @@ public class Zombie extends Entity{
     public void setSpeed(float speed) { this.speed = speed; }
     public void setPosition(float x, float y) { this.x = x; this.y = y; }
     public void setLine(int line) {
-        if(line < 1)
-            line = 2;
-        else if(line > 5)
-            line = 4;
-
-        this.line = line;
+        this.line = Math.max(0, Math.min(4, line));
+        this.y = this.line * Tile.getHeight();
     }
     public void setFrozen(boolean frozen) { this.frozen = frozen; }
     public void setHypnotized(boolean hypnotized) { this.hypnotized = hypnotized; }

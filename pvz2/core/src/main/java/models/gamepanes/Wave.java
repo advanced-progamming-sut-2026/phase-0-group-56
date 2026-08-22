@@ -13,6 +13,7 @@ public class Wave {
     private int id;
     private int hardness;
     private float cost;
+    boolean finalWave;
     public Wave(){}
     public Wave(int id, int hardness, float cost){
         this.id = id;
@@ -35,10 +36,14 @@ public class Wave {
         for (Zombie z : zombies) {
             totalHp += z.getHp();
         }
-        return totalHp <= 0.75f * zombiesHP;
+        return (finalWave && Math.abs(totalHp - 0) <= 0.1) ||
+            (!finalWave && totalHp <= 0.25f * zombiesHP);
     }
 
 
+    public void setFinalWave(boolean finalWave) {
+        this.finalWave = finalWave;
+    }
 
     public void setZombies(ArrayList<Zombie> zombies) {
         this.zombies = zombies;

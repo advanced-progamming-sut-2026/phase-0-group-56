@@ -3,6 +3,7 @@ package models.entity;
 import models.App;
 import models.factory.ZombieFactory;
 import models.factory.builder.PlantType;
+import models.factory.builder.PlantLevel;
 import models.factory.plantSkills.Explosive;
 import models.factory.plantSkills.Skill;
 import models.factory.plantSkills.skillDatas.ExplosionData;
@@ -262,7 +263,7 @@ public class Plant extends Entity {
            }
         }
         else if(tags.contains(PlantTags.EXPLOSIVE)){
-            if(App.getCurrentuser().getLevels().get(this.type) >= 3) damage += 200;
+            if (PlantLevel.current(this.type) >= 3) damage += 200;
             ExplosionData data = new ExplosionData(3 , 3);
             Explosive boom = new Explosive(data);
             boom.do_skill(this ,game );
@@ -297,4 +298,3 @@ public class Plant extends Entity {
         this.skillObserver = skillObserver;
     }
 }
-

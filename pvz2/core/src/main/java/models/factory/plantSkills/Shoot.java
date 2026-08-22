@@ -5,6 +5,7 @@ import models.Constants;
 import models.entity.*;
 import models.factory.plantSkills.skillDatas.ShootingData;
 import models.factory.plantSkills.skillDatas.ShootingMood;
+import models.factory.builder.PlantLevel;
 import models.gamepanes.Tile;
 import models.games.BaseGame;
 
@@ -74,7 +75,7 @@ public class Shoot implements Skill {
     float onionChange;
     public void oneLineShoot(Plant shooter, ShootingData data , BaseGame game) throws CloneNotSupportedException {
         onionChange += 2;
-        int level = App.getCurrentuser().getLevels().get(shooter.getType());
+        int level = PlantLevel.current(shooter.getType());
         if(data.getBullet() == ProjectileType.ONION_1 || data.getBullet() == ProjectileType.ONION_3){
             if(onionChange >= (level >= 2 ? 9 : 10)) {
                 data.setBullet(ProjectileType.ONION_2);
@@ -145,7 +146,8 @@ public class Shoot implements Skill {
         ShootingData front = new ShootingData(data.getBullet() , data.getMood() ,
                 data.getBulletNumber() / 2);
         oneLineShoot(shooter , front , game);
-        Projectile projectileBack = new Projectile(shooter.getX() , shooter.getY() + shooter.getHeight() * MOUTH_EXITPOINT
+        Projectile projectileBack = new Projectile(
+                shooter.getX(), shooter.getY() + shooter.getHeight() * MOUTH_EXITPOINT
                 ,Constants.BULLET_VELOCITY_X * -1
                 , data.getBullet(), shooter.getDamage() ,  shooter.getLine());
         for (int i = 0; i < data.getBulletNumber() / 2; i++) {
@@ -158,7 +160,8 @@ public class Shoot implements Skill {
     private void starShoot(Plant shooter , ShootingData data , BaseGame game) throws CloneNotSupportedException {
         oneLineShoot(shooter, new ShootingData(data.getBullet() , data.getMood()
                 , data.getBulletNumber() / 5), game);///right
-        Projectile projectileStar2 = new Projectile(shooter.getX() , shooter.getY() + shooter.getHeight() * MOUTH_EXITPOINT ,
+        Projectile projectileStar2 = new Projectile(
+            shooter.getX(), shooter.getY() + shooter.getHeight() * MOUTH_EXITPOINT,
                Constants.BULLET_VELOCITY_X * -1 , data.getBullet() , shooter.getDamage()
         ,  shooter.getLine());
         Projectile projectileStar3 = (Projectile) projectileStar2.clone();
@@ -182,7 +185,8 @@ public class Shoot implements Skill {
 
 
     private void diagonal(Plant shooter , ShootingData  data , BaseGame game) throws CloneNotSupportedException {
-        Projectile projectile1 = new Projectile(shooter.getX() + shooter.getWidth() , shooter.getY() + shooter.getHeight() * 0.9f ,
+        Projectile projectile1 = new Projectile(
+            shooter.getX() + shooter.getWidth(), shooter.getY() + shooter.getHeight() * 0.9f,
                 Constants.BULLET_VELOCITY_X, data.getBullet() , shooter.getDamage()
         ,   shooter.getLine());
         projectile1.setVelocityY(projectile1.getVelocityX());
@@ -258,7 +262,7 @@ public class Shoot implements Skill {
                 , data.getBullet(),shooter.getLine());
         if(data.getBullet() == ProjectileType.CORN){
             Random rand = new Random();
-            boolean changeIncrease = App.getCurrentuser().getLevels().get(shooter.getType()) >= 2;
+            boolean changeIncrease = PlantLevel.current(shooter.getType()) >= 2;
             int a = rand.nextInt(100); // probability = 20%
             if((a >= 1 && a <= 40) || (changeIncrease && a >= 41 && a <= 45)) projectile.setType(ProjectileType.BUTTER);
         }

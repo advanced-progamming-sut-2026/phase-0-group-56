@@ -39,10 +39,10 @@ public class Projectile implements Cloneable {
     private boolean proved = false;
     /// for homing plantsInField of course!
     private Zombie toLockIn;
-    public void setTags(ArrayList<PlantTags> tags) {
+    public Projectile setTags(ArrayList<PlantTags> tags) {
         this.tags.clear();
         if (tags == null) {
-            return;
+            return this;
         }
 
         if (tags.contains(PlantTags.Fire)) {
@@ -60,6 +60,7 @@ public class Projectile implements Cloneable {
         if (tags.contains(PlantTags.AoE)) {
             this.tags.add(Tag.AoE);
         }
+        return this;
     }
 
 
@@ -317,16 +318,18 @@ public class Projectile implements Cloneable {
         return x;
     }
 
-    public void setX(float x) {
+    public Projectile setX(float x) {
         this.x = x;
+        return this;
     }
 
     public float getY() {
         return y;
     }
 
-    public void setY(float y) {
+    public Projectile setY(float y) {
         this.y = y;
+        return this;
     }
 
     public boolean isProved() {

@@ -1,0 +1,3217 @@
+From b943c838d56bef60fbfa36adff4a2e7371805bde Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Sat, 22 Aug 2026 14:21:53 +0200
+Subject: [PATCH] Implement Beghouled and I, Zombie minigames
+
+---
+ pvz2/core/src/main/java/com/game/Main.java    |   2 +
+ .../gamecontroller/BeghouledController.java   | 135 +++++
+ .../gamecontroller/IZombieController.java     |  70 +++
+ pvz2/core/src/main/java/models/User.java      |   2 +-
+ .../src/main/java/models/entity/Plant.java    |   4 +-
+ .../src/main/java/models/entity/Zombie.java   |  42 +-
+ .../models/factory/builder/PlantBuilder.java  |   8 +-
+ .../models/factory/builder/PlantLevel.java    |  19 +
+ .../models/factory/builder/PlantType.java     |  17 +-
+ .../models/factory/plantSkills/Block.java     |   5 +-
+ .../models/factory/plantSkills/ExtraHP.java   |   2 +-
+ .../models/factory/plantSkills/Homing.java    |   2 +-
+ .../models/factory/plantSkills/Shoot.java     |  14 +-
+ .../plantSkills/skillDatas/Modify.java        |   5 +-
+ .../src/main/java/models/gamepanes/Wave.java  |   5 +-
+ .../src/main/java/models/games/BaseGame.java  |   2 +-
+ .../main/java/models/games/NormalGame.java    |  17 +-
+ .../models/games/minigames/Beghouled.java     | 566 +++++++++++++++++-
+ .../java/models/games/minigames/IZombie.java  | 401 ++++++++++++-
+ .../games/specialgames/ConveyorBelt.java      |   2 +-
+ .../games/specialgames/LockedPlants.java      |  19 +-
+ .../src/main/java/view/MiniGamesView.java     | 111 ++++
+ pvz2/core/src/main/java/view/PlayView.java    |  25 +
+ .../java/view/gameview/BeghouledView.java     | 263 ++++++++
+ .../main/java/view/gameview/IZombieView.java  | 312 ++++++++++
+ .../java/view/gameview/MinigameBoardView.java | 276 +++++++++
+ .../java/view/gameview/MinigamePamVisual.java | 102 ++++
+ .../java/view/gameview/PvzAssetLocator.java   |  72 +++
+ .../minigames/MinigameModelSmokeTest.java     | 139 +++++
+ 29 files changed, 2545 insertions(+), 94 deletions(-)
+ create mode 100644 pvz2/core/src/main/java/controllers/menus/gamecontroller/BeghouledController.java
+ create mode 100644 pvz2/core/src/main/java/controllers/menus/gamecontroller/IZombieController.java
+ create mode 100644 pvz2/core/src/main/java/models/factory/builder/PlantLevel.java
+ create mode 100644 pvz2/core/src/main/java/view/MiniGamesView.java
+ create mode 100644 pvz2/core/src/main/java/view/gameview/BeghouledView.java
+ create mode 100644 pvz2/core/src/main/java/view/gameview/IZombieView.java
+ create mode 100644 pvz2/core/src/main/java/view/gameview/MinigameBoardView.java
+ create mode 100644 pvz2/core/src/main/java/view/gameview/MinigamePamVisual.java
+ create mode 100644 pvz2/core/src/main/java/view/gameview/PvzAssetLocator.java
+ create mode 100644 pvz2/core/src/test/java/models/games/minigames/MinigameModelSmokeTest.java
+
+diff --git a/pvz2/core/src/main/java/com/game/Main.java b/pvz2/core/src/main/java/com/game/Main.java
+index a6395ce..78f304b 100644
+--- a/pvz2/core/src/main/java/com/game/Main.java
++++ b/pvz2/core/src/main/java/com/game/Main.java
+@@ -2,6 +2,7 @@ package com.game;
+ 
+ import com.badlogic.gdx.Game;
+ import controllers.datacontroller.Data;
++import controllers.datacontroller.MiniGameLevelManager;
+ import models.App;
+ 
+ /**
+@@ -15,6 +16,7 @@ public class Main extends Game {
+ 
+         Data.loadPlantsFromJson();
+         Data.loadLevelsFromJson();
++        MiniGameLevelManager.loadLevelsFromFile("minigames.json");
+         Data.setUp();
+     }
+ 
+diff --git a/pvz2/core/src/main/java/controllers/menus/gamecontroller/BeghouledController.java b/pvz2/core/src/main/java/controllers/menus/gamecontroller/BeghouledController.java
+new file mode 100644
+index 0000000..7805473
+--- /dev/null
++++ b/pvz2/core/src/main/java/controllers/menus/gamecontroller/BeghouledController.java
+@@ -0,0 +1,135 @@
++package controllers.menus.gamecontroller;
++
++import controllers.datacontroller.Data;
++import models.App;
++import models.User;
++import models.factory.builder.PlantType;
++import models.games.minigames.Beghouled;
++import models.utils.Result;
++
++/** Controller for Beghouled input, selection state, upgrades, and score saving. */
++public final class BeghouledController implements Controller {
++    private final Beghouled game;
++    private int selectedColumn = -1;
++    private int selectedRow = -1;
++    private boolean resultSaved;
++
++    public BeghouledController(int levelNumber) {
++        game = new Beghouled(levelNumber);
++    }
++
++    @Override
++    public String playGame(float delta) {
++        String log = game.playGame(delta);
++        Result end = game.check_endGame();
++        if (end.success() && !resultSaved) {
++            resultSaved = true;
++            saveScore();
++        }
++        return log == null ? "" : log;
++    }
++
++    public SelectionResult selectTile(int column, int row) {
++        if (game.isLost()) {
++            clearSelection();
++            return new SelectionResult(false, "The game is over.");
++        }
++        if (game.getPlantAt(row, column) == null) {
++            clearSelection();
++            return new SelectionResult(false, "There is no plant on that tile.");
++        }
++        if (!hasSelection()) {
++            setSelection(column, row);
++            return new SelectionResult(false, "Plant selected. Choose an adjacent plant.");
++        }
++        if (selectedColumn == column && selectedRow == row) {
++            clearSelection();
++            return new SelectionResult(false, "Selection cancelled.");
++        }
++        if (!isAdjacent(column, row)) {
++            setSelection(column, row);
++            return new SelectionResult(false, "New plant selected. Choose an adjacent plant.");
++        }
++
++        Beghouled.SwapResult result = game.swap(
++            selectedColumn,
++            selectedRow,
++            column,
++            row
++        );
++        clearSelection();
++        return new SelectionResult(result == Beghouled.SwapResult.MATCHED, swapMessage(result));
++    }
++
++    public String upgrade(PlantType from) {
++        Beghouled.UpgradeResult result = game.upgrade(from);
++        return switch (result) {
++            case UPGRADED -> pretty(from) + " upgraded.";
++            case NOT_ENOUGH_SUN -> "Not enough sun for that upgrade.";
++            case NOT_AVAILABLE -> "That upgrade is not available on this board.";
++        };
++    }
++
++    private String swapMessage(Beghouled.SwapResult result) {
++        return switch (result) {
++            case MATCHED -> "Match! Sun and score awarded.";
++            case NO_MATCH -> "That swap does not create a match.";
++            case NOT_ADJACENT -> "Choose an adjacent plant.";
++            case EMPTY_TILE -> "Both tiles must contain plants.";
++            case OUT_OF_BOUNDS -> "That tile is outside the lawn.";
++            case GAME_OVER -> "The game is over.";
++        };
++    }
++
++    private boolean isAdjacent(int column, int row) {
++        return Math.abs(selectedColumn - column) + Math.abs(selectedRow - row) == 1;
++    }
++
++    private void setSelection(int column, int row) {
++        selectedColumn = column;
++        selectedRow = row;
++    }
++
++    public void clearSelection() {
++        selectedColumn = -1;
++        selectedRow = -1;
++    }
++
++    public boolean hasSelection() {
++        return selectedColumn >= 0 && selectedRow >= 0;
++    }
++
++    public int getSelectedColumn() {
++        return selectedColumn;
++    }
++
++    public int getSelectedRow() {
++        return selectedRow;
++    }
++
++    public Beghouled getGame() {
++        return game;
++    }
++
++    private void saveScore() {
++        User user = App.getCurrentuser();
++        if (user == null) {
++            return;
++        }
++        user.setHighestScore(game.getScore());
++        user.incrementGamesPlayed();
++        Data.saveUser();
++    }
++
++    private static String pretty(PlantType type) {
++        return type.name().toLowerCase().replace('_', ' ');
++    }
++
++    @Override
++    public String GameStart(String input) {
++        return "Beghouled is already running.";
++    }
++
++    public record SelectionResult(boolean matched, String message) {
++    }
++}
+diff --git a/pvz2/core/src/main/java/controllers/menus/gamecontroller/IZombieController.java b/pvz2/core/src/main/java/controllers/menus/gamecontroller/IZombieController.java
+new file mode 100644
+index 0000000..4aeb05a
+--- /dev/null
++++ b/pvz2/core/src/main/java/controllers/menus/gamecontroller/IZombieController.java
+@@ -0,0 +1,70 @@
++package controllers.menus.gamecontroller;
++
++import controllers.datacontroller.Data;
++import models.App;
++import models.User;
++import models.games.minigames.IZombie;
++import models.utils.Result;
++
++/** Controller gateway for the reverse-role I, Zombie minigame. */
++public final class IZombieController implements Controller {
++    private final IZombie game;
++    private boolean resultSaved;
++
++    public IZombieController(int levelNumber) {
++        game = new IZombie(levelNumber);
++    }
++
++    @Override
++    public String playGame(float delta) {
++        String log = game.playGame(delta);
++        Result end = game.check_endGame();
++        if (end.success() && !resultSaved) {
++            resultSaved = true;
++            saveResult("Won".equals(end.message()));
++        }
++        return log == null ? "" : log;
++    }
++
++    public String placeZombie(String type, int column, int row) {
++        IZombie.PlacementResult result = game.placeZombie(type, column, row);
++        return switch (result) {
++            case PLACED -> pretty(type) + " deployed.";
++            case INVALID_TILE -> "Place zombies to the right of the red line.";
++            case BRAIN_ALREADY_EATEN -> "That row's brain is already eaten.";
++            case NOT_AVAILABLE -> "That zombie is not available in this level.";
++            case NOT_ENOUGH_SUN -> "Not enough sun.";
++            case OCCUPIED -> "Another deployed zombie is already on that tile.";
++            case GAME_OVER -> "The game is over.";
++        };
++    }
++
++    private void saveResult(boolean won) {
++        User user = App.getCurrentuser();
++        if (user == null) {
++            return;
++        }
++        user.incrementGamesPlayed();
++        if (won) {
++            if (game.getLevelNumber() >= user.getIZombie()) {
++                user.setIZombie(user.getIZombie() + 1);
++            }
++            user.incrementMinigamesWon();
++            user.updateQuestProgress("WIN_MINIGAME", 1);
++        }
++        Data.saveUser();
++    }
++
++    public IZombie getGame() {
++        return game;
++    }
++
++    private static String pretty(String value) {
++        return value == null ? "Zombie" : value.toLowerCase().replace('_', ' ');
++    }
++
++    @Override
++    public String GameStart(String input) {
++        return "I, Zombie is already running.";
++    }
++}
+diff --git a/pvz2/core/src/main/java/models/User.java b/pvz2/core/src/main/java/models/User.java
+index a4acb80..41e3994 100644
+--- a/pvz2/core/src/main/java/models/User.java
++++ b/pvz2/core/src/main/java/models/User.java
+@@ -241,7 +241,7 @@ public class User implements Serializable, QuestObserver {
+     }
+ 
+     public void setIZombie(int IZombie) {
+-        this.IZombie = Math.max(1, IZombie);
++        this.IZombie = Math.min(3, Math.max(1, IZombie));
+     }
+ 
+     public int getCoins() {
+diff --git a/pvz2/core/src/main/java/models/entity/Plant.java b/pvz2/core/src/main/java/models/entity/Plant.java
+index ee73500..060e8ae 100644
+--- a/pvz2/core/src/main/java/models/entity/Plant.java
++++ b/pvz2/core/src/main/java/models/entity/Plant.java
+@@ -3,6 +3,7 @@ package models.entity;
+ import models.App;
+ import models.factory.ZombieFactory;
+ import models.factory.builder.PlantType;
++import models.factory.builder.PlantLevel;
+ import models.factory.plantSkills.Explosive;
+ import models.factory.plantSkills.Skill;
+ import models.factory.plantSkills.skillDatas.ExplosionData;
+@@ -262,7 +263,7 @@ public class Plant extends Entity {
+            }
+         }
+         else if(tags.contains(PlantTags.EXPLOSIVE)){
+-            if(App.getCurrentuser().getLevels().get(this.type) >= 3) damage += 200;
++            if (PlantLevel.current(this.type) >= 3) damage += 200;
+             ExplosionData data = new ExplosionData(3 , 3);
+             Explosive boom = new Explosive(data);
+             boom.do_skill(this ,game );
+@@ -297,4 +298,3 @@ public class Plant extends Entity {
+         this.skillObserver = skillObserver;
+     }
+ }
+-
+diff --git a/pvz2/core/src/main/java/models/entity/Zombie.java b/pvz2/core/src/main/java/models/entity/Zombie.java
+index 95a26ea..12bd69f 100644
+--- a/pvz2/core/src/main/java/models/entity/Zombie.java
++++ b/pvz2/core/src/main/java/models/entity/Zombie.java
+@@ -155,17 +155,16 @@ public class Zombie extends Entity{
+         }
+ 
+         eatTimer += deltaTime;
+-        Plant plant = null;
+-        if (eatTimer >= eatCooldown) {
+-            eatTimer = 0;
+-             plant = game.findTargetPlant(this , this.tileIndex);
+-            if (plant != null) {
+-                attack(plant , game);
+-                return;
+-                // don't move while eating
++        Plant plant = game.findTargetPlant(this, Tile.getWidth() * 0.72f);
++        if (plant != null) {
++            if (eatTimer >= eatCooldown) {
++                eatTimer = 0;
++                attack(plant, game);
+             }
++            move(deltaTime, game, plant);
++            return;
+         }
+-        move(deltaTime , game , plant);
++        move(deltaTime, game, null);
+     }
+ 
+     // ====== EFFECTS ======
+@@ -286,28 +285,29 @@ public class Zombie extends Entity{
+ 
+     public void die() {
+         dead = true;
++        models.User user = App.getCurrentuser();
+         int random = (int)(Math.random() * 100);
+-        if( random <= 10){
++        if (user != null && random <= 10) {
+             int rand = random % 3;
+             if(rand == 0) {
+-                App.getCurrentuser().addCoins(50);
++                user.addCoins(50);
+                 System.out.println("mara koshti but this 50 coins for you , be kind");
+             }
+             else if(rand == 1) {
+-                App.getCurrentuser().addDiamonds(1);
++                user.addDiamonds(1);
+                 System.out.println("mara koshti but this diamond for you , be kind");
+             }
+             else {
+-                App.getCurrentuser().addUnlockedPots(1);
++                user.addUnlockedPots(1);
+                 System.out.println("mara koshti but this pot for you , nahali beneshan be yade man");
+             }
+         }
+-        else if(random <=  15){
+-            App.getCurrentuser().addPlantFoods(1);
++        else if (user != null && random <= 15) {
++            user.addPlantFoods(1);
+             System.out.println("mara koshti bedoon sabr, but eat this food patiently ");
+         }
+-        if (App.getCurrentuser() != null) {
+-            App.getCurrentuser().updateQuestProgress("KILL_ZOMBIE", 1);
++        if (user != null) {
++            user.updateQuestProgress("KILL_ZOMBIE", 1);
+         }
+     }
+ 
+@@ -402,12 +402,8 @@ public class Zombie extends Entity{
+     public void setSpeed(float speed) { this.speed = speed; }
+     public void setPosition(float x, float y) { this.x = x; this.y = y; }
+     public void setLine(int line) {
+-        if(line < 1)
+-            line = 2;
+-        else if(line > 5)
+-            line = 4;
+-
+-        this.line = line;
++        this.line = Math.max(0, Math.min(4, line));
++        this.y = this.line * Tile.getHeight();
+     }
+     public void setFrozen(boolean frozen) { this.frozen = frozen; }
+     public void setHypnotized(boolean hypnotized) { this.hypnotized = hypnotized; }
+diff --git a/pvz2/core/src/main/java/models/factory/builder/PlantBuilder.java b/pvz2/core/src/main/java/models/factory/builder/PlantBuilder.java
+index b8b1453..5669138 100644
+--- a/pvz2/core/src/main/java/models/factory/builder/PlantBuilder.java
++++ b/pvz2/core/src/main/java/models/factory/builder/PlantBuilder.java
+@@ -27,7 +27,7 @@ public class PlantBuilder {
+         plant.setWidth(Tile.getWidth());
+         plant.setHeight(Tile.getHeight());
+         plant.setType(plantType);
+-        int level = App.getCurrentuser().getLevels().get(plantType);
++        int level = PlantLevel.current(plantType);
+         plant.setHp(upgradedHP(plantType , level));
+         plant.setDamage(upgradedDamage(plantType , level));
+         plant.setActionInterval(upgradedSpeed(plantType , level));
+@@ -48,7 +48,7 @@ public class PlantBuilder {
+ 
+ 
+     private void upgradeEffect(){
+-        int level = App.getCurrentuser().getLevels().get(plant.getType());
++        int level = PlantLevel.current(plant.getType());
+         plant.setHp(upgradedHP(plant.getType() , level));
+         plant.setDamage(upgradedDamage(plant.getType() , level));
+ 
+@@ -58,7 +58,7 @@ public class PlantBuilder {
+     }
+ 
+     private void explodeOnFinish(){
+-        for (int i = 2 ; i <= App.getCurrentuser().getLevels().get(plant.getType()); i++){
++        for (int i = 2; i <= PlantLevel.current(plant.getType()); i++) {
+             if(Data.getPlants().get(plant.getType()).getUpgrades().get(i - 2)
+                     .getEffect().matches("Explode on Finish")){
+                 plant.getTags().add(PlantTags.EXPLOSIVE);
+@@ -67,7 +67,7 @@ public class PlantBuilder {
+     }
+ 
+     private void plantFoodFromStart(){
+-        for (int i = 2 ; i <= App.getCurrentuser().getLevels().get(plant.getType()); i++){
++        for (int i = 2; i <= PlantLevel.current(plant.getType()); i++) {
+             if(Data.getPlants().get(plant.getType()).getUpgrades().get(i - 2)
+             .getEffect().matches("Plant Food From Start")){
+                 plant.setPlantFood(true);
+diff --git a/pvz2/core/src/main/java/models/factory/builder/PlantLevel.java b/pvz2/core/src/main/java/models/factory/builder/PlantLevel.java
+new file mode 100644
+index 0000000..be54484
+--- /dev/null
++++ b/pvz2/core/src/main/java/models/factory/builder/PlantLevel.java
+@@ -0,0 +1,19 @@
++package models.factory.builder;
++
++import models.App;
++import models.User;
++
++/** Null-safe access to a plant's persistent upgrade level. */
++public final class PlantLevel {
++    private PlantLevel() {
++    }
++
++    public static int current(PlantType type) {
++        User user = App.getCurrentuser();
++        if (user == null || type == null || user.getLevels() == null) {
++            return 1;
++        }
++        Integer level = user.getLevels().get(type);
++        return level == null ? 1 : Math.max(1, level);
++    }
++}
+diff --git a/pvz2/core/src/main/java/models/factory/builder/PlantType.java b/pvz2/core/src/main/java/models/factory/builder/PlantType.java
+index f576347..3e67a5e 100644
+--- a/pvz2/core/src/main/java/models/factory/builder/PlantType.java
++++ b/pvz2/core/src/main/java/models/factory/builder/PlantType.java
+@@ -191,7 +191,7 @@ public enum PlantType {
+         public Plant allocateSkill(Plant plant) {
+             ShootingData data = new ShootingData(ProjectileType.BUBBLE ,
+                     ShootingMood.MID_RANGE , 1);
+-            data.range = App.getCurrentuser().getLevels().get(plant.getType())
++            data.range = PlantLevel.current(plant.getType())
+                     == 4 ? 4 : 3;
+             ShootingData pf = new ShootingData(ProjectileType.BUBBLE , ShootingMood.MID_RANGE , 30);
+             ExtraHP hp = new ExtraHP(ExtraHP.Type.LIFE_RESET);
+@@ -205,7 +205,7 @@ public enum PlantType {
+         public Plant allocateSkill(Plant plant) {
+             ShootingData data = new ShootingData(ProjectileType.BUBBLE ,
+                     ShootingMood.MID_RANGE , 1);
+-            data.range = App.getCurrentuser().getLevels().get(plant.getType())
++            data.range = PlantLevel.current(plant.getType())
+                     >= 2 ? 4 : 3;
+             ShootingData pf = new ShootingData(ProjectileType.BUBBLE , ShootingMood.MID_RANGE , 30);
+             ExtraHP hp = new ExtraHP(ExtraHP.Type.LIFE_RESET);
+@@ -229,7 +229,8 @@ public enum PlantType {
+     PRIMAL_POTATO_MINE{
+         @Override
+         public Plant allocateSkill(Plant plant) {
+-            ExplosionData data = new ExplosionData(3 ,3); /// this plant has Trap tag , so by default just when a zombie is close to it , it explodes
++            // Trap plants trigger this area explosion when a zombie gets close.
++            ExplosionData data = new ExplosionData(3, 3);
+             plant.getBaseSkill().add(new Explosive(data));
+             ExtraHP clone = new ExtraHP(ExtraHP.Type.CLONE);
+             clone.cloneNumber = 2;
+@@ -261,7 +262,7 @@ public enum PlantType {
+         @Override
+         public Plant allocateSkill(Plant plant) {
+             ExplosionData data = new ExplosionData(3,3);
+-            /// needs an implementation: base skill should be a list , and we should add Clone class(for this , and potatos)
++            // Clone behaviour is represented by ExtraHP until dedicated clone entities exist.
+             plant.getBaseSkill().add(new Explosive(data));
+             return  super.allocateSkill(plant);
+ 
+@@ -287,7 +288,7 @@ public enum PlantType {
+         @Override
+         public Plant allocateSkill(Plant plant) {
+             ExplosionData data = new ExplosionData(ExplosionData.ExplosionType.NEXT_TO);
+-            data.randomCount = App.getCurrentuser().getLevels().get(plant.getType()) >= 3 ? 2 : 1;
++            data.randomCount = PlantLevel.current(plant.getType()) >= 3 ? 2 : 1;
+             plant.getBaseSkill().add(new Explosive(data));
+             ExplosionData pf = new ExplosionData(2);
+             Explosive e = new Explosive(pf);
+@@ -385,7 +386,7 @@ public enum PlantType {
+         @Override
+         public Plant allocateSkill(Plant plant) {
+             ShootingData data = new ShootingData(ProjectileType.BUBBLE , ShootingMood.MID_RANGE , 1);
+-            int level = App.getCurrentuser().getLevels().get(plant.getType());
++            int level = PlantLevel.current(plant.getType());
+             data.range = level >= 2 ? 5 : 4;
+             plant.getBaseSkill().add(new Shoot(data));
+             plant.getPlantfoodSkill().add(new Modify());
+@@ -425,7 +426,7 @@ public enum PlantType {
+     WASABI_WHIP{
+         @Override
+         public Plant allocateSkill(Plant plant) {
+-            int level =  App.getCurrentuser().getLevels().get(plant.getType());
++            int level = PlantLevel.current(plant.getType());
+             int range = level >= 3 ? 2 : 1;
+             plant.getBaseSkill().add(new Melee(Melee.MeleeAttack.PUNCH).setRange(range));
+             ExplosionData pf = new ExplosionData(ExplosionData.ExplosionType.RANDOM);
+@@ -592,7 +593,7 @@ public enum PlantType {
+ 
+ 
+     public Plant allocateSkill(Plant plant){
+-        for (int i = 2; i <= App.getCurrentuser().getLevels().get(plant.getType()) ; i++) {
++        for (int i = 2; i <= PlantLevel.current(plant.getType()); i++) {
+             if(Data.getPlants().get(plant.getType())
+                     .getUpgrades().get(i - 1).getEffect().equals("AoE on Death")) plant
+                     .getTags().add(PlantTags.EXPLOSIVE);
+diff --git a/pvz2/core/src/main/java/models/factory/plantSkills/Block.java b/pvz2/core/src/main/java/models/factory/plantSkills/Block.java
+index 9ec8e1e..5a81b78 100644
+--- a/pvz2/core/src/main/java/models/factory/plantSkills/Block.java
++++ b/pvz2/core/src/main/java/models/factory/plantSkills/Block.java
+@@ -6,6 +6,7 @@ import models.entity.PlantTags;
+ import models.entity.Sun;
+ import models.entity.Zombie;
+ import models.gamepanes.Tile;
++import models.factory.builder.PlantLevel;
+ import models.games.BaseGame;
+ import models.entity.Plant;
+ 
+@@ -67,11 +68,11 @@ public class Block implements Skill{
+             if(zombie.getX() - self.getX() < 10 && self.isHurt()) {
+                if(damage) {
+                    float extraDamage = self.getArmor() != null ? Constants.ENDURIAN_ARMOR_DAMAGE : 0;
+-                   if(App.getCurrentuser().getLevels().get(self.getType()) >= 2) extraDamage += 5;
++                   if (PlantLevel.current(self.getType()) >= 2) extraDamage += 5;
+                    zombie.setHp(zombie.getHp() - self.getDamage() - extraDamage);
+                }
+                else if(self.getTags().contains(PlantTags.SUN)) {
+-                   int level = App.getCurrentuser().getLevels().get(self.getType());
++                   int level = PlantLevel.current(self.getType());
+                    game.getSuns().add(new Sun(level >= 2 ? 10 : 5 , 5 , self.getX() + self.getWidth(),
+                            self.getY()));
+                }
+diff --git a/pvz2/core/src/main/java/models/factory/plantSkills/ExtraHP.java b/pvz2/core/src/main/java/models/factory/plantSkills/ExtraHP.java
+index 94c5a7c..51a06cf 100644
+--- a/pvz2/core/src/main/java/models/factory/plantSkills/ExtraHP.java
++++ b/pvz2/core/src/main/java/models/factory/plantSkills/ExtraHP.java
+@@ -79,7 +79,7 @@ public class ExtraHP implements Skill{
+         for (Plant p :  game.getPlantsInField()) {
+             if (p.getTileIndex() == row
+                     && p.getTileIndex() == col
+-                    && !p.getArmor().getLast().pumpkin) {
++                    && !p.getArmor().get(p.getArmor().size() - 1).pumpkin) {
+                 PlantArmor pumpkinArmor = new PlantArmor(plant.getHp());
+                 pumpkinArmor.pumpkin = true;
+                 p.getArmor().add(pumpkinArmor);
+diff --git a/pvz2/core/src/main/java/models/factory/plantSkills/Homing.java b/pvz2/core/src/main/java/models/factory/plantSkills/Homing.java
+index 307fd60..3be262d 100644
+--- a/pvz2/core/src/main/java/models/factory/plantSkills/Homing.java
++++ b/pvz2/core/src/main/java/models/factory/plantSkills/Homing.java
+@@ -64,7 +64,7 @@ public class Homing implements Skill{
+ 
+     private void closestZombie(Plant plant , BaseGame game) {
+         Iterator iterator =  game.getCurrentWave().getZombies().iterator();
+-        Zombie curr = game.getCurrentWave().getZombies().getFirst();
++        Zombie curr = game.getCurrentWave().getZombies().get(0);
+         float distance = distance(plant.getX() , plant.getY() , curr.getX() , curr.getY());
+         while (iterator.hasNext()) {
+             Zombie zombie = (Zombie) iterator.next();
+diff --git a/pvz2/core/src/main/java/models/factory/plantSkills/Shoot.java b/pvz2/core/src/main/java/models/factory/plantSkills/Shoot.java
+index 1144edb..f3c6c61 100644
+--- a/pvz2/core/src/main/java/models/factory/plantSkills/Shoot.java
++++ b/pvz2/core/src/main/java/models/factory/plantSkills/Shoot.java
+@@ -5,6 +5,7 @@ import models.Constants;
+ import models.entity.*;
+ import models.factory.plantSkills.skillDatas.ShootingData;
+ import models.factory.plantSkills.skillDatas.ShootingMood;
++import models.factory.builder.PlantLevel;
+ import models.gamepanes.Tile;
+ import models.games.BaseGame;
+ 
+@@ -74,7 +75,7 @@ public class Shoot implements Skill {
+     float onionChange;
+     public void oneLineShoot(Plant shooter, ShootingData data , BaseGame game) throws CloneNotSupportedException {
+         onionChange += 2;
+-        int level = App.getCurrentuser().getLevels().get(shooter.getType());
++        int level = PlantLevel.current(shooter.getType());
+         if(data.getBullet() == ProjectileType.ONION_1 || data.getBullet() == ProjectileType.ONION_3){
+             if(onionChange >= (level >= 2 ? 9 : 10)) {
+                 data.setBullet(ProjectileType.ONION_2);
+@@ -145,7 +146,8 @@ public class Shoot implements Skill {
+         ShootingData front = new ShootingData(data.getBullet() , data.getMood() ,
+                 data.getBulletNumber() / 2);
+         oneLineShoot(shooter , front , game);
+-        Projectile projectileBack = new Projectile(shooter.getX() , shooter.getY() + shooter.getHeight() * MOUTH_EXITPOINT
++        Projectile projectileBack = new Projectile(
++                shooter.getX(), shooter.getY() + shooter.getHeight() * MOUTH_EXITPOINT
+                 ,Constants.BULLET_VELOCITY_X * -1
+                 , data.getBullet(), shooter.getDamage() ,  shooter.getLine());
+         for (int i = 0; i < data.getBulletNumber() / 2; i++) {
+@@ -158,7 +160,8 @@ public class Shoot implements Skill {
+     private void starShoot(Plant shooter , ShootingData data , BaseGame game) throws CloneNotSupportedException {
+         oneLineShoot(shooter, new ShootingData(data.getBullet() , data.getMood()
+                 , data.getBulletNumber() / 5), game);///right
+-        Projectile projectileStar2 = new Projectile(shooter.getX() , shooter.getY() + shooter.getHeight() * MOUTH_EXITPOINT ,
++        Projectile projectileStar2 = new Projectile(
++            shooter.getX(), shooter.getY() + shooter.getHeight() * MOUTH_EXITPOINT,
+                Constants.BULLET_VELOCITY_X * -1 , data.getBullet() , shooter.getDamage()
+         ,  shooter.getLine());
+         Projectile projectileStar3 = (Projectile) projectileStar2.clone();
+@@ -182,7 +185,8 @@ public class Shoot implements Skill {
+ 
+ 
+     private void diagonal(Plant shooter , ShootingData  data , BaseGame game) throws CloneNotSupportedException {
+-        Projectile projectile1 = new Projectile(shooter.getX() + shooter.getWidth() , shooter.getY() + shooter.getHeight() * 0.9f ,
++        Projectile projectile1 = new Projectile(
++            shooter.getX() + shooter.getWidth(), shooter.getY() + shooter.getHeight() * 0.9f,
+                 Constants.BULLET_VELOCITY_X, data.getBullet() , shooter.getDamage()
+         ,   shooter.getLine());
+         projectile1.setVelocityY(projectile1.getVelocityX());
+@@ -258,7 +262,7 @@ public class Shoot implements Skill {
+                 , data.getBullet(),shooter.getLine());
+         if(data.getBullet() == ProjectileType.CORN){
+             Random rand = new Random();
+-            boolean changeIncrease = App.getCurrentuser().getLevels().get(shooter.getType()) >= 2;
++            boolean changeIncrease = PlantLevel.current(shooter.getType()) >= 2;
+             int a = rand.nextInt(100); // probability = 20%
+             if((a >= 1 && a <= 40) || (changeIncrease && a >= 41 && a <= 45)) projectile.setType(ProjectileType.BUTTER);
+         }
+diff --git a/pvz2/core/src/main/java/models/factory/plantSkills/skillDatas/Modify.java b/pvz2/core/src/main/java/models/factory/plantSkills/skillDatas/Modify.java
+index 5381b0b..fa6ab24 100644
+--- a/pvz2/core/src/main/java/models/factory/plantSkills/skillDatas/Modify.java
++++ b/pvz2/core/src/main/java/models/factory/plantSkills/skillDatas/Modify.java
+@@ -3,6 +3,7 @@ package models.factory.plantSkills.skillDatas;
+ import models.App;
+ import models.entity.*;
+ import models.factory.builder.PlantType;
++import models.factory.builder.PlantLevel;
+ import models.factory.plantSkills.Skill;
+ import models.gamepanes.Tile;
+ import models.gamepanes.TileType;
+@@ -81,7 +82,7 @@ public class Modify implements Skill {
+         if(plant != null){
+             plant.setFreezeLevel(0);
+         }
+-        if(App.getCurrentuser().getLevels().get(heater.getType()) >= 3){
++        if (PlantLevel.current(heater.getType()) >= 3) {
+             for (Plant p :  game.getPlantsInField()){
+                 if(Math.abs(p.getTileIndex() - heater.getTileIndex()) <= 1
+                 && Math.abs(p.getLine() - heater.getLine()) <= 1){
+@@ -99,7 +100,7 @@ public class Modify implements Skill {
+ 
+     @Override
+     public ArrayList<Zombie> random(Plant plant, BaseGame game, int numbers) {
+-        Zombie zombie =  Skill.super.random(plant, game, 1).getFirst();
++        Zombie zombie = Skill.super.random(plant, game, 1).get(0);
+         Armor armor = null;
+         for (Armor x : zombie.getArmors()){
+             if(x.isMagnetic()){
+diff --git a/pvz2/core/src/main/java/models/gamepanes/Wave.java b/pvz2/core/src/main/java/models/gamepanes/Wave.java
+index 53bd374..84d9627 100644
+--- a/pvz2/core/src/main/java/models/gamepanes/Wave.java
++++ b/pvz2/core/src/main/java/models/gamepanes/Wave.java
+@@ -25,8 +25,9 @@ public class Wave {
+         int index = rand.nextInt(available.size());
+         zombies.add(ZombieFactory.createZombie(available.get(index)));
+         zombieCount++;
+-        zombiesHP += zombies.getLast().getHp();
+-        cost -= zombies.getLast().getCost();
++        Zombie lastZombie = zombies.get(zombies.size() - 1);
++        zombiesHP += lastZombie.getHp();
++        cost -= lastZombie.getCost();
+         initWave(available);
+     }
+ 
+diff --git a/pvz2/core/src/main/java/models/games/BaseGame.java b/pvz2/core/src/main/java/models/games/BaseGame.java
+index 7d798b3..bcac60e 100644
+--- a/pvz2/core/src/main/java/models/games/BaseGame.java
++++ b/pvz2/core/src/main/java/models/games/BaseGame.java
+@@ -264,7 +264,7 @@ public class BaseGame implements Game {
+     protected int waveID = 0;
+     protected Result attack(float delta) {
+         if(currentWave == null || currentWave.isFinished()){
+-            if(currentWave!= null && currentWave == waves.getLast()){
++            if (currentWave != null && currentWave == waves.get(waves.size() - 1)) {
+                 won = true;
+                 return new Result(true , "Won" , null);
+             }
+diff --git a/pvz2/core/src/main/java/models/games/NormalGame.java b/pvz2/core/src/main/java/models/games/NormalGame.java
+index 4eba506..660b489 100644
+--- a/pvz2/core/src/main/java/models/games/NormalGame.java
++++ b/pvz2/core/src/main/java/models/games/NormalGame.java
+@@ -48,7 +48,8 @@ public NormalGame(Chapters chapters, Level level){
+             Wave wave = new Wave();
+             float lastCost ;
+             try {
+-                lastCost = waves.getLast() == null ? baseCost : waves.getLast().getCost();
++                Wave lastWave = waves.isEmpty() ? null : waves.get(waves.size() - 1);
++                lastCost = lastWave == null ? baseCost : lastWave.getCost();
+             } catch (Exception e){
+                 lastCost = baseCost;
+             }
+@@ -60,7 +61,7 @@ public NormalGame(Chapters chapters, Level level){
+ 
+         Wave finalWave = new Wave();
+         finalWave.setId(wavesCount);
+-        finalWave.setCost(waves.getLast().getCost() * 2);
++        finalWave.setCost(waves.get(waves.size() - 1).getCost() * 2);
+         finalWave.initWave(zombies);
+         waves.add(finalWave);
+     }
+@@ -153,7 +154,9 @@ public NormalGame(Chapters chapters, Level level){
+         Plant existingPlant = findByCoordinates(x, y);
+ 
+         // Pea Pod Stacking logic
+-        if (existingPlant != null && existingPlant.getType() == PlantType.PEA_POD && type.getType() == PlantType.PEA_POD) {
++        if (existingPlant != null
++            && existingPlant.getType() == PlantType.PEA_POD
++            && type.getType() == PlantType.PEA_POD) {
+             return true;
+         }
+         else if (type.getType() == PlantType.GRAVE_BUSTER) {
+@@ -202,7 +205,13 @@ public NormalGame(Chapters chapters, Level level){
+     @Override
+     public String add(String name) {
+         if(availablePlants.size() == 8) return "Impossible. Slots are full";
+-        if(name.equalsIgnoreCase("Imitater")) name = availablePlants.lastEntry().getKey().name();
++        if (name.equalsIgnoreCase("Imitater") && !availablePlants.isEmpty()) {
++            PlantType lastType = null;
++            for (PlantType type : availablePlants.keySet()) {
++                lastType = type;
++            }
++            name = lastType == null ? name : lastType.name();
++        }
+         SeedPackage seedPackage = selection.selectPlant(name);
+        if(seedPackage != null){
+            availablePlants.put(seedPackage.getPlant(), seedPackage);
+diff --git a/pvz2/core/src/main/java/models/games/minigames/Beghouled.java b/pvz2/core/src/main/java/models/games/minigames/Beghouled.java
+index f04ffed..80b6f17 100644
+--- a/pvz2/core/src/main/java/models/games/minigames/Beghouled.java
++++ b/pvz2/core/src/main/java/models/games/minigames/Beghouled.java
+@@ -1,79 +1,583 @@
+ package models.games.minigames;
+ 
+ import models.entity.Plant;
++import models.entity.Zombie;
++import models.factory.ZombieFactory;
+ import models.factory.builder.PlantType;
+ import models.gameadventure.Chapters;
++import models.gamepanes.Field;
++import models.gamepanes.Tile;
+ import models.games.NormalGame;
++import models.utils.Result;
+ 
++import java.util.ArrayList;
++import java.util.Collections;
+ import java.util.EnumMap;
+-import java.util.HashMap;
++import java.util.HashSet;
++import java.util.List;
++import java.util.Map;
++import java.util.Random;
++import java.util.Set;
+ 
+-public class Beghouled extends NormalGame {
+-    public Beghouled(int i) {
++/** Match-three minigame played on top of the normal plant/zombie simulation. */
++public final class Beghouled extends NormalGame {
++    public static final int COLUMN_COUNT = 9;
++    public static final int ROW_COUNT = 5;
+ 
++    private static final int SUN_PER_MATCHED_PLANT = 25;
++    private static final float FIRST_SPAWN_DELAY = 4f;
++    private static final float MIN_SPAWN_INTERVAL = 2.25f;
++    private static final int MAX_CASCADE_DEPTH = 20;
++
++    private final int levelNumber;
++    private final Random random;
++    private final List<PlantType> boardTypes;
++    private final Map<PlantType, Upgrade> upgrades;
++
++    private float elapsedTime;
++    private float spawnTimer = FIRST_SPAWN_DELAY;
++    private int score;
++    private int bestCombo;
++    private int lastCombo;
++    private int totalMatched;
++    private boolean lost;
++
++    public Beghouled(int levelNumber) {
++        this(levelNumber, new Random());
++    }
++
++    Beghouled(int levelNumber, Random random) {
++        this.levelNumber = Math.max(1, Math.min(3, levelNumber));
++        this.random = random == null ? new Random() : random;
++        boardTypes = List.copyOf(typesForLevel(this.levelNumber));
++        upgrades = buildUpgrades();
++        initialiseBoard();
+     }
+ 
++    private void initialiseBoard() {
++        plantsInField.clear();
++        zombies.clear();
++        projectiles.clear();
++        suns.clear();
++        elapsedTime = 0f;
++        spawnTimer = FIRST_SPAWN_DELAY;
++        score = 0;
++        bestCombo = 0;
++        lastCombo = 0;
++        totalMatched = 0;
++        lost = false;
++        won = false;
++        sunCount = 0;
++        chapter = Chapters.AncientEgypt;
++        field = new Field().initField(chapter, 0);
++        field.getMoaners().clear();
++        state = GameState.PLAYING;
++        rebuildStableBoard();
++    }
++
++    @Override
++    public void initGame(Chapters ignoredChapter, models.gameadventure.levels.Level ignoredLevel) {
++        initialiseBoard();
++    }
++
++    @Override
++    public boolean startGame(String ignored) {
++        state = GameState.PLAYING;
++        return true;
++    }
+ 
+     @Override
+     public String playGame(float delta) {
+-        if(resetNeeded()){
+-            reset();
+-            return "LeBron James";
++        if (state != GameState.PLAYING || lost) {
++            return "";
++        }
++
++        float safeDelta = Math.max(0f, delta);
++        elapsedTime += safeDelta;
++        updateProjectiles(safeDelta);
++        updatePlants(safeDelta);
++        updateZombies(safeDelta);
++        spawnEndlessZombie(safeDelta);
++        updateScene(safeDelta);
++
++        if (hasZombieReachedHouse()) {
++            lost = true;
++            state = GameState.END;
++            return "The zombies reached the house.";
++        }
++        return "";
++    }
++
++    @Override
++    public void updatePlants(float delta) {
++        super.updatePlants(delta);
++        if (plantsInField.size() < COLUMN_COUNT * ROW_COUNT) {
++            refillBoard(true);
++            Set<Cell> automaticMatches = findMatches();
++            if (!automaticMatches.isEmpty()) {
++                resolveCascades(automaticMatches, false);
++            }
++            ensurePlayableBoard();
+         }
+-        return "Game played";
+     }
+ 
+-    public void move(Plant plant , boolean positive , boolean horizontal){
+-        boolean canMove = checkMove(plant, positive, horizontal);
+-        if(canMove){
++    /** Swaps two adjacent plants only when the swap creates at least one match. */
++    public SwapResult swap(int firstColumn, int firstRow, int secondColumn, int secondRow) {
++        if (state != GameState.PLAYING) {
++            return SwapResult.GAME_OVER;
++        }
++        if (!isInside(firstColumn, firstRow) || !isInside(secondColumn, secondRow)) {
++            return SwapResult.OUT_OF_BOUNDS;
++        }
++        if (Math.abs(firstColumn - secondColumn) + Math.abs(firstRow - secondRow) != 1) {
++            return SwapResult.NOT_ADJACENT;
++        }
++
++        Plant first = getPlantAt(firstRow, firstColumn);
++        Plant second = getPlantAt(secondRow, secondColumn);
++        if (first == null || second == null) {
++            return SwapResult.EMPTY_TILE;
++        }
+ 
++        swapPositions(first, second);
++        Set<Cell> matches = findMatches();
++        if (matches.isEmpty()) {
++            swapPositions(first, second);
++            return SwapResult.NO_MATCH;
+         }
++
++        resolveCascades(matches, true);
++        ensurePlayableBoard();
++        return SwapResult.MATCHED;
+     }
+ 
+-    private void movePlant(){
++    public UpgradeResult upgrade(PlantType from) {
++        Upgrade upgrade = upgrades.get(from);
++        if (upgrade == null || !containsType(from)) {
++            return UpgradeResult.NOT_AVAILABLE;
++        }
++        if (sunCount < upgrade.cost()) {
++            return UpgradeResult.NOT_ENOUGH_SUN;
++        }
+ 
++        sunCount -= upgrade.cost();
++        replaceAll(from, upgrade.to());
++        Set<Cell> matches = findMatches();
++        if (!matches.isEmpty()) {
++            resolveCascades(matches, true);
++        }
++        ensurePlayableBoard();
++        return UpgradeResult.UPGRADED;
+     }
+ 
+-    private void deleteCombinations(){
++    public List<Upgrade> getAvailableUpgrades() {
++        ArrayList<Upgrade> available = new ArrayList<>();
++        for (Upgrade upgrade : upgrades.values()) {
++            if (containsType(upgrade.from())) {
++                available.add(upgrade);
++            }
++        }
++        return Collections.unmodifiableList(available);
++    }
++
++    private void resolveCascades(Set<Cell> firstMatches, boolean reward) {
++        Set<Cell> matches = firstMatches;
++        int combo = 0;
++
++        while (!matches.isEmpty() && combo < MAX_CASCADE_DEPTH) {
++            combo++;
++            int removed = removeMatches(matches);
++            if (reward) {
++                int multiplier = Math.min(combo, 5);
++                sunCount += removed * SUN_PER_MATCHED_PLANT;
++                score += removed * 100 * multiplier;
++                totalMatched += removed;
++            }
++            refillBoard(false);
++            matches = findMatches();
++        }
++
++        if (!matches.isEmpty()) {
++            rebuildStableBoard();
++        }
+ 
++        if (reward) {
++            lastCombo = combo;
++            bestCombo = Math.max(bestCombo, combo);
++        }
+     }
+ 
++    private int removeMatches(Set<Cell> matches) {
++        int before = plantsInField.size();
++        plantsInField.removeIf(plant -> matches.contains(
++            new Cell(plant.getTileIndex(), plant.getLine())
++        ));
++        for (Cell cell : matches) {
++            field.getTileByCoordinats(cell.column(), cell.row()).setEmpty(true);
++        }
++        return before - plantsInField.size();
++    }
+ 
+-    private void reset(){}
++    private void refillBoard(boolean avoidMatches) {
++        for (int column = 0; column < COLUMN_COUNT; column++) {
++            collapseColumn(column);
++            for (int row = columnPlantCount(column); row < ROW_COUNT; row++) {
++                PlantType type = avoidMatches
++                    ? chooseStableType(column, row)
++                    : randomBoardType();
++                addPlant(type, column, row);
++            }
++        }
++    }
+ 
+-    private boolean resetNeeded(){
+-        for (Plant x : plantsInField){
+-            boolean right = checkMove(x,true,true);
+-            boolean left = checkMove(x,false,true);
+-            boolean up =  checkMove(x,true,false);
+-            boolean down =  checkMove(x,false,false);
+-            if(!right && !left && !up && !down){
+-                return true;
++    private void collapseColumn(int column) {
++        ArrayList<Plant> columnPlants = new ArrayList<>();
++        for (int row = 0; row < ROW_COUNT; row++) {
++            Plant plant = getPlantAt(row, column);
++            if (plant != null) {
++                columnPlants.add(plant);
++            }
++        }
++        for (int row = 0; row < ROW_COUNT; row++) {
++            field.getTileByCoordinats(column, row).setEmpty(true);
++        }
++        for (int row = 0; row < columnPlants.size(); row++) {
++            placePlant(columnPlants.get(row), column, row);
++        }
++    }
++
++    private int columnPlantCount(int column) {
++        int count = 0;
++        for (Plant plant : plantsInField) {
++            if (plant.getTileIndex() == column) {
++                count++;
++            }
++        }
++        return count;
++    }
++
++    private void rebuildStableBoard() {
++        for (int attempt = 0; attempt < 100; attempt++) {
++            plantsInField.clear();
++            markAllTilesEmpty();
++            refillBoard(true);
++            if (findMatches().isEmpty() && hasValidMove()) {
++                return;
++            }
++        }
++        forceKnownPlayablePattern();
++    }
++
++    private void markAllTilesEmpty() {
++        for (int row = 0; row < ROW_COUNT; row++) {
++            for (int column = 0; column < COLUMN_COUNT; column++) {
++                field.getTileByCoordinats(column, row).setEmpty(true);
++            }
++        }
++    }
++
++    private PlantType chooseStableType(int column, int row) {
++        ArrayList<PlantType> candidates = new ArrayList<>(boardTypes);
++        Collections.shuffle(candidates, random);
++        for (PlantType candidate : candidates) {
++            if (!wouldCreateMatch(candidate, column, row)) {
++                return candidate;
++            }
++        }
++        return candidates.get(0);
++    }
++
++    private boolean wouldCreateMatch(PlantType type, int column, int row) {
++        Plant leftOne = getPlantAt(row, column - 1);
++        Plant leftTwo = getPlantAt(row, column - 2);
++        if (sameType(type, leftOne) && sameType(type, leftTwo)) {
++            return true;
++        }
++        Plant downOne = getPlantAt(row - 1, column);
++        Plant downTwo = getPlantAt(row - 2, column);
++        return sameType(type, downOne) && sameType(type, downTwo);
++    }
++
++    private boolean sameType(PlantType type, Plant plant) {
++        return plant != null && plant.getType() == type;
++    }
++
++    private void ensurePlayableBoard() {
++        if (!hasValidMove()) {
++            rebuildStableBoard();
++        }
++    }
++
++    public boolean hasValidMove() {
++        for (int row = 0; row < ROW_COUNT; row++) {
++            for (int column = 0; column < COLUMN_COUNT; column++) {
++                if (column + 1 < COLUMN_COUNT && createsMatchAfterSwap(
++                    column, row, column + 1, row
++                )) {
++                    return true;
++                }
++                if (row + 1 < ROW_COUNT && createsMatchAfterSwap(
++                    column, row, column, row + 1
++                )) {
++                    return true;
++                }
+             }
+         }
+         return false;
+     }
+ 
+-    private boolean checkMove(Plant plant, boolean positive , boolean horizontal){
+-        EnumMap<PlantType , Integer> plantsInThisColumn = new EnumMap<>(PlantType.class);
++    private boolean createsMatchAfterSwap(int firstColumn, int firstRow, int secondColumn, int secondRow) {
++        Plant first = getPlantAt(firstRow, firstColumn);
++        Plant second = getPlantAt(secondRow, secondColumn);
++        if (first == null || second == null || first.getType() == second.getType()) {
++            return false;
++        }
++        swapPositions(first, second);
++        boolean match = !findMatches().isEmpty();
++        swapPositions(first, second);
++        return match;
++    }
+ 
+-        int i = positive ? 1 : -1;
+-        for (Plant x : plantsInField){
++    private Set<Cell> findMatches() {
++        Set<Cell> matches = new HashSet<>();
++        findHorizontalMatches(matches);
++        findVerticalMatches(matches);
++        return matches;
++    }
++
++    private void findHorizontalMatches(Set<Cell> matches) {
++        for (int row = 0; row < ROW_COUNT; row++) {
++            int runStart = 0;
++            for (int column = 1; column <= COLUMN_COUNT; column++) {
++                if (column < COLUMN_COUNT && sameCellType(column, row, runStart, row)) {
++                    continue;
++                }
++                addRun(matches, runStart, column, row, true);
++                runStart = column;
++            }
++        }
++    }
+ 
+-            boolean check = horizontal ? x.getLine() == plant.getLine() + i
+-                : x.getTileIndex() == plant.getTileIndex() + i;
+-            if(check){
+-                plantsInThisColumn.merge(x.getType(), 1, Integer::sum);
++    private void findVerticalMatches(Set<Cell> matches) {
++        for (int column = 0; column < COLUMN_COUNT; column++) {
++            int runStart = 0;
++            for (int row = 1; row <= ROW_COUNT; row++) {
++                if (row < ROW_COUNT && sameCellType(column, row, column, runStart)) {
++                    continue;
++                }
++                addRun(matches, runStart, row, column, false);
++                runStart = row;
+             }
+         }
+-        for (Integer integer : plantsInThisColumn.values()){
+-            if(integer >= 3){
++    }
++
++    private boolean sameCellType(int firstColumn, int firstRow, int secondColumn, int secondRow) {
++        Plant first = getPlantAt(firstRow, firstColumn);
++        Plant second = getPlantAt(secondRow, secondColumn);
++        return first != null && second != null && first.getType() == second.getType();
++    }
++
++    private void addRun(Set<Cell> matches, int start, int end, int fixed, boolean horizontal) {
++        if (end - start < 3) {
++            return;
++        }
++        for (int index = start; index < end; index++) {
++            matches.add(horizontal ? new Cell(index, fixed) : new Cell(fixed, index));
++        }
++    }
++
++    private void swapPositions(Plant first, Plant second) {
++        int firstColumn = first.getTileIndex();
++        int firstRow = first.getLine();
++        placePlant(first, second.getTileIndex(), second.getLine());
++        placePlant(second, firstColumn, firstRow);
++    }
++
++    private void placePlant(Plant plant, int column, int row) {
++        plant.setTileIndex(column);
++        plant.setLine(row);
++        field.getTileByCoordinats(column, row).setEmpty(false);
++    }
++
++    private void addPlant(PlantType type, int column, int row) {
++        Plant plant = plantFactory.createPlant(type);
++        placePlant(plant, column, row);
++        plantsInField.add(plant);
++    }
++
++    private void replaceAll(PlantType from, PlantType to) {
++        ArrayList<Cell> positions = new ArrayList<>();
++        plantsInField.removeIf(plant -> {
++            if (plant.getType() != from) {
++                return false;
++            }
++            positions.add(new Cell(plant.getTileIndex(), plant.getLine()));
++            return true;
++        });
++        for (Cell cell : positions) {
++            addPlant(to, cell.column(), cell.row());
++        }
++    }
++
++    private boolean containsType(PlantType type) {
++        for (Plant plant : plantsInField) {
++            if (plant.getType() == type) {
++                return true;
++            }
++        }
++        return false;
++    }
++
++    private void spawnEndlessZombie(float delta) {
++        spawnTimer -= delta;
++        if (spawnTimer > 0f) {
++            return;
++        }
++
++        Zombie zombie = ZombieFactory.createZombie(chooseZombieType());
++        int row = random.nextInt(ROW_COUNT);
++        zombie.setLine(row);
++        zombie.setTileIndex(COLUMN_COUNT - 1);
++        zombie.setPosition(COLUMN_COUNT * Tile.getWidth() + 100f, row * Tile.getHeight());
++        zombies.add(zombie);
++
++        float interval = Math.max(MIN_SPAWN_INTERVAL, 7f - elapsedTime * 0.018f);
++        spawnTimer = interval * (0.82f + random.nextFloat() * 0.36f);
++    }
++
++    private String chooseZombieType() {
++        if (elapsedTime > 100f && random.nextFloat() < 0.18f) {
++            return "bucket";
++        }
++        if (elapsedTime > 45f && random.nextFloat() < 0.32f) {
++            return "cone";
++        }
++        return "normal";
++    }
++
++    private boolean hasZombieReachedHouse() {
++        for (Zombie zombie : zombies) {
++            if (!zombie.isDead() && zombie.getX() <= -35f) {
+                 return true;
+             }
+         }
+         return false;
+     }
+ 
++    private PlantType randomBoardType() {
++        return boardTypes.get(random.nextInt(boardTypes.size()));
++    }
++
++    private void forceKnownPlayablePattern() {
++        plantsInField.clear();
++        markAllTilesEmpty();
++        for (int row = 0; row < ROW_COUNT; row++) {
++            for (int column = 0; column < COLUMN_COUNT; column++) {
++                int typeIndex = (column + row * 2) % boardTypes.size();
++                addPlant(boardTypes.get(typeIndex), column, row);
++            }
++        }
++    }
+ 
++    private static boolean isInside(int column, int row) {
++        return column >= 0 && column < COLUMN_COUNT && row >= 0 && row < ROW_COUNT;
++    }
+ 
++    private static List<PlantType> typesForLevel(int level) {
++        return switch (level) {
++            case 2 -> List.of(
++                PlantType.PEASHOOTER,
++                PlantType.WALL_NUT,
++                PlantType.PUFF_SHROOM,
++                PlantType.CABBAGE_PULT,
++                PlantType.REPEATER
++            );
++            case 3 -> List.of(
++                PlantType.REPEATER,
++                PlantType.TALL_NUT,
++                PlantType.CABBAGE_PULT,
++                PlantType.MELON_PULT,
++                PlantType.WINTER_MELON
++            );
++            default -> List.of(
++                PlantType.PEASHOOTER,
++                PlantType.WALL_NUT,
++                PlantType.CHOMPER,
++                PlantType.SNOW_PEA,
++                PlantType.POTATO_MINE
++            );
++        };
++    }
++
++    private static Map<PlantType, Upgrade> buildUpgrades() {
++        EnumMap<PlantType, Upgrade> result = new EnumMap<>(PlantType.class);
++        addUpgrade(result, PlantType.PEASHOOTER, PlantType.REPEATER, 500);
++        addUpgrade(result, PlantType.REPEATER, PlantType.MEGA_GATLING_PEA, 1500);
++        addUpgrade(result, PlantType.WALL_NUT, PlantType.TALL_NUT, 500);
++        addUpgrade(result, PlantType.PUFF_SHROOM, PlantType.FUM_SHROOM, 250);
++        addUpgrade(result, PlantType.CABBAGE_PULT, PlantType.MELON_PULT, 1000);
++        addUpgrade(result, PlantType.MELON_PULT, PlantType.WINTER_MELON, 750);
++        return Collections.unmodifiableMap(result);
++    }
++
++    private static void addUpgrade(
++        Map<PlantType, Upgrade> map,
++        PlantType from,
++        PlantType to,
++        int cost
++    ) {
++        map.put(from, new Upgrade(from, to, cost));
++    }
++
++    @Override
++    public Result check_endGame() {
++        return lost
++            ? new Result(true, "Loss", null)
++            : new Result(false, null, null);
++    }
++
++    public int getLevelNumber() {
++        return levelNumber;
++    }
++
++    public int getScore() {
++        return score;
++    }
++
++    public int getBestCombo() {
++        return bestCombo;
++    }
++
++    public int getLastCombo() {
++        return lastCombo;
++    }
++
++    public int getTotalMatched() {
++        return totalMatched;
++    }
++
++    public boolean isLost() {
++        return lost;
++    }
++
++    public record Upgrade(PlantType from, PlantType to, int cost) {
++    }
++
++    private record Cell(int column, int row) {
++    }
++
++    public enum SwapResult {
++        MATCHED,
++        NO_MATCH,
++        NOT_ADJACENT,
++        EMPTY_TILE,
++        OUT_OF_BOUNDS,
++        GAME_OVER
++    }
++
++    public enum UpgradeResult {
++        UPGRADED,
++        NOT_ENOUGH_SUN,
++        NOT_AVAILABLE
++    }
+ }
+diff --git a/pvz2/core/src/main/java/models/games/minigames/IZombie.java b/pvz2/core/src/main/java/models/games/minigames/IZombie.java
+index 54e276d..fb0bade 100644
+--- a/pvz2/core/src/main/java/models/games/minigames/IZombie.java
++++ b/pvz2/core/src/main/java/models/games/minigames/IZombie.java
+@@ -1,13 +1,410 @@
+ package models.games.minigames;
+ 
+-import models.games.BaseGame;
++import models.entity.Plant;
++import models.entity.Zombie;
++import models.factory.ZombieFactory;
++import models.factory.builder.PlantType;
++import models.gameadventure.Chapters;
++import models.gamepanes.Field;
++import models.gamepanes.Tile;
++import models.games.NormalGame;
++import models.utils.Result;
+ 
+-public class IZombie extends BaseGame {
++import java.util.ArrayList;
++import java.util.Collections;
++import java.util.IdentityHashMap;
++import java.util.List;
++import java.util.Map;
++import java.util.Random;
++import java.util.Set;
+ 
++/** Reverse-role minigame in which the player buys and deploys zombies. */
++public final class IZombie extends NormalGame {
++    public static final int COLUMN_COUNT = 9;
++    public static final int ROW_COUNT = 5;
++    public static final int FIRST_ZOMBIE_COLUMN = 5;
++    public static final int STARTING_SUN = 150;
+ 
++    private static final int PRODUCED_SUN = 25;
++    private static final float INITIAL_PRODUCTION_INTERVAL = 11f;
++    private static final float MIN_PRODUCTION_INTERVAL = 3.5f;
+ 
++    private final int levelNumber;
++    private final Random random;
++    private final List<ZombieCard> zombieCards;
++    private final boolean[] brainsEaten = new boolean[ROW_COUNT];
++    private final Set<Zombie> sunProducers = Collections.newSetFromMap(
++        new IdentityHashMap<>()
++    );
++    private final Map<Zombie, Float> producerElapsed = new IdentityHashMap<>();
++    private final Map<Zombie, Float> producerTimers = new IdentityHashMap<>();
+ 
++    private boolean wonGame;
++    private boolean lostGame;
+ 
++    public IZombie(int levelNumber) {
++        this(levelNumber, new Random());
++    }
+ 
++    IZombie(int levelNumber, Random random) {
++        this.levelNumber = Math.max(1, Math.min(3, levelNumber));
++        this.random = random == null ? new Random() : random;
++        zombieCards = List.copyOf(cardsForLevel(this.levelNumber));
++        initialiseGame();
++    }
+ 
++    private void initialiseGame() {
++        plantsInField.clear();
++        zombies.clear();
++        projectiles.clear();
++        suns.clear();
++        sunProducers.clear();
++        producerElapsed.clear();
++        producerTimers.clear();
++        for (int row = 0; row < ROW_COUNT; row++) {
++            brainsEaten[row] = false;
++        }
++        wonGame = false;
++        lostGame = false;
++        won = false;
++        chapter = Chapters.AncientEgypt;
++        field = new Field().initField(chapter, 0);
++        field.getMoaners().clear();
++        sunCount = STARTING_SUN;
++        state = GameState.PLAYING;
++        createDefendingPlants();
++        createSunProducers();
++    }
++
++    @Override
++    public void initGame(Chapters ignoredChapter, models.gameadventure.levels.Level ignoredLevel) {
++        initialiseGame();
++    }
++
++    @Override
++    public boolean startGame(String ignored) {
++        state = GameState.PLAYING;
++        return true;
++    }
++
++    private void createDefendingPlants() {
++        List<PlantType> types = plantTypesForLevel(levelNumber);
++        for (int row = 0; row < ROW_COUNT; row++) {
++            int count = 3 + (row + levelNumber) % 2;
++            for (int index = 0; index < count; index++) {
++                int column = 1 + index;
++                PlantType type = types.get((row + index + random.nextInt(types.size())) % types.size());
++                addPlant(type, column, row);
++            }
++        }
++    }
++
++    private void addPlant(PlantType type, int column, int row) {
++        Plant plant = plantFactory.createPlant(type);
++        plant.setTileIndex(column);
++        plant.setLine(row);
++        plantsInField.add(plant);
++        field.getTileByCoordinats(column, row).setEmpty(false);
++    }
++
++    private void createSunProducers() {
++        for (int row = 0; row < ROW_COUNT; row++) {
++            Zombie producer = ZombieFactory.createZombie("bucket");
++            producer.setSpeed(0f);
++            producer.setLine(row);
++            producer.setTileIndex(COLUMN_COUNT - 1);
++            producer.setPosition(
++                (COLUMN_COUNT - 0.5f) * Tile.getWidth(),
++                row * Tile.getHeight()
++            );
++            zombies.add(producer);
++            sunProducers.add(producer);
++            producerElapsed.put(producer, 0f);
++            producerTimers.put(producer, INITIAL_PRODUCTION_INTERVAL + row * 0.35f);
++        }
++    }
++
++    @Override
++    public String playGame(float delta) {
++        if (state != GameState.PLAYING) {
++            return "";
++        }
++
++        float safeDelta = Math.max(0f, delta);
++        updatePlants(safeDelta);
++        updateProjectiles(safeDelta);
++        updateZombies(safeDelta);
++        updateProducers(safeDelta);
++        consumeReachedBrains();
++        updateScene(safeDelta);
++        evaluateEndState();
++
++        if (wonGame) {
++            return "All five brains were eaten.";
++        }
++        if (lostGame) {
++            return "No sun producers or affordable zombies remain.";
++        }
++        return "";
++    }
++
++    public PlacementResult placeZombie(String type, int column, int row) {
++        if (state != GameState.PLAYING) {
++            return PlacementResult.GAME_OVER;
++        }
++        if (!isPlacementCell(column, row)) {
++            return PlacementResult.INVALID_TILE;
++        }
++        if (brainsEaten[row]) {
++            return PlacementResult.BRAIN_ALREADY_EATEN;
++        }
++
++        ZombieCard card = findCard(type);
++        if (card == null) {
++            return PlacementResult.NOT_AVAILABLE;
++        }
++        if (sunCount < card.cost()) {
++            return PlacementResult.NOT_ENOUGH_SUN;
++        }
++        if (hasDeployedZombieAt(column, row)) {
++            return PlacementResult.OCCUPIED;
++        }
++
++        Zombie zombie = ZombieFactory.createZombie(card.type());
++        zombie.setLine(row);
++        zombie.setTileIndex(column);
++        zombie.setPosition(
++            (column + 0.5f) * Tile.getWidth(),
++            row * Tile.getHeight()
++        );
++        zombies.add(zombie);
++        sunCount -= card.cost();
++        return PlacementResult.PLACED;
++    }
++
++    private boolean hasDeployedZombieAt(int column, int row) {
++        float targetX = (column + 0.5f) * Tile.getWidth();
++        for (Zombie zombie : zombies) {
++            if (sunProducers.contains(zombie) || zombie.isDead() || zombie.getLine() != row) {
++                continue;
++            }
++            if (Math.abs(zombie.getX() - targetX) < Tile.getWidth() * 0.45f) {
++                return true;
++            }
++        }
++        return false;
++    }
++
++    private ZombieCard findCard(String type) {
++        if (type == null) {
++            return null;
++        }
++        for (ZombieCard card : zombieCards) {
++            if (card.type().equalsIgnoreCase(type)) {
++                return card;
++            }
++        }
++        return null;
++    }
++
++    private void updateProducers(float delta) {
++        sunProducers.removeIf(zombie -> zombie == null || zombie.isDead() || !zombies.contains(zombie));
++        producerElapsed.keySet().removeIf(zombie -> !sunProducers.contains(zombie));
++        producerTimers.keySet().removeIf(zombie -> !sunProducers.contains(zombie));
++
++        for (Zombie producer : sunProducers) {
++            float elapsed = producerElapsed.getOrDefault(producer, 0f) + delta;
++            float timer = producerTimers.getOrDefault(producer, INITIAL_PRODUCTION_INTERVAL) - delta;
++            producerElapsed.put(producer, elapsed);
++
++            if (timer <= 0f) {
++                sunCount += PRODUCED_SUN;
++                timer = Math.max(
++                    MIN_PRODUCTION_INTERVAL,
++                    INITIAL_PRODUCTION_INTERVAL - elapsed * 0.075f
++                );
++            }
++            producerTimers.put(producer, timer);
++        }
++    }
++
++    private void consumeReachedBrains() {
++        ArrayList<Zombie> reached = new ArrayList<>();
++        for (Zombie zombie : zombies) {
++            int row = zombie.getLine();
++            if (sunProducers.contains(zombie) || zombie.isDead() || row < 0 || row >= ROW_COUNT) {
++                continue;
++            }
++            if (zombie.getX() <= Tile.getWidth() * 0.10f) {
++                brainsEaten[row] = true;
++                reached.add(zombie);
++            }
++        }
++        zombies.removeAll(reached);
++    }
++
++    private void evaluateEndState() {
++        wonGame = getBrainsEatenCount() == ROW_COUNT;
++        if (wonGame) {
++            won = true;
++            state = GameState.END;
++            return;
++        }
++
++        boolean canProduceMoreSun = !sunProducers.isEmpty();
++        boolean hasDeployedZombie = getDeployedZombieCount() > 0;
++        lostGame = !canProduceMoreSun
++            && !hasDeployedZombie
++            && sunCount < getCheapestZombieCost();
++        if (lostGame) {
++            state = GameState.END;
++        }
++    }
++
++    private int getDeployedZombieCount() {
++        int count = 0;
++        for (Zombie zombie : zombies) {
++            if (!sunProducers.contains(zombie) && !zombie.isDead()) {
++                count++;
++            }
++        }
++        return count;
++    }
++
++    public int getCheapestZombieCost() {
++        int cheapest = Integer.MAX_VALUE;
++        for (ZombieCard card : zombieCards) {
++            cheapest = Math.min(cheapest, card.cost());
++        }
++        return cheapest == Integer.MAX_VALUE ? 0 : cheapest;
++    }
++
++    public boolean isSunProducer(Zombie zombie) {
++        return sunProducers.contains(zombie);
++    }
++
++    public List<Zombie> getSunProducers() {
++        return List.copyOf(sunProducers);
++    }
++
++    public List<ZombieCard> getZombieCards() {
++        return zombieCards;
++    }
++
++    public boolean isBrainEaten(int row) {
++        return row >= 0 && row < ROW_COUNT && brainsEaten[row];
++    }
++
++    public int getBrainsEatenCount() {
++        int count = 0;
++        for (boolean eaten : brainsEaten) {
++            if (eaten) {
++                count++;
++            }
++        }
++        return count;
++    }
++
++    public int getLevelNumber() {
++        return levelNumber;
++    }
++
++    public boolean isWonGame() {
++        return wonGame;
++    }
++
++    public boolean isLostGame() {
++        return lostGame;
++    }
++
++    private static boolean isPlacementCell(int column, int row) {
++        return column >= FIRST_ZOMBIE_COLUMN
++            && column < COLUMN_COUNT
++            && row >= 0
++            && row < ROW_COUNT;
++    }
++
++    private static List<PlantType> plantTypesForLevel(int level) {
++        return switch (level) {
++            case 2 -> List.of(
++                PlantType.REPEATER,
++                PlantType.CABBAGE_PULT,
++                PlantType.TALL_NUT,
++                PlantType.CHOMPER,
++                PlantType.SNOW_PEA
++            );
++            case 3 -> List.of(
++                PlantType.WINTER_MELON,
++                PlantType.TORCHWOOD,
++                PlantType.TALL_NUT,
++                PlantType.REPEATER,
++                PlantType.MELON_PULT
++            );
++            default -> List.of(
++                PlantType.PEASHOOTER,
++                PlantType.CABBAGE_PULT,
++                PlantType.WALL_NUT,
++                PlantType.POTATO_MINE,
++                PlantType.SNOW_PEA
++            );
++        };
++    }
++
++    private static List<ZombieCard> cardsForLevel(int level) {
++        return switch (level) {
++            case 2 -> List.of(
++                new ZombieCard("knight", 150),
++                new ZombieCard("brick", 175),
++                new ZombieCard("allstar", 150),
++                new ZombieCard("parasol", 100),
++                new ZombieCard("explorer", 125)
++            );
++            case 3 -> List.of(
++                new ZombieCard("gargantuar", 300),
++                new ZombieCard("prospector", 125),
++                new ZombieCard("dodo", 150),
++                new ZombieCard("snorkel", 125),
++                new ZombieCard("juggler", 150)
++            );
++            default -> List.of(
++                new ZombieCard("normal", 50),
++                new ZombieCard("cone", 75),
++                new ZombieCard("imp", 50),
++                new ZombieCard("newspaper", 100),
++                new ZombieCard("prospector", 125)
++            );
++        };
++    }
++
++    @Override
++    public Result check_endGame() {
++        if (wonGame) {
++            return new Result(true, "Won", null);
++        }
++        if (lostGame) {
++            return new Result(true, "Loss", null);
++        }
++        return new Result(false, null, null);
++    }
++
++    public record ZombieCard(String type, int cost) {
++        public ZombieCard {
++            if (type == null || type.isBlank()) {
++                throw new IllegalArgumentException("Zombie type cannot be blank.");
++            }
++            if (cost <= 0) {
++                throw new IllegalArgumentException("Zombie cost must be positive.");
++            }
++        }
++    }
++
++    public enum PlacementResult {
++        PLACED,
++        INVALID_TILE,
++        BRAIN_ALREADY_EATEN,
++        NOT_AVAILABLE,
++        NOT_ENOUGH_SUN,
++        OCCUPIED,
++        GAME_OVER
++    }
+ }
+diff --git a/pvz2/core/src/main/java/models/games/specialgames/ConveyorBelt.java b/pvz2/core/src/main/java/models/games/specialgames/ConveyorBelt.java
+index 021984f..61d837d 100644
+--- a/pvz2/core/src/main/java/models/games/specialgames/ConveyorBelt.java
++++ b/pvz2/core/src/main/java/models/games/specialgames/ConveyorBelt.java
+@@ -19,7 +19,7 @@ public class ConveyorBelt extends NormalGame implements SpecialGame {
+     public  ConveyorBelt(Chapters chapter, Level level) {
+         super(chapter, level);
+         initPlants(5);
+-        belt.add(plants.getFirst());
++        belt.add(plants.get(0));
+         state = GameState.PLAYING;
+     }
+ 
+diff --git a/pvz2/core/src/main/java/models/games/specialgames/LockedPlants.java b/pvz2/core/src/main/java/models/games/specialgames/LockedPlants.java
+index a5fc32e..0460c4b 100644
+--- a/pvz2/core/src/main/java/models/games/specialgames/LockedPlants.java
++++ b/pvz2/core/src/main/java/models/games/specialgames/LockedPlants.java
+@@ -22,10 +22,21 @@ public class LockedPlants extends NormalGame implements SpecialGame {
+     public boolean startGame(String plantName) {
+ 
+         if(!availablePlants.isEmpty() && lockType == LockType.ByCategory) {
+-            PlantCategory lock;
+-            lock = availablePlants.lastEntry().getValue().getPlant().getCategory();
+-
+-            selection.getPlantsToChoose().removeIf(plant -> plant.getCategory().equals(lock));
++            PlantCategory lock = null;
++            controllers.datacontroller.SeedPackage lastPackage = null;
++            for (controllers.datacontroller.SeedPackage seedPackage : availablePlants.values()) {
++                lastPackage = seedPackage;
++            }
++            if (lastPackage != null) {
++                lock = lastPackage.getPlant().getCategory();
++            }
++
++            PlantCategory categoryToLock = lock;
++            if (categoryToLock != null) {
++                selection.getPlantsToChoose().removeIf(
++                    plant -> plant.getCategory().equals(categoryToLock)
++                );
++            }
+         }
+         return super.startGame(plantName);
+ 
+diff --git a/pvz2/core/src/main/java/view/MiniGamesView.java b/pvz2/core/src/main/java/view/MiniGamesView.java
+new file mode 100644
+index 0000000..17b0357
+--- /dev/null
++++ b/pvz2/core/src/main/java/view/MiniGamesView.java
+@@ -0,0 +1,111 @@
++package view;
++
++import com.badlogic.gdx.Screen;
++import com.badlogic.gdx.scenes.scene2d.InputEvent;
++import com.badlogic.gdx.scenes.scene2d.ui.Label;
++import com.badlogic.gdx.scenes.scene2d.ui.Table;
++import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
++import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
++import com.badlogic.gdx.scenes.scene2d.utils.Drawable;
++import com.badlogic.gdx.utils.Align;
++import models.App;
++import models.User;
++import view.gameview.BeghouledView;
++import view.gameview.IZombieView;
++
++/** Menu and level selector for the implemented graphical minigames. */
++public final class MiniGamesView extends View {
++    @Override
++    protected String getScreenTitle() {
++        return "MINIGAMES";
++    }
++
++    @Override
++    protected Screen getBackScreen() {
++        return new PlayView();
++    }
++
++    @Override
++    protected void buildContent(Table table) {
++        table.top().pad(12f);
++        Label hint = new Label(
++            "Match plants in Beghouled, or command the zombie side in I, Zombie.",
++            skin,
++            "medium_outline"
++        );
++        hint.setAlignment(Align.center);
++        table.add(hint).colspan(2).expandX().center().padBottom(18f).row();
++
++        table.add(buildBeghouledCard()).width(520f).height(390f).pad(12f);
++        table.add(buildIZombieCard()).width(520f).height(390f).pad(12f);
++    }
++
++    private Table buildBeghouledCard() {
++        Table card = createCard(
++            "BEGHOULED",
++            "Swap adjacent plants only when the move forms 3 or more. "
++                + "Matches earn sun for upgrades while endless zombies attack."
++        );
++        addLevelButtons(card, false);
++        return card;
++    }
++
++    private Table buildIZombieCard() {
++        Table card = createCard(
++            "I, ZOMBIE",
++            "Spend zombie sun beyond the red line, protect your five producers, "
++                + "and eat all five brains."
++        );
++        addLevelButtons(card, true);
++        return card;
++    }
++
++    private Table createCard(String titleText, String description) {
++        Table card = new Table();
++        card.top().pad(20f);
++        Drawable background =
++            getSkinDrawableSafe("image_ui_quests_panel_edge_to_edge_ten");
++        if (background != null) {
++            card.setBackground(background);
++        }
++
++        Label title = new Label(titleText, skin, "big_outline");
++        title.setAlignment(Align.center);
++        Label body = new Label(description, skin);
++        body.setWrap(true);
++        body.setAlignment(Align.center);
++
++        card.add(title).expandX().center().padBottom(12f).row();
++        card.add(body).width(440f).height(105f).center().padBottom(20f).row();
++        return card;
++    }
++
++    private void addLevelButtons(Table card, boolean iZombie) {
++        User user = App.getCurrentuser();
++        int unlocked = iZombie && user != null ? user.getIZombie() : 3;
++        Table levels = new Table();
++
++        for (int level = 1; level <= 3; level++) {
++            int selectedLevel = level;
++            boolean available = level <= unlocked;
++            TextButton button = new TextButton(
++                available ? "LEVEL " + level : "LOCKED " + level,
++                skin,
++                available ? "green" : "brown"
++            );
++            button.setDisabled(!available);
++            if (available) {
++                button.addListener(new ClickListener() {
++                    @Override
++                    public void clicked(InputEvent event, float x, float y) {
++                        App.setScreen(iZombie
++                            ? new IZombieView(selectedLevel)
++                            : new BeghouledView(selectedLevel));
++                    }
++                });
++            }
++            levels.add(button).size(130f, 62f).pad(5f);
++        }
++        card.add(levels).center();
++    }
++}
+diff --git a/pvz2/core/src/main/java/view/PlayView.java b/pvz2/core/src/main/java/view/PlayView.java
+index 90c075c..606bfc1 100644
+--- a/pvz2/core/src/main/java/view/PlayView.java
++++ b/pvz2/core/src/main/java/view/PlayView.java
+@@ -437,6 +437,13 @@ public class PlayView extends View {
+                 "brown"
+             );
+ 
++        TextButton minigamesButton =
++            new TextButton(
++                "MINIGAMES",
++                skin,
++                "green"
++            );
++
+ 
+         backButton.addListener(
+             new ClickListener() {
+@@ -453,6 +460,19 @@ public class PlayView extends View {
+             }
+         );
+ 
++        minigamesButton.addListener(
++            new ClickListener() {
++                @Override
++                public void clicked(
++                    InputEvent event,
++                    float x,
++                    float y
++                ) {
++                    App.setScreen(new MiniGamesView());
++                }
++            }
++        );
++
+ 
+         // ---------------------------------------------------------------------
+         // Title
+@@ -511,6 +531,11 @@ public class PlayView extends View {
+             .height(55f)
+             .left();
+ 
++        hud.add(minigamesButton)
++            .width(165f)
++            .height(55f)
++            .padLeft(8f);
++
+ 
+         hud.add()
+             .expandX();
+diff --git a/pvz2/core/src/main/java/view/gameview/BeghouledView.java b/pvz2/core/src/main/java/view/gameview/BeghouledView.java
+new file mode 100644
+index 0000000..fd54e95
+--- /dev/null
++++ b/pvz2/core/src/main/java/view/gameview/BeghouledView.java
+@@ -0,0 +1,263 @@
++package view.gameview;
++
++import com.badlogic.gdx.Gdx;
++import com.badlogic.gdx.Input;
++import com.badlogic.gdx.InputAdapter;
++import com.badlogic.gdx.graphics.Color;
++import com.badlogic.gdx.graphics.GL20;
++import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
++import com.badlogic.gdx.scenes.scene2d.InputEvent;
++import com.badlogic.gdx.scenes.scene2d.ui.Label;
++import com.badlogic.gdx.scenes.scene2d.ui.Table;
++import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
++import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
++import com.badlogic.gdx.scenes.scene2d.utils.Drawable;
++import com.badlogic.gdx.utils.Align;
++import com.badlogic.gdx.utils.ScreenUtils;
++import controllers.menus.gamecontroller.BeghouledController;
++import models.App;
++import models.factory.builder.PlantType;
++import models.games.minigames.Beghouled;
++import view.MiniGamesView;
++
++import java.util.Locale;
++
++/** Fully graphical Beghouled screen. */
++public final class BeghouledView extends MinigameBoardView {
++    private static final String LINK_TILE_PAM =
++        "768/INITIAL/BACKGROUNDS/LINKTILE_01/LINKTILE_01.PAM";
++
++    private final int levelNumber;
++    private final BeghouledController controller;
++
++    private MinigamePamVisual selectionVisual;
++    private Label scoreLabel;
++    private Label sunLabel;
++    private Label comboLabel;
++    private Label statusLabel;
++    private Table upgradeTable;
++    private Table gameOverPanel;
++    private String upgradeSignature = "";
++    private float animationTime;
++
++    public BeghouledView(int levelNumber) {
++        this.levelNumber = Math.max(1, Math.min(3, levelNumber));
++        controller = new BeghouledController(this.levelNumber);
++    }
++
++    @Override
++    public void show() {
++        initialiseScreen();
++        if (pvzAssetsRoot != null && textureBank != null) {
++            selectionVisual = new MinigamePamVisual(
++                pvzAssetsRoot,
++                textureBank,
++                LINK_TILE_PAM
++            );
++        }
++        buildUi();
++        installInput(createInput());
++    }
++
++    @Override
++    public void render(float delta) {
++        float safeDelta = safeDelta(delta);
++        animationTime += safeDelta;
++        updateSharedAssets();
++
++        String log = controller.playGame(safeDelta);
++        if (!log.isBlank()) {
++            statusLabel.setText(log);
++        }
++        refreshHud();
++
++        ScreenUtils.clear(0.03f, 0.08f, 0.04f, 1f);
++        renderMap();
++        renderSelectionFallback();
++        renderWorld(safeDelta);
++
++        uiViewport.apply();
++        stage.act(safeDelta);
++        stage.draw();
++    }
++
++    private void renderWorld(float delta) {
++        Beghouled game = controller.getGame();
++        beginWorldBatch();
++        try {
++            renderSelectedTilePam();
++            renderPlants(game.getPlantsInField());
++            renderProjectiles(game.getBullets(), delta);
++            renderZombies(game.getZombies(), delta);
++        } finally {
++            batch.setColor(Color.WHITE);
++            batch.end();
++        }
++    }
++
++    private void renderSelectedTilePam() {
++        if (!controller.hasSelection() || selectionVisual == null || !selectionVisual.isReady()) {
++            return;
++        }
++        int column = controller.getSelectedColumn();
++        int row = controller.getSelectedRow();
++        selectionVisual.draw(
++            batch,
++            animationTime,
++            cellCenterX(column),
++            cellCenterY(row),
++            lawnBounds.width / 9f,
++            lawnBounds.height / 5f
++        );
++    }
++
++    private void renderSelectionFallback() {
++        if (!controller.hasSelection()
++            || (selectionVisual != null && selectionVisual.isReady())) {
++            return;
++        }
++        float cellWidth = lawnBounds.width / 9f;
++        float cellHeight = lawnBounds.height / 5f;
++        float x = lawnBounds.x + controller.getSelectedColumn() * cellWidth;
++        float y = lawnBounds.y + controller.getSelectedRow() * cellHeight;
++
++        worldViewport.apply();
++        shapes.setProjectionMatrix(worldCamera.combined);
++        Gdx.gl.glEnable(GL20.GL_BLEND);
++        shapes.begin(ShapeRenderer.ShapeType.Filled);
++        shapes.setColor(1f, 0.84f, 0.12f, 0.35f);
++        shapes.rect(x, y, cellWidth, cellHeight);
++        shapes.end();
++        Gdx.gl.glDisable(GL20.GL_BLEND);
++    }
++
++    private void buildUi() {
++        Table hud = new Table();
++        hud.setFillParent(true);
++        hud.top().pad(10f, 14f, 0f, 14f);
++
++        TextButton back = button("BACK", "brown", this::goBack);
++        Label title = new Label("BEGHOULED  •  LEVEL " + levelNumber,
++            skin, "big_outline");
++        title.setAlignment(Align.center);
++        scoreLabel = new Label("", skin, "medium_outline");
++        sunLabel = new Label("", skin, "medium_outline");
++        comboLabel = new Label("", skin, "medium_outline");
++        statusLabel = new Label("Select two adjacent plants to make a match.", skin);
++        statusLabel.setAlignment(Align.center);
++
++        hud.add(back).size(105f, 50f);
++        hud.add(scoreLabel).width(150f).padLeft(8f);
++        hud.add(title).expandX().center();
++        hud.add(sunLabel).width(145f).right();
++        hud.add(comboLabel).width(130f).right().row();
++
++        upgradeTable = new Table();
++        hud.add(upgradeTable).colspan(5).center().padTop(5f).row();
++        hud.add(statusLabel).colspan(5).expandX().fillX().padTop(3f);
++        stage.addActor(hud);
++
++        buildGameOverPanel();
++        refreshHud();
++    }
++
++    private void buildGameOverPanel() {
++        gameOverPanel = new Table();
++        gameOverPanel.setFillParent(true);
++        gameOverPanel.center();
++        gameOverPanel.setVisible(false);
++
++        Table card = new Table();
++        card.pad(24f);
++        Drawable background =
++            getSkinDrawableSafe("image_ui_quests_panel_edge_to_edge_ten");
++        if (background != null) {
++            card.setBackground(background);
++        }
++        card.add(new Label("GAME OVER", skin, "big_outline")).colspan(2).row();
++        card.add(button("RETRY", "green", () -> App.setScreen(new BeghouledView(levelNumber))))
++            .size(160f, 58f).pad(8f);
++        card.add(button("MINIGAMES", "brown", this::goBack)).size(180f, 58f).pad(8f);
++        gameOverPanel.add(card);
++        stage.addActor(gameOverPanel);
++    }
++
++    private void refreshHud() {
++        Beghouled game = controller.getGame();
++        scoreLabel.setText("SCORE: " + game.getScore());
++        sunLabel.setText("SUN: " + game.getSunCount());
++        comboLabel.setText("COMBO: x" + Math.max(1, game.getLastCombo()));
++        gameOverPanel.setVisible(game.isLost());
++        refreshUpgradeButtons();
++    }
++
++    private void refreshUpgradeButtons() {
++        StringBuilder signature = new StringBuilder();
++        for (Beghouled.Upgrade upgrade : controller.getGame().getAvailableUpgrades()) {
++            signature.append(upgrade.from()).append(':').append(upgrade.cost()).append('|');
++        }
++        if (signature.toString().equals(upgradeSignature)) {
++            return;
++        }
++        upgradeSignature = signature.toString();
++        upgradeTable.clearChildren();
++        for (Beghouled.Upgrade upgrade : controller.getGame().getAvailableUpgrades()) {
++            String text = pretty(upgrade.from()) + " → " + pretty(upgrade.to())
++                + "  " + upgrade.cost();
++            TextButton button = button(text, "brown", () -> performUpgrade(upgrade.from()));
++            upgradeTable.add(button).height(46f).padRight(5f);
++        }
++    }
++
++    private void performUpgrade(PlantType type) {
++        statusLabel.setText(controller.upgrade(type));
++        upgradeSignature = "";
++        refreshHud();
++    }
++
++    private InputAdapter createInput() {
++        return new InputAdapter() {
++            @Override
++            public boolean keyDown(int keycode) {
++                if (keycode == Input.Keys.ESCAPE) {
++                    goBack();
++                    return true;
++                }
++                return false;
++            }
++
++            @Override
++            public boolean touchDown(int screenX, int screenY, int pointer, int button) {
++                if (button != Input.Buttons.LEFT || !updatePointer(screenX, screenY)) {
++                    return false;
++                }
++                BeghouledController.SelectionResult result = controller.selectTile(
++                    pointerColumn(),
++                    pointerRow()
++                );
++                statusLabel.setText(result.message());
++                upgradeSignature = "";
++                return true;
++            }
++        };
++    }
++
++    private TextButton button(String text, String style, Runnable action) {
++        TextButton button = new TextButton(text, skin, style);
++        button.addListener(new ClickListener() {
++            @Override
++            public void clicked(InputEvent event, float x, float y) {
++                action.run();
++            }
++        });
++        return button;
++    }
++
++    private void goBack() {
++        App.setScreen(new MiniGamesView());
++    }
++
++    private static String pretty(PlantType type) {
++        return type.name().toLowerCase(Locale.ROOT).replace('_', ' ');
++    }
++}
+diff --git a/pvz2/core/src/main/java/view/gameview/IZombieView.java b/pvz2/core/src/main/java/view/gameview/IZombieView.java
+new file mode 100644
+index 0000000..916e539
+--- /dev/null
++++ b/pvz2/core/src/main/java/view/gameview/IZombieView.java
+@@ -0,0 +1,312 @@
++package view.gameview;
++
++import com.badlogic.gdx.Gdx;
++import com.badlogic.gdx.Input;
++import com.badlogic.gdx.InputAdapter;
++import com.badlogic.gdx.graphics.Color;
++import com.badlogic.gdx.graphics.GL20;
++import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
++import com.badlogic.gdx.scenes.scene2d.InputEvent;
++import com.badlogic.gdx.scenes.scene2d.ui.Label;
++import com.badlogic.gdx.scenes.scene2d.ui.Table;
++import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
++import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
++import com.badlogic.gdx.scenes.scene2d.utils.Drawable;
++import com.badlogic.gdx.utils.Align;
++import com.badlogic.gdx.utils.ScreenUtils;
++import controllers.menus.gamecontroller.IZombieController;
++import models.App;
++import models.entity.Zombie;
++import models.games.minigames.IZombie;
++import models.gamepanes.Tile;
++import view.MiniGamesView;
++
++import java.util.LinkedHashMap;
++import java.util.Locale;
++import java.util.Map;
++
++/** Fully graphical reverse-role I, Zombie screen. */
++public final class IZombieView extends MinigameBoardView {
++    private static final String BRAIN_PAM =
++        "768/FULL/EFFECTS/BRAIN_EFFECT/BRAIN_EFFECT.PAM";
++
++    private final int levelNumber;
++    private final IZombieController controller;
++    private final Map<String, TextButton> zombieButtons = new LinkedHashMap<>();
++
++    private MinigamePamVisual brainVisual;
++    private String selectedZombie;
++    private Label sunLabel;
++    private Label brainLabel;
++    private Label statusLabel;
++    private Label resultLabel;
++    private Table resultPanel;
++    private float animationTime;
++
++    public IZombieView(int levelNumber) {
++        this.levelNumber = Math.max(1, Math.min(3, levelNumber));
++        controller = new IZombieController(this.levelNumber);
++    }
++
++    @Override
++    public void show() {
++        initialiseScreen();
++        if (pvzAssetsRoot != null && textureBank != null) {
++            brainVisual = new MinigamePamVisual(pvzAssetsRoot, textureBank, BRAIN_PAM);
++        }
++        buildUi();
++        installInput(createInput());
++    }
++
++    @Override
++    public void render(float delta) {
++        float safeDelta = safeDelta(delta);
++        animationTime += safeDelta;
++        updateSharedAssets();
++
++        String log = controller.playGame(safeDelta);
++        if (!log.isBlank()) {
++            statusLabel.setText(log);
++        }
++        refreshHud();
++
++        ScreenUtils.clear(0.08f, 0.035f, 0.05f, 1f);
++        renderMap();
++        renderBoardGuides();
++        renderWorld(safeDelta);
++
++        uiViewport.apply();
++        stage.act(safeDelta);
++        stage.draw();
++    }
++
++    private void renderWorld(float delta) {
++        IZombie game = controller.getGame();
++        beginWorldBatch();
++        try {
++            renderBrains(game);
++            renderPlants(game.getPlantsInField());
++            renderProjectiles(game.getBullets(), delta);
++            renderZombies(game.getZombies(), delta);
++        } finally {
++            batch.setColor(Color.WHITE);
++            batch.end();
++        }
++    }
++
++    private void renderBrains(IZombie game) {
++        if (brainVisual == null || !brainVisual.isReady()) {
++            return;
++        }
++        float width = lawnBounds.width / 9f * 0.86f;
++        float height = lawnBounds.height / 5f * 0.72f;
++        for (int row = 0; row < IZombie.ROW_COUNT; row++) {
++            if (!game.isBrainEaten(row)) {
++                brainVisual.draw(
++                    batch,
++                    animationTime,
++                    cellCenterX(0),
++                    cellCenterY(row),
++                    width,
++                    height
++                );
++            }
++        }
++    }
++
++    private void renderBoardGuides() {
++        IZombie game = controller.getGame();
++        float cellWidth = lawnBounds.width / 9f;
++        float cellHeight = lawnBounds.height / 5f;
++        float lineX = lawnBounds.x + IZombie.FIRST_ZOMBIE_COLUMN * cellWidth;
++
++        worldViewport.apply();
++        shapes.setProjectionMatrix(worldCamera.combined);
++        Gdx.gl.glEnable(GL20.GL_BLEND);
++        shapes.begin(ShapeRenderer.ShapeType.Filled);
++        shapes.setColor(0.92f, 0.08f, 0.05f, 0.92f);
++        shapes.rect(lineX - 3f, lawnBounds.y, 6f, lawnBounds.height);
++        renderProducerHalos(game, cellWidth, cellHeight);
++        renderBrainFallbacks(game, cellWidth, cellHeight);
++        shapes.end();
++        Gdx.gl.glDisable(GL20.GL_BLEND);
++    }
++
++    private void renderProducerHalos(IZombie game, float cellWidth, float cellHeight) {
++        shapes.setColor(1f, 0.82f, 0.08f, 0.28f);
++        for (Zombie producer : game.getSunProducers()) {
++            float x = lawnBounds.x + producer.getX() / (9f * Tile.getWidth()) * lawnBounds.width;
++            float y = cellCenterY(producer.getLine());
++            shapes.circle(x, y, Math.min(cellWidth, cellHeight) * 0.45f, 24);
++        }
++    }
++
++    private void renderBrainFallbacks(IZombie game, float cellWidth, float cellHeight) {
++        if (brainVisual != null && brainVisual.isReady()) {
++            return;
++        }
++        shapes.setColor(0.96f, 0.42f, 0.62f, 0.88f);
++        for (int row = 0; row < IZombie.ROW_COUNT; row++) {
++            if (!game.isBrainEaten(row)) {
++                shapes.ellipse(
++                    cellCenterX(0) - cellWidth * 0.32f,
++                    cellCenterY(row) - cellHeight * 0.22f,
++                    cellWidth * 0.64f,
++                    cellHeight * 0.44f
++                );
++            }
++        }
++    }
++
++    private void buildUi() {
++        Table hud = new Table();
++        hud.setFillParent(true);
++        hud.top().pad(10f, 14f, 0f, 14f);
++
++        TextButton back = button("BACK", "brown", this::goBack);
++        Label title = new Label("I, ZOMBIE  •  LEVEL " + levelNumber, skin, "big_outline");
++        title.setAlignment(Align.center);
++        sunLabel = new Label("", skin, "medium_outline");
++        brainLabel = new Label("", skin, "medium_outline");
++        statusLabel = new Label("Choose a zombie, then place it right of the red line.", skin);
++        statusLabel.setAlignment(Align.center);
++
++        hud.add(back).size(105f, 50f);
++        hud.add(sunLabel).width(145f).padLeft(8f);
++        hud.add(title).expandX().center();
++        hud.add(brainLabel).width(180f).right().row();
++
++        Table cardRow = buildZombieCards();
++        hud.add(cardRow).colspan(4).center().padTop(5f).row();
++        hud.add(statusLabel).colspan(4).expandX().fillX().padTop(3f);
++        stage.addActor(hud);
++        buildResultPanel();
++    }
++
++    private Table buildZombieCards() {
++        Table row = new Table();
++        for (IZombie.ZombieCard card : controller.getGame().getZombieCards()) {
++            String text = pretty(card.type()) + "\n" + card.cost() + " SUN";
++            TextButton button = button(text, "brown", () -> selectZombie(card.type()));
++            button.getLabel().setWrap(true);
++            zombieButtons.put(card.type(), button);
++            row.add(button).size(150f, 62f).padRight(5f);
++        }
++        return row;
++    }
++
++    private void buildResultPanel() {
++        resultPanel = new Table();
++        resultPanel.setFillParent(true);
++        resultPanel.center();
++        resultPanel.setVisible(false);
++
++        Table card = new Table();
++        card.pad(24f);
++        Drawable background =
++            getSkinDrawableSafe("image_ui_quests_panel_edge_to_edge_ten");
++        if (background != null) {
++            card.setBackground(background);
++        }
++        resultLabel = new Label("", skin, "big_outline");
++        card.add(resultLabel).colspan(2).row();
++        card.add(button("RETRY", "green", () -> App.setScreen(new IZombieView(levelNumber))))
++            .size(160f, 58f).pad(8f);
++        card.add(button("MINIGAMES", "brown", this::goBack)).size(180f, 58f).pad(8f);
++        resultPanel.add(card);
++        stage.addActor(resultPanel);
++    }
++
++    private void refreshHud() {
++        IZombie game = controller.getGame();
++        sunLabel.setText("SUN: " + game.getSunCount());
++        brainLabel.setText("BRAINS: " + game.getBrainsEatenCount() + "/5");
++        for (Map.Entry<String, TextButton> entry : zombieButtons.entrySet()) {
++            IZombie.ZombieCard card = findCard(entry.getKey());
++            boolean affordable = card != null && game.getSunCount() >= card.cost();
++            entry.getValue().setDisabled(!affordable || game.getState() != models.games.BaseGame.GameState.PLAYING);
++            entry.getValue().setColor(
++                entry.getKey().equals(selectedZombie)
++                    ? new Color(0.72f, 1f, 0.72f, 1f)
++                    : Color.WHITE
++            );
++        }
++
++        boolean ended = game.isWonGame() || game.isLostGame();
++        resultPanel.setVisible(ended);
++        if (ended) {
++            resultLabel.setText(game.isWonGame() ? "ZOMBIES WIN!" : "PLANTS WIN");
++        }
++    }
++
++    private IZombie.ZombieCard findCard(String type) {
++        for (IZombie.ZombieCard card : controller.getGame().getZombieCards()) {
++            if (card.type().equals(type)) {
++                return card;
++            }
++        }
++        return null;
++    }
++
++    private void selectZombie(String type) {
++        selectedZombie = type.equals(selectedZombie) ? null : type;
++        statusLabel.setText(selectedZombie == null
++            ? "Zombie selection cancelled."
++            : pretty(selectedZombie) + " selected.");
++        refreshHud();
++    }
++
++    private InputAdapter createInput() {
++        return new InputAdapter() {
++            @Override
++            public boolean keyDown(int keycode) {
++                if (keycode == Input.Keys.ESCAPE) {
++                    goBack();
++                    return true;
++                }
++                return false;
++            }
++
++            @Override
++            public boolean touchDown(int screenX, int screenY, int pointer, int button) {
++                if (button != Input.Buttons.LEFT || !updatePointer(screenX, screenY)) {
++                    return false;
++                }
++                if (selectedZombie == null) {
++                    statusLabel.setText("Choose a zombie card first.");
++                    return true;
++                }
++                statusLabel.setText(controller.placeZombie(
++                    selectedZombie,
++                    pointerColumn(),
++                    pointerRow()
++                ));
++                refreshHud();
++                return true;
++            }
++        };
++    }
++
++    private TextButton button(String text, String style, Runnable action) {
++        TextButton button = new TextButton(text, skin, style);
++        button.addListener(new ClickListener() {
++            @Override
++            public void clicked(InputEvent event, float x, float y) {
++                action.run();
++            }
++        });
++        return button;
++    }
++
++    private void goBack() {
++        App.setScreen(new MiniGamesView());
++    }
++
++    private static String pretty(String value) {
++        if (value == null || value.isBlank()) {
++            return "Zombie";
++        }
++        String normalized = value.toLowerCase(Locale.ROOT).replace('_', ' ');
++        return Character.toUpperCase(normalized.charAt(0)) + normalized.substring(1);
++    }
++}
+diff --git a/pvz2/core/src/main/java/view/gameview/MinigameBoardView.java b/pvz2/core/src/main/java/view/gameview/MinigameBoardView.java
+new file mode 100644
+index 0000000..2f53d5b
+--- /dev/null
++++ b/pvz2/core/src/main/java/view/gameview/MinigameBoardView.java
+@@ -0,0 +1,276 @@
++package view.gameview;
++
++import com.badlogic.gdx.Gdx;
++import com.badlogic.gdx.InputAdapter;
++import com.badlogic.gdx.InputMultiplexer;
++import com.badlogic.gdx.files.FileHandle;
++import com.badlogic.gdx.graphics.OrthographicCamera;
++import com.badlogic.gdx.graphics.g2d.SpriteBatch;
++import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
++import com.badlogic.gdx.maps.MapProperties;
++import com.badlogic.gdx.maps.tiled.TiledMap;
++import com.badlogic.gdx.maps.tiled.TmxMapLoader;
++import com.badlogic.gdx.maps.tiled.renderers.OrthogonalTiledMapRenderer;
++import com.badlogic.gdx.math.Rectangle;
++import com.badlogic.gdx.math.Vector2;
++import com.badlogic.gdx.scenes.scene2d.Stage;
++import com.badlogic.gdx.utils.viewport.FitViewport;
++import models.entity.Plant;
++import models.entity.Projectile;
++import models.entity.Zombie;
++import pvz.libpvz.textures.TextureBank;
++import pvz.skin.PvzSkin;
++import view.View;
++
++/** Shared rendering shell for lawn-based graphical minigames. */
++abstract class MinigameBoardView extends View {
++    protected static final float MAX_DELTA = 1f / 15f;
++
++    protected final OrthographicCamera worldCamera = new OrthographicCamera();
++    protected final OrthographicCamera uiCamera = new OrthographicCamera();
++    protected final Rectangle lawnBounds = new Rectangle();
++    protected final Vector2 pointerWorld = new Vector2();
++
++    protected FitViewport worldViewport;
++    protected FitViewport uiViewport;
++    protected SpriteBatch batch;
++    protected ShapeRenderer shapes;
++    protected FileHandle pvzAssetsRoot;
++    protected TextureBank textureBank;
++    protected PlantRenderer plantRenderer;
++    protected ZombieRenderer zombieRenderer;
++    protected ProjectileRenderer projectileRenderer;
++
++    private TiledMap tiledMap;
++    private OrthogonalTiledMapRenderer mapRenderer;
++    private InputMultiplexer inputMultiplexer;
++    private boolean disposed;
++
++    protected final void initialiseScreen() {
++        disposed = false;
++        skin = PvzSkin.get();
++        worldViewport = new FitViewport(VIRTUAL_WIDTH, VIRTUAL_HEIGHT, worldCamera);
++        uiViewport = new FitViewport(VIRTUAL_WIDTH, VIRTUAL_HEIGHT, uiCamera);
++        stage = new Stage(uiViewport);
++        batch = new SpriteBatch();
++        shapes = new ShapeRenderer();
++        loadMap();
++        configureLawn();
++        initialiseAssets();
++    }
++
++    protected final void installInput(InputAdapter worldInput) {
++        inputMultiplexer = new InputMultiplexer(stage, worldInput);
++        Gdx.input.setInputProcessor(inputMultiplexer);
++    }
++
++    protected final float safeDelta(float delta) {
++        return Math.min(Math.max(0f, delta), MAX_DELTA);
++    }
++
++    protected final void updateSharedAssets() {
++        if (textureBank != null) {
++            textureBank.update();
++        }
++        if (plantRenderer != null) {
++            plantRenderer.update();
++        }
++    }
++
++    protected final void renderMap() {
++        if (mapRenderer == null) {
++            return;
++        }
++        worldViewport.apply();
++        worldCamera.update();
++        mapRenderer.setView(worldCamera);
++        mapRenderer.render();
++    }
++
++    protected final void beginWorldBatch() {
++        worldViewport.apply();
++        worldCamera.update();
++        batch.setProjectionMatrix(worldCamera.combined);
++        batch.begin();
++    }
++
++    protected final void renderPlants(Iterable<Plant> plants) {
++        if (plantRenderer == null || plants == null) {
++            return;
++        }
++        float cellWidth = lawnBounds.width / 9f;
++        float cellHeight = lawnBounds.height / 5f;
++        for (Plant plant : plants) {
++            if (plant == null || plant.getHp() <= 0f) {
++                continue;
++            }
++            plantRenderer.render(
++                batch,
++                plant,
++                cellCenterX(plant.getTileIndex()),
++                cellCenterY(plant.getLine()),
++                cellWidth,
++                cellHeight
++            );
++        }
++    }
++
++    protected final void renderZombies(Iterable<Zombie> zombies, float delta) {
++        if (zombieRenderer != null) {
++            zombieRenderer.render(batch, zombies, lawnBounds, delta);
++        }
++    }
++
++    protected final void renderProjectiles(java.util.List<Projectile> projectiles, float delta) {
++        if (projectileRenderer != null) {
++            projectileRenderer.render(batch, projectiles, lawnBounds, delta);
++        }
++    }
++
++    protected final float cellCenterX(int column) {
++        return lawnBounds.x + (column + 0.5f) * lawnBounds.width / 9f;
++    }
++
++    protected final float cellCenterY(int row) {
++        return lawnBounds.y + (row + 0.5f) * lawnBounds.height / 5f;
++    }
++
++    protected final boolean updatePointer(int screenX, int screenY) {
++        pointerWorld.set(screenX, screenY);
++        worldViewport.unproject(pointerWorld);
++        return lawnBounds.contains(pointerWorld);
++    }
++
++    protected final int pointerColumn() {
++        return Math.max(0, Math.min(8, (int) (
++            (pointerWorld.x - lawnBounds.x) / (lawnBounds.width / 9f)
++        )));
++    }
++
++    protected final int pointerRow() {
++        return Math.max(0, Math.min(4, (int) (
++            (pointerWorld.y - lawnBounds.y) / (lawnBounds.height / 5f)
++        )));
++    }
++
++    private void loadMap() {
++        try {
++            tiledMap = new TmxMapLoader().load("ancientegypt.tmx");
++            mapRenderer = new OrthogonalTiledMapRenderer(tiledMap, 1f);
++        } catch (RuntimeException exception) {
++            tiledMap = null;
++            mapRenderer = null;
++            Gdx.app.error(getClass().getSimpleName(), "Could not load ancientegypt.tmx", exception);
++        }
++    }
++
++    private void configureLawn() {
++        if (tiledMap != null) {
++            try {
++                lawnBounds.set(PitchBoundsReader.read(tiledMap));
++            } catch (RuntimeException exception) {
++                setFallbackLawn();
++            }
++        } else {
++            setFallbackLawn();
++        }
++
++        float cameraX = lawnBounds.x + lawnBounds.width / 2f;
++        float cameraY = lawnBounds.y + lawnBounds.height / 2f;
++        if (tiledMap != null) {
++            MapProperties properties = tiledMap.getProperties();
++            cameraX = numberProperty(properties, "battleCameraX", cameraX);
++            cameraY = numberProperty(properties, "battleCameraY", cameraY);
++        }
++        worldCamera.position.set(cameraX, cameraY, 0f);
++        worldCamera.update();
++    }
++
++    private void setFallbackLawn() {
++        lawnBounds.set(250f, 105f, 9f * 82f, 5f * 97f);
++    }
++
++    private static float numberProperty(MapProperties properties, String key, float fallback) {
++        Object value = properties == null ? null : properties.get(key);
++        if (value instanceof Number number) {
++            return number.floatValue();
++        }
++        try {
++            return value == null ? fallback : Float.parseFloat(value.toString());
++        } catch (NumberFormatException ignored) {
++            return fallback;
++        }
++    }
++
++    private void initialiseAssets() {
++        pvzAssetsRoot = PvzAssetLocator.find();
++        if (pvzAssetsRoot == null) {
++            Gdx.app.error(getClass().getSimpleName(), "Extracted PvZ assets were not found.");
++            return;
++        }
++        try {
++            textureBank = new TextureBank("768", pvzAssetsRoot);
++            plantRenderer = new PlantRenderer(pvzAssetsRoot);
++            zombieRenderer = new ZombieRenderer(pvzAssetsRoot, textureBank);
++            projectileRenderer = new ProjectileRenderer(pvzAssetsRoot, textureBank);
++        } catch (RuntimeException exception) {
++            Gdx.app.error(getClass().getSimpleName(), "Could not initialise PvZ renderers.", exception);
++        }
++    }
++
++    @Override
++    public void resize(int width, int height) {
++        if (worldViewport != null) {
++            worldViewport.update(width, height, false);
++        }
++        if (uiViewport != null) {
++            uiViewport.update(width, height, true);
++        }
++    }
++
++    @Override
++    public void hide() {
++        if (Gdx.input.getInputProcessor() == inputMultiplexer) {
++            Gdx.input.setInputProcessor(null);
++        }
++        if (!disposed) {
++            Gdx.app.postRunnable(this::dispose);
++        }
++    }
++
++    @Override
++    public void dispose() {
++        if (disposed) {
++            return;
++        }
++        disposed = true;
++        if (stage != null) {
++            stage.dispose();
++            stage = null;
++        }
++        if (mapRenderer != null) {
++            mapRenderer.dispose();
++        }
++        if (tiledMap != null) {
++            tiledMap.dispose();
++        }
++        if (plantRenderer != null) {
++            plantRenderer.dispose();
++        }
++        if (zombieRenderer != null) {
++            zombieRenderer.dispose();
++        }
++        if (projectileRenderer != null) {
++            projectileRenderer.dispose();
++        }
++        if (batch != null) {
++            batch.dispose();
++        }
++        if (shapes != null) {
++            shapes.dispose();
++        }
++        if (textureBank != null) {
++            textureBank.dispose();
++        }
++    }
++}
+diff --git a/pvz2/core/src/main/java/view/gameview/MinigamePamVisual.java b/pvz2/core/src/main/java/view/gameview/MinigamePamVisual.java
+new file mode 100644
+index 0000000..7048da8
+--- /dev/null
++++ b/pvz2/core/src/main/java/view/gameview/MinigamePamVisual.java
+@@ -0,0 +1,102 @@
++package view.gameview;
++
++import com.badlogic.gdx.Gdx;
++import com.badlogic.gdx.files.FileHandle;
++import com.badlogic.gdx.graphics.g2d.Batch;
++import com.badlogic.gdx.math.Rectangle;
++import pvz.libpvz.pam.ClipRef;
++import pvz.libpvz.pam.PamPlayer;
++import pvz.libpvz.textures.TextureBank;
++
++import java.util.List;
++import java.util.Locale;
++
++/** One asynchronously loaded PAM visual used by a minigame overlay. */
++final class MinigamePamVisual {
++    private static final String TAG = "MinigamePamVisual";
++
++    private final String path;
++    private final PamPlayer player;
++    private final FileHandle pamRoot;
++    private ClipRef clip;
++    private Rectangle bounds;
++    private boolean loading;
++    private boolean missing;
++
++    MinigamePamVisual(FileHandle assetsRoot, TextureBank textureBank, String path) {
++        this.path = path;
++        FileHandle explicit = assetsRoot.child("pam");
++        pamRoot = explicit.exists() ? explicit : assetsRoot.child("IMAGES");
++        player = new PamPlayer(textureBank, assetsRoot);
++        request();
++    }
++
++    boolean isReady() {
++        return clip != null && bounds != null;
++    }
++
++    void draw(Batch batch, float time, float centerX, float centerY, float width, float height) {
++        if (!isReady()) {
++            request();
++            return;
++        }
++        float sourceWidth = Math.max(1f, bounds.width);
++        float sourceHeight = Math.max(1f, bounds.height);
++        float scale = Math.min(width / sourceWidth, height / sourceHeight);
++        player.draw(batch, clip, time, centerX, centerY, scale, scale, true);
++    }
++
++    private void request() {
++        if (loading || missing || clip != null) {
++            return;
++        }
++        if (!pamRoot.child(path).exists()) {
++            missing = true;
++            Gdx.app.error(TAG, "PAM not found: " + path);
++            return;
++        }
++        loading = true;
++        player.loadAsync(path, this::finishLoading);
++    }
++
++    private void finishLoading() {
++        try {
++            List<String> clips = player.clips(path);
++            String selected = chooseClip(clips);
++            if (selected == null) {
++                missing = true;
++                return;
++            }
++            clip = player.getClip(path, selected);
++            Rectangle loadedBounds = player.bounds(path, selected);
++            bounds = loadedBounds == null ? null : new Rectangle(loadedBounds);
++            missing = clip == null || bounds == null;
++        } catch (RuntimeException exception) {
++            missing = true;
++            Gdx.app.error(TAG, "Failed to load PAM: " + path, exception);
++        } finally {
++            loading = false;
++        }
++    }
++
++    private static String chooseClip(List<String> clips) {
++        if (clips == null || clips.isEmpty()) {
++            return null;
++        }
++        String[] preferred = {"animation", "idle", "loop", "anim", "default"};
++        for (String wanted : preferred) {
++            for (String clip : clips) {
++                if (clip != null && clip.equalsIgnoreCase(wanted)) {
++                    return clip;
++                }
++            }
++        }
++        for (String clip : clips) {
++            String normalized = clip == null ? "" : clip.toLowerCase(Locale.ROOT);
++            if (normalized.contains("idle") || normalized.contains("loop")) {
++                return clip;
++            }
++        }
++        return clips.get(0);
++    }
++}
+diff --git a/pvz2/core/src/main/java/view/gameview/PvzAssetLocator.java b/pvz2/core/src/main/java/view/gameview/PvzAssetLocator.java
+new file mode 100644
+index 0000000..d622f19
+--- /dev/null
++++ b/pvz2/core/src/main/java/view/gameview/PvzAssetLocator.java
+@@ -0,0 +1,72 @@
++package view.gameview;
++
++import com.badlogic.gdx.Gdx;
++import com.badlogic.gdx.files.FileHandle;
++
++import java.io.File;
++import java.util.ArrayList;
++import java.util.List;
++
++/** Locates the extracted PvZ asset root without assuming one IDE working directory. */
++public final class PvzAssetLocator {
++    private PvzAssetLocator() {
++    }
++
++    public static FileHandle find() {
++        List<FileHandle> candidates = new ArrayList<>();
++        String configured = System.getProperty("pvz.assets");
++        if (configured != null && !configured.isBlank()) {
++            candidates.add(new FileHandle(new File(configured)));
++        }
++
++        String[] paths = {
++            "Assets",
++            "../Assets",
++            "../../Assets",
++            "pvz-assets",
++            "../pvz-assets",
++            "../../pvz-assets"
++        };
++        for (String path : paths) {
++            candidates.add(new FileHandle(new File(path)));
++        }
++        candidates.add(Gdx.files.internal("pvz-assets"));
++
++        for (FileHandle candidate : candidates) {
++            FileHandle root = resolve(candidate);
++            if (root != null) {
++                return root;
++            }
++        }
++        return null;
++    }
++
++    private static FileHandle resolve(FileHandle candidate) {
++        if (candidate == null || !candidate.exists()) {
++            return null;
++        }
++        if (isRoot(candidate)) {
++            return candidate;
++        }
++
++        String[] children = {"Base Assets", "base assets", "BaseAssets", "assets"};
++        for (String childName : children) {
++            FileHandle child = candidate.child(childName);
++            if (isRoot(child)) {
++                return child;
++            }
++        }
++        return null;
++    }
++
++    private static boolean isRoot(FileHandle root) {
++        if (root == null || !root.exists()) {
++            return false;
++        }
++        boolean resources = root.child("resources.json").exists()
++            || root.child("RESOURCES.json").exists();
++        boolean atlases = root.child("atlases").exists()
++            || root.child("ATLASES").exists();
++        return resources && atlases;
++    }
++}
+diff --git a/pvz2/core/src/test/java/models/games/minigames/MinigameModelSmokeTest.java b/pvz2/core/src/test/java/models/games/minigames/MinigameModelSmokeTest.java
+new file mode 100644
+index 0000000..067bab9
+--- /dev/null
++++ b/pvz2/core/src/test/java/models/games/minigames/MinigameModelSmokeTest.java
+@@ -0,0 +1,139 @@
++package models.games.minigames;
++
++import com.badlogic.gdx.files.FileHandle;
++import com.badlogic.gdx.utils.Json;
++import controllers.datacontroller.Data;
++import controllers.datacontroller.PlantData;
++import models.App;
++import models.User;
++import models.entity.Zombie;
++import models.factory.PlantFactory;
++import models.factory.builder.PlantType;
++
++import java.lang.reflect.Field;
++import java.util.ArrayList;
++import java.util.HashMap;
++import java.util.HashSet;
++import java.util.Locale;
++import java.util.Set;
++
++/** Standalone model smoke tests; run with assertions enabled. */
++public final class MinigameModelSmokeTest {
++    private MinigameModelSmokeTest() {
++    }
++
++    public static void main(String[] args) throws Exception {
++        installPlantData();
++        App.setCurrentuser(new User("test", "hash", "tester", "test@example.com", "x"));
++        check(new PlantFactory().createPlant(PlantType.FUM_SHROOM) != null,
++            "Beghouled's FUM_SHROOM upgrade must be constructible.");
++
++        testBeghouledBoardAndSwap();
++        testIZombieConfigurationAndWin();
++        testZombieRowZero();
++        System.out.println("Minigame model smoke tests passed.");
++    }
++
++    private static void testBeghouledBoardAndSwap() {
++        Beghouled game = new Beghouled(2);
++        check(game.getPlantsInField().size() == 45, "Beghouled must fill all 45 tiles.");
++        check(game.hasValidMove(), "Beghouled must start with a legal move.");
++
++        boolean matched = false;
++        for (int row = 0; row < Beghouled.ROW_COUNT && !matched; row++) {
++            for (int column = 0; column < Beghouled.COLUMN_COUNT && !matched; column++) {
++                if (column + 1 < Beghouled.COLUMN_COUNT) {
++                    matched = game.swap(column, row, column + 1, row)
++                        == Beghouled.SwapResult.MATCHED;
++                }
++                if (!matched && row + 1 < Beghouled.ROW_COUNT) {
++                    matched = game.swap(column, row, column, row + 1)
++                        == Beghouled.SwapResult.MATCHED;
++                }
++            }
++        }
++
++        check(matched, "At least one advertised Beghouled move must create a match.");
++        check(game.getPlantsInField().size() == 45, "Cascades must refill the board.");
++        check(game.getSunCount() > 0, "Matches must award upgrade sun.");
++        check(game.getScore() > 0, "Matches must award score.");
++    }
++
++    private static void testIZombieConfigurationAndWin() {
++        Set<String> allTypes = new HashSet<>();
++        for (int level = 1; level <= 3; level++) {
++            IZombie configured = new IZombie(level);
++            check(configured.getZombieCards().size() == 5, "Every I, Zombie level needs five cards.");
++            configured.getZombieCards().forEach(card -> allTypes.add(card.type()));
++        }
++        check(allTypes.size() >= 10, "I, Zombie needs at least ten distinct zombies across levels.");
++
++        IZombie game = new IZombie(1);
++        check(game.getSunCount() == IZombie.STARTING_SUN, "I, Zombie must start with 150 sun.");
++        check(game.getSunProducers().size() == 5, "One producer is required in every row.");
++        game.setSunCount(1000);
++
++        for (int row = 0; row < IZombie.ROW_COUNT; row++) {
++            String type = game.getZombieCards().get(0).type();
++            IZombie.PlacementResult result = game.placeZombie(
++                type,
++                IZombie.FIRST_ZOMBIE_COLUMN,
++                row
++            );
++            check(result == IZombie.PlacementResult.PLACED, "A funded valid placement must work.");
++            Zombie deployed = findDeployedZombie(game, row);
++            check(deployed != null, "Placed zombie must enter the active list.");
++            deployed.setX(0f);
++        }
++
++        game.playGame(0f);
++        check(game.isWonGame(), "Eating all five brains must win I, Zombie.");
++    }
++
++    private static Zombie findDeployedZombie(IZombie game, int row) {
++        for (Zombie zombie : game.getZombies()) {
++            if (!game.isSunProducer(zombie) && zombie.getLine() == row) {
++                return zombie;
++            }
++        }
++        return null;
++    }
++
++    private static void testZombieRowZero() {
++        Zombie zombie = models.factory.ZombieFactory.createZombie("normal");
++        zombie.setLine(0);
++        check(zombie.getLine() == 0, "Zombie row zero must remain row zero.");
++    }
++
++    @SuppressWarnings("unchecked")
++    private static void installPlantData() throws Exception {
++        Json json = new Json();
++        json.setIgnoreUnknownFields(true);
++        ArrayList<PlantData> list = json.fromJson(
++            ArrayList.class,
++            PlantData.class,
++            new FileHandle("assets/plants.json")
++        );
++
++        HashMap<PlantType, PlantData> loaded = new HashMap<>();
++        for (PlantData data : list) {
++            String name = data.getName()
++                .trim()
++                .replace('-', '_')
++                .replace(' ', '_')
++                .replaceAll("_+", "_")
++                .toUpperCase(Locale.ROOT);
++            loaded.put(PlantType.valueOf(name), data);
++        }
++
++        Field plantsField = Data.class.getDeclaredField("plants");
++        plantsField.setAccessible(true);
++        plantsField.set(null, loaded);
++    }
++
++    private static void check(boolean condition, String message) {
++        if (!condition) {
++            throw new AssertionError(message);
++        }
++    }
++}
+-- 
+2.51.1
+

@@ -79,7 +79,7 @@ public class ExtraHP implements Skill{
         for (Plant p :  game.getPlantsInField()) {
             if (p.getTileIndex() == row
                     && p.getTileIndex() == col
-                    && !p.getArmor().getLast().pumpkin) {
+                    && !p.getArmor().get(p.getArmor().size() - 1).pumpkin) {
                 PlantArmor pumpkinArmor = new PlantArmor(plant.getHp());
                 pumpkinArmor.pumpkin = true;
                 p.getArmor().add(pumpkinArmor);

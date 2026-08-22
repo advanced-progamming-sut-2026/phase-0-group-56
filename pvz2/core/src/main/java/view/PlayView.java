@@ -437,6 +437,13 @@ public class PlayView extends View {
                 "brown"
             );
 
+        TextButton minigamesButton =
+            new TextButton(
+                "MINIGAMES",
+                skin,
+                "green"
+            );
+
 
         backButton.addListener(
             new ClickListener() {
@@ -449,6 +456,19 @@ public class PlayView extends View {
                 ) {
 
                     goBack();
+                }
+            }
+        );
+
+        minigamesButton.addListener(
+            new ClickListener() {
+                @Override
+                public void clicked(
+                    InputEvent event,
+                    float x,
+                    float y
+                ) {
+                    App.setScreen(new MiniGamesView());
                 }
             }
         );
@@ -510,6 +530,11 @@ public class PlayView extends View {
             .width(125f)
             .height(55f)
             .left();
+
+        hud.add(minigamesButton)
+            .width(165f)
+            .height(55f)
+            .padLeft(8f);
 
 
         hud.add()

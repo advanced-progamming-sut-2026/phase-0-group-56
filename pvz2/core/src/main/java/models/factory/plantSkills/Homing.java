@@ -45,7 +45,7 @@ public class Homing implements Skill{
 
     @Override
     public ArrayList<Zombie> random(Plant plant, BaseGame game, int numbers) {
-        java.util.ArrayList<Zombie> targets =  Skill.super.random(plant, game, targetCount);
+        ArrayList<Zombie> targets =  Skill.super.random(plant, game, targetCount);
         for (Zombie x : targets){
             Projectile projectile = new Projectile(plant.getX() + plant.getWidth() ,
                 plant.getY() + plant.getHeight() * 0.8f , this.bullet,plant.getLine());
@@ -64,7 +64,7 @@ public class Homing implements Skill{
 
     private void closestZombie(Plant plant , BaseGame game) {
         Iterator iterator =  game.getCurrentWave().getZombies().iterator();
-        Zombie curr = game.getCurrentWave().getZombies().getFirst();
+        Zombie curr = game.getCurrentWave().getZombies().get(0);
         float distance = distance(plant.getX() , plant.getY() , curr.getX() , curr.getY());
         while (iterator.hasNext()) {
             Zombie zombie = (Zombie) iterator.next();

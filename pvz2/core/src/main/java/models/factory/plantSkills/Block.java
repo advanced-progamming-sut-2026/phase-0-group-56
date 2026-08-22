@@ -6,6 +6,7 @@ import models.entity.PlantTags;
 import models.entity.Sun;
 import models.entity.Zombie;
 import models.gamepanes.Tile;
+import models.factory.builder.PlantLevel;
 import models.games.BaseGame;
 import models.entity.Plant;
 
@@ -67,11 +68,11 @@ public class Block implements Skill{
             if(zombie.getX() - self.getX() < 10 && self.isHurt()) {
                if(damage) {
                    float extraDamage = self.getArmor() != null ? Constants.ENDURIAN_ARMOR_DAMAGE : 0;
-                   if(App.getCurrentuser().getLevels().get(self.getType()) >= 2) extraDamage += 5;
+                   if (PlantLevel.current(self.getType()) >= 2) extraDamage += 5;
                    zombie.setHp(zombie.getHp() - self.getDamage() - extraDamage);
                }
                else if(self.getTags().contains(PlantTags.SUN)) {
-                   int level = App.getCurrentuser().getLevels().get(self.getType());
+                   int level = PlantLevel.current(self.getType());
                    game.getSuns().add(new Sun(level >= 2 ? 10 : 5 , 5 , self.getX() + self.getWidth(),
                            self.getY()));
                }

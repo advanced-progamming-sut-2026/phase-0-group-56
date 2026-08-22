@@ -60,6 +60,7 @@ public NormalGame(Chapters chapters, Level level){
 
         Wave finalWave = new Wave();
         finalWave.setId(wavesCount);
+        finalWave.setFinalWave(true);
         finalWave.setCost(waves.getLast().getCost() * 2);
         finalWave.initWave(zombies);
         waves.add(finalWave);

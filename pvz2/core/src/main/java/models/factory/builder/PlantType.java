@@ -191,7 +191,7 @@ public enum PlantType {
         public Plant allocateSkill(Plant plant) {
             ShootingData data = new ShootingData(ProjectileType.BUBBLE ,
                     ShootingMood.MID_RANGE , 1);
-            data.range = App.getCurrentuser().getLevels().get(plant.getType())
+            data.range = PlantLevel.current(plant.getType())
                     == 4 ? 4 : 3;
             ShootingData pf = new ShootingData(ProjectileType.BUBBLE , ShootingMood.MID_RANGE , 30);
             ExtraHP hp = new ExtraHP(ExtraHP.Type.LIFE_RESET);
@@ -205,7 +205,7 @@ public enum PlantType {
         public Plant allocateSkill(Plant plant) {
             ShootingData data = new ShootingData(ProjectileType.BUBBLE ,
                     ShootingMood.MID_RANGE , 1);
-            data.range = App.getCurrentuser().getLevels().get(plant.getType())
+            data.range = PlantLevel.current(plant.getType())
                     >= 2 ? 4 : 3;
             ShootingData pf = new ShootingData(ProjectileType.BUBBLE , ShootingMood.MID_RANGE , 30);
             ExtraHP hp = new ExtraHP(ExtraHP.Type.LIFE_RESET);
@@ -229,7 +229,8 @@ public enum PlantType {
     PRIMAL_POTATO_MINE{
         @Override
         public Plant allocateSkill(Plant plant) {
-            ExplosionData data = new ExplosionData(3 ,3); /// this plant has Trap tag , so by default just when a zombie is close to it , it explodes
+            // Trap plants trigger this area explosion when a zombie gets close.
+            ExplosionData data = new ExplosionData(3, 3);
             plant.getBaseSkill().add(new Explosive(data));
             ExtraHP clone = new ExtraHP(ExtraHP.Type.CLONE);
             clone.cloneNumber = 2;
@@ -261,7 +262,7 @@ public enum PlantType {
         @Override
         public Plant allocateSkill(Plant plant) {
             ExplosionData data = new ExplosionData(3,3);
-            /// needs an implementation: base skill should be a list , and we should add Clone class(for this , and potatos)
+            // Clone behaviour is represented by ExtraHP until dedicated clone entities exist.
             plant.getBaseSkill().add(new Explosive(data));
             return  super.allocateSkill(plant);
 
@@ -287,7 +288,7 @@ public enum PlantType {
         @Override
         public Plant allocateSkill(Plant plant) {
             ExplosionData data = new ExplosionData(ExplosionData.ExplosionType.NEXT_TO);
-            data.randomCount = App.getCurrentuser().getLevels().get(plant.getType()) >= 3 ? 2 : 1;
+            data.randomCount = PlantLevel.current(plant.getType()) >= 3 ? 2 : 1;
             plant.getBaseSkill().add(new Explosive(data));
             ExplosionData pf = new ExplosionData(2);
             Explosive e = new Explosive(pf);
@@ -385,7 +386,7 @@ public enum PlantType {
         @Override
         public Plant allocateSkill(Plant plant) {
             ShootingData data = new ShootingData(ProjectileType.BUBBLE , ShootingMood.MID_RANGE , 1);
-            int level = App.getCurrentuser().getLevels().get(plant.getType());
+            int level = PlantLevel.current(plant.getType());
             data.range = level >= 2 ? 5 : 4;
             plant.getBaseSkill().add(new Shoot(data));
             plant.getPlantfoodSkill().add(new Modify());
@@ -425,7 +426,7 @@ public enum PlantType {
     WASABI_WHIP{
         @Override
         public Plant allocateSkill(Plant plant) {
-            int level =  App.getCurrentuser().getLevels().get(plant.getType());
+            int level = PlantLevel.current(plant.getType());
             int range = level >= 3 ? 2 : 1;
             plant.getBaseSkill().add(new Melee(Melee.MeleeAttack.PUNCH).setRange(range));
             ExplosionData pf = new ExplosionData(ExplosionData.ExplosionType.RANDOM);
@@ -592,7 +593,7 @@ public enum PlantType {
 
 
     public Plant allocateSkill(Plant plant){
-        for (int i = 2; i <= App.getCurrentuser().getLevels().get(plant.getType()) ; i++) {
+        for (int i = 2; i <= PlantLevel.current(plant.getType()); i++) {
             if(Data.getPlants().get(plant.getType())
                     .getUpgrades().get(i - 1).getEffect().equals("AoE on Death")) plant
                     .getTags().add(PlantTags.EXPLOSIVE);

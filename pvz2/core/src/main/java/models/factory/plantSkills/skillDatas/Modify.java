@@ -3,6 +3,7 @@ package models.factory.plantSkills.skillDatas;
 import models.App;
 import models.entity.*;
 import models.factory.builder.PlantType;
+import models.factory.builder.PlantLevel;
 import models.factory.plantSkills.Skill;
 import models.gamepanes.Tile;
 import models.gamepanes.TileType;
@@ -81,7 +82,7 @@ public class Modify implements Skill {
         if(plant != null){
             plant.setFreezeLevel(0);
         }
-        if(App.getCurrentuser().getLevels().get(heater.getType()) >= 3){
+        if (PlantLevel.current(heater.getType()) >= 3) {
             for (Plant p :  game.getPlantsInField()){
                 if(Math.abs(p.getTileIndex() - heater.getTileIndex()) <= 1
                 && Math.abs(p.getLine() - heater.getLine()) <= 1){
@@ -99,7 +100,7 @@ public class Modify implements Skill {
 
     @Override
     public ArrayList<Zombie> random(Plant plant, BaseGame game, int numbers) {
-        Zombie zombie =  Skill.super.random(plant, game, 1).getFirst();
+        Zombie zombie = Skill.super.random(plant, game, 1).get(0);
         Armor armor = null;
         for (Armor x : zombie.getArmors()){
             if(x.isMagnetic()){
