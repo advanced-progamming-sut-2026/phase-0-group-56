@@ -47,6 +47,17 @@ public class CollectionView extends View {
         Collection controller =
             (Collection) menu;
 
+        table.add(
+                menuSectionHeader(
+                    "almanac",
+                    "COLLECTION",
+                    "Browse unlocked plants and zombies, inspect details, and manage upgrades."
+                )
+            )
+            .width(820f)
+            .padBottom(14f)
+            .row();
+
         buildTabs(table);
 
         if (plantTab) {

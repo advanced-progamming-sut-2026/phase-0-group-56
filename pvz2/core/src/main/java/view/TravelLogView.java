@@ -53,16 +53,16 @@ public class TravelLogView extends View {
         /* Applies daily reset/migration before the summary is calculated. */
         ((TravelLog) menu).getSortedQuests("ALL");
 
-        Label heading =
-            mediumTitle(
-                "TRAVEL LOG"
-            );
-
-        heading.setAlignment(Align.center);
-
-        table.add(heading)
+        table.add(
+                menuSectionHeader(
+                    "hud_quests",
+                    "TRAVEL LOG",
+                    "Track quests, rewards, priorities, and minigame access."
+                )
+            )
+            .width(800f)
             .padTop(4f)
-            .padBottom(10f)
+            .padBottom(12f)
             .row();
 
         buildQuestSummary(

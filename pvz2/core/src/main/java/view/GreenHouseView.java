@@ -47,16 +47,14 @@ public class GreenHouseView extends View {
             return;
         }
 
-        Label title =
-            mediumTitle(
-                "ZEN GARDEN"
-            );
-
-        title.setAlignment(
-            Align.center
-        );
-
-        table.add(title)
+        table.add(
+                menuSectionHeader(
+                    "hud_zg",
+                    "ZEN GARDEN",
+                    "Plant seedlings, grow them, and collect their rewards."
+                )
+            )
+            .width(820f)
             .padTop(6f)
             .padBottom(12f)
             .row();

@@ -54,6 +54,59 @@ public class HomeView extends View {
             .padBottom(12f)
             .row();
 
+        Table shortcutPanel = pvzInnerPanel();
+
+        shortcutPanel.defaults()
+            .width(132f)
+            .height(112f)
+            .pad(4f);
+
+        shortcutPanel.add(
+            menuShortcut(
+                "almanac",
+                "ADVENTURE",
+                () -> openMenu("Adventure menu")
+            )
+        );
+
+        shortcutPanel.add(
+            menuShortcut(
+                "almanac",
+                "COLLECTION",
+                () -> openMenu("Collection menu")
+            )
+        );
+
+        shortcutPanel.add(
+            menuShortcut(
+                "hud_quests",
+                "TRAVEL LOG",
+                () -> openMenu("Travel Log menu")
+            )
+        );
+
+        shortcutPanel.add(
+            menuShortcut(
+                "settings",
+                "SETTINGS",
+                () -> openMenu("Settings menu")
+            )
+        );
+
+        shortcutPanel.add(
+            menuShortcut(
+                "hud_zg",
+                "GREENHOUSE",
+                () -> openMenu("Greenhouse menu")
+            )
+        );
+
+        table.add(shortcutPanel)
+            .width(760f)
+            .center()
+            .padBottom(12f)
+            .row();
+
         Table mainPanel = pvzPanel();
 
         TextButton adventure =

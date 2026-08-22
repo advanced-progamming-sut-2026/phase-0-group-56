@@ -32,17 +32,15 @@ public class LogInView extends View {
         LogIn controller =
             (LogIn) menu;
 
-        Label subtitle =
-            mediumTitle(
-                "WELCOME BACK"
-            );
-
-        subtitle.setAlignment(
-            Align.center
-        );
-
-        table.add(subtitle)
-            .padTop(18f)
+        table.add(
+                menuSectionHeader(
+                    "hud_quests",
+                    "WELCOME BACK",
+                    "Log in to continue your garden adventure."
+                )
+            )
+            .width(760f)
+            .padTop(12f)
             .padBottom(18f)
             .row();
 

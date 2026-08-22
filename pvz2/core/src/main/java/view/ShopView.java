@@ -56,16 +56,14 @@ public class ShopView extends View {
         String daily =
             shop.setDailyOffer();
 
-        Label heading =
-            mediumTitle(
-                "CRAZY DAVE'S SHOP"
-            );
-
-        heading.setAlignment(
-            Align.center
-        );
-
-        table.add(heading)
+        table.add(
+                menuSectionHeader(
+                    "hud_zg",
+                    "CRAZY DAVE'S SHOP",
+                    "Spend coins and gems on permanent and daily offers."
+                )
+            )
+            .width(980f)
             .padTop(4f)
             .padBottom(12f)
             .row();

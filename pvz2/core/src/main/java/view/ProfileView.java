@@ -51,16 +51,14 @@ public class ProfileView extends View {
             "PLAYER"
         );
 
-        Label player =
-            mediumTitle(
-                nickname.toUpperCase()
-            );
-
-        player.setAlignment(
-            Align.center
-        );
-
-        table.add(player)
+        table.add(
+                menuSectionHeader(
+                    "almanac",
+                    "PROFILE",
+                    "PLAYER: " + nickname.toUpperCase()
+                )
+            )
+            .width(760f)
             .padTop(5f)
             .padBottom(14f)
             .row();
