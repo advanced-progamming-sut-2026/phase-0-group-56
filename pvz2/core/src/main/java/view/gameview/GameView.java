@@ -36,6 +36,7 @@ import com.badlogic.gdx.scenes.scene2d.utils.Drawable;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
+import controllers.datacontroller.Data;
 import controllers.datacontroller.SeedPackage;
 import controllers.menus.gamecontroller.GameController;
 import models.App;
@@ -118,6 +119,7 @@ public final class GameView extends View {
     private PlantTable plantTable;
 
     private ToolsStack toolsStack;
+    private Table pauseOverlay;
 
     private FileHandle pvzAssetsRoot;
     private TextureBank textureBank;
@@ -176,6 +178,7 @@ public final class GameView extends View {
         toolsStack = new ToolsStack(controller);
         toolsStack.setVisible(false);
         stage.addActor(toolsStack);
+        buildPauseOverlay();
 
         if (controller.getGame().getState() == BaseGame.GameState.STARTING) {
             buildPreparationUI();
@@ -211,6 +214,7 @@ public final class GameView extends View {
         }
 
         BaseGame.GameState state = controller.getGame().getState();
+        syncPauseOverlay(state);
         updatePointerFromScreen(Gdx.input.getX(), Gdx.input.getY());
         updateCursorPlant(safeDelta, state);
         syncSystemCursor(state);
@@ -411,6 +415,80 @@ public final class GameView extends View {
                 height
             );
         }
+    }
+
+    private void buildPauseOverlay() {
+        pauseOverlay = new Table();
+        pauseOverlay.setFillParent(true);
+        pauseOverlay.center();
+        pauseOverlay.setTouchable(Touchable.enabled);
+        pauseOverlay.setVisible(false);
+
+        Drawable background = safeDrawable("image_ui_quests_panel_edge_to_edge_ten");
+        if (background != null) {
+            pauseOverlay.setBackground(background);
+        }
+
+        Table panel = new Table();
+        panel.center().pad(26f);
+
+        Label title = new Label("GAME PAUSED", skin, "big_outline");
+        title.setAlignment(Align.center);
+        panel.add(title).width(420f).padBottom(20f).row();
+
+        TextButton resume = new TextButton("RESUME", skin, "green");
+        resume.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                controller.resumeGame();
+                syncPauseOverlay(controller.getGame().getState());
+                toolsStack.refresh();
+            }
+        });
+
+        TextButton restart = new TextButton("RESTART LEVEL", skin, "brown");
+        restart.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                App.setScreen(new GameView(chapter, level));
+            }
+        });
+
+        TextButton saveAndExit = new TextButton("SAVE & EXIT", skin, "green");
+        saveAndExit.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                Data.saveUser();
+                App.setScreen(new PlayView());
+            }
+        });
+
+        TextButton exit = new TextButton("EXIT TO ADVENTURE", skin, "brown");
+        exit.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                Data.saveUser();
+                App.setScreen(new PlayView());
+            }
+        });
+
+        panel.add(resume).width(300f).height(52f).pad(5f).row();
+        panel.add(restart).width(300f).height(52f).pad(5f).row();
+        panel.add(saveAndExit).width(300f).height(52f).pad(5f).row();
+        panel.add(exit).width(300f).height(52f).pad(5f).row();
+
+        pauseOverlay.add(panel).center();
+        stage.addActor(pauseOverlay);
+    }
+
+    private void syncPauseOverlay(BaseGame.GameState state) {
+        if (pauseOverlay == null) {
+            return;
+        }
+
+        boolean paused = state == BaseGame.GameState.PAUSE;
+        pauseOverlay.setVisible(paused);
+        pauseOverlay.setTouchable(paused ? Touchable.enabled : Touchable.disabled);
     }
 
     private void initialiseInteractionCursorAssets() {

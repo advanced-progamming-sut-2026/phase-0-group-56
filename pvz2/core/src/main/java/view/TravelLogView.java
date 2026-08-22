@@ -12,6 +12,7 @@ import controllers.menus.secondarymenus.TravelLog;
 import models.App;
 import models.Quest;
 import models.User;
+import view.MiniGamesView;
 
 import java.util.List;
 
@@ -422,7 +423,7 @@ public class TravelLogView extends View {
         Label description =
             wrappedLabel(
                 "Your unlocked minigame progress is shown here. "
-                    + "Starting minigame gameplay remains in its own menu.",
+                    + "Use the button below to open the existing MiniGames menu.",
                 720f
             );
 
@@ -430,6 +431,18 @@ public class TravelLogView extends View {
 
         descriptionPanel.add(description)
             .width(720f);
+
+        descriptionPanel.row();
+
+        TextButton openGames = greenButton(
+            "OPEN MINI-GAMES",
+            () -> App.setScreen(new MiniGamesView())
+        );
+
+        descriptionPanel.add(openGames)
+            .width(260f)
+            .height(50f)
+            .padTop(14f);
 
         table.add(descriptionPanel)
             .width(790f)
@@ -447,7 +460,7 @@ public class TravelLogView extends View {
         title.setAlignment(Align.center);
 
         minigames.add(title)
-            .colspan(3)
+            .colspan(4)
             .padBottom(20f)
             .row();
 
@@ -457,7 +470,7 @@ public class TravelLogView extends View {
                     user.getVaseBreaker()
                 )
             )
-            .width(250f)
+            .width(205f)
             .pad(10f);
 
         minigames.add(
@@ -466,7 +479,7 @@ public class TravelLogView extends View {
                     user.getWallNutBowling()
                 )
             )
-            .width(250f)
+            .width(205f)
             .pad(10f);
 
         minigames.add(
@@ -475,11 +488,20 @@ public class TravelLogView extends View {
                     user.getIZombie()
                 )
             )
-            .width(250f)
+            .width(205f)
+            .pad(10f);
+
+        minigames.add(
+                buildMinigameCard(
+                    "BEGHOULED",
+                    1
+                )
+            )
+            .width(205f)
             .pad(10f);
 
         table.add(minigames)
-            .width(860f);
+            .width(900f);
     }
 
     private Table buildMinigameCard(
@@ -498,12 +520,12 @@ public class TravelLogView extends View {
         levelLabel.setAlignment(Align.center);
 
         card.add(nameLabel)
-            .width(220f)
+            .width(185f)
             .padBottom(10f)
             .row();
 
         card.add(levelLabel)
-            .width(220f);
+            .width(185f);
 
         return card;
     }
