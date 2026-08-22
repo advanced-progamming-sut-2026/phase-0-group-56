@@ -1,6 +1,7 @@
 package controllers.menus.gamecontroller;
 
 import controllers.datacontroller.Data;
+import controllers.datacontroller.LevelProgressService;
 import controllers.datacontroller.SeedPackage;
 import controllers.menus.Menu;
 import models.App;
@@ -357,6 +358,7 @@ public class GameController implements Controller, Menu {
         Result endResult = game.check_endGame();
 
         if (endResult.success() && "Loss".equals(endResult.message())) {
+            questSession.onGameLost();
             App.setScreen(new PlayView());
             return "You lost the level.";
         }
@@ -377,29 +379,7 @@ public class GameController implements Controller, Menu {
             return;
         }
 
-        if (chapter == user.getChapter() && level.getId() == user.getLevelId()) {
-            user.setLevelId(user.getLevelId() + 1);
-            user.setLevelsPassed(user.getLevelsPassed() + 1);
-
-            for (PlantType type : level.getUnlockingPlants()) {
-                user.getUnlockedPlants().add(type);
-                user.getLevels().put(type, 1);
-                user.getUnreadNews().add(
-                    "Congratulations, you've unlocked a new plant: " + type.name()
-                );
-            }
-        }
-
-        if (user.getLevelId() == 5) {
-            user.setLevelId(1);
-            Chapters newChapter = switch (user.getChapter()) {
-                case AncientEgypt -> Chapters.FrozenCaves;
-                case FrozenCaves -> Chapters.BigWaveBeach;
-                case BigWaveBeach -> Chapters.DarkAge;
-                default -> user.getChapter();
-            };
-            user.setChapter(newChapter);
-        }
+        LevelProgressService.completeLevel(user, chapter, level);
 
         Data.saveUser();
         App.setScreen(new PlayView());
@@ -426,6 +406,7 @@ public class GameController implements Controller, Menu {
     // -------------------------------------------------------------------------
 
     public String gameEndCheat() {
+        questSession.markCheatUsed();
         end();
         return "game ended. you won!";
     }
@@ -435,11 +416,13 @@ public class GameController implements Controller, Menu {
     }
 
     public String cheatSunAmount(int amount) {
+        questSession.markCheatUsed();
         game.setSunCount(game.getSunCount() + amount);
         return "==== >> Suns added by Cheat code : " + amount + "\n now " + showSunAmount();
     }
 
     public String cheatZombieKiller() {
+        questSession.markCheatUsed();
         for (Zombie zombie : game.getZombies()) {
             zombie.setHp(0);
         }
@@ -507,6 +490,7 @@ public class GameController implements Controller, Menu {
     }
 
     public String cheat(String content) {
+        questSession.markCheatUsed();
         String output = null;
 
         switch (content) {

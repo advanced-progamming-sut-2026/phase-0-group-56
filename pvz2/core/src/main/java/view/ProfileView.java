@@ -332,6 +332,11 @@ public class ProfileView extends View {
                 "New password"
             );
 
+        TextField confirmPassword =
+            passwordField(
+                "Confirm new password"
+            );
+
         Table panel =
             pvzPanel();
 
@@ -383,6 +388,23 @@ public class ProfileView extends View {
             .pad(8f)
             .row();
 
+        panel.add(
+                new Label(
+                    "CONFIRM PASSWORD",
+                    skin,
+                    "medium_outline"
+                )
+            )
+            .width(200f)
+            .left()
+            .pad(8f);
+
+        panel.add(confirmPassword)
+            .width(360f)
+            .height(44f)
+            .pad(8f)
+            .row();
+
         content.add(panel)
             .width(680f)
             .padTop(60f)
@@ -413,6 +435,8 @@ public class ProfileView extends View {
                                     oldPassword
                                         .getText(),
                                     newPassword
+                                        .getText(),
+                                    confirmPassword
                                         .getText()
                                 );
 

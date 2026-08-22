@@ -4,6 +4,7 @@ import controllers.datacontroller.Data;
 import controllers.menus.Menu;
 import models.App;
 import models.Quest;
+import models.QuestCatalog;
 import models.User;
 import view.HomeView;
 
@@ -73,6 +74,8 @@ public class TravelLog implements Menu {
             return result;
         }
 
+        ensureQuestCatalog(user);
+
         String filter =
             category == null
                 ? "ALL"
@@ -137,6 +140,8 @@ public class TravelLog implements Menu {
             return "Error: quest not found.";
         }
 
+        ensureQuestCatalog(user);
+
         if (!user.getActiveQuests().contains(quest)) {
             return "Error: this quest does not belong to the current user.";
         }
@@ -160,6 +165,8 @@ public class TravelLog implements Menu {
         if (user == null) {
             return "Error: no user is currently logged in.";
         }
+
+        ensureQuestCatalog(user);
 
         for (
             Quest quest :
@@ -218,5 +225,11 @@ public class TravelLog implements Menu {
         }
 
         return output.toString().trim();
+    }
+
+    private void ensureQuestCatalog(User user) {
+        if (QuestCatalog.ensureCurrentQuests(user)) {
+            Data.saveUser();
+        }
     }
 }

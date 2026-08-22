@@ -36,6 +36,14 @@ public class Quest implements Serializable, QuestObserver {
     private String rewardType;
     private int rewardAmount;
 
+    /*
+     * Stable per-user configuration for quests whose statement contains a
+     * generated variable such as n, chapter, plant or family_type.
+     */
+    private String variableName;
+    private String variableValue;
+    private int variableNumber;
+
     public Quest(
         String questName,
         int priority,
@@ -101,6 +109,47 @@ public class Quest implements Serializable, QuestObserver {
         this.progress = 0f;
         this.isDone = false;
         this.rewardClaimed = false;
+    }
+
+    public Quest configure(
+        String name,
+        String value,
+        int number
+    ) {
+        variableName =
+            name == null
+                ? ""
+                : name.trim().toUpperCase();
+
+        variableValue =
+            value == null
+                ? ""
+                : value.trim().toUpperCase();
+
+        variableNumber = Math.max(0, number);
+        return this;
+    }
+
+    void copyStateFrom(Quest previous) {
+        if (previous == null) {
+            return;
+        }
+
+        progress = Math.min(
+            getTarget(),
+            Math.max(0f, previous.getProgress())
+        );
+
+        isDone = previous.isDone()
+            || progress >= getTarget();
+
+        if (isDone) {
+            progress = getTarget();
+        }
+
+        rewardClaimed =
+            previous.isRewardClaimed()
+                && isDone;
     }
 
     @Override
@@ -222,7 +271,7 @@ public class Quest implements Serializable, QuestObserver {
                 + " "
                 + getRewardType();
 
-        News.pushNewsToUser(
+        News.queueNewsForUser(
             user,
             newsMessage
         );
@@ -456,6 +505,22 @@ public class Quest implements Serializable, QuestObserver {
 
     public int getRewardAmount() {
         return Math.max(0, rewardAmount);
+    }
+
+    public String getVariableName() {
+        return variableName == null
+            ? ""
+            : variableName;
+    }
+
+    public String getVariableValue() {
+        return variableValue == null
+            ? ""
+            : variableValue;
+    }
+
+    public int getVariableNumber() {
+        return Math.max(0, variableNumber);
     }
 
     public boolean isDaily() {

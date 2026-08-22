@@ -10,6 +10,7 @@ import com.badlogic.gdx.utils.Array;
 
 import controllers.datacontroller.Data;
 import controllers.menus.secondarymenus.Settings;
+import models.App;
 import models.User;
 
 public class SettingsView extends View {
@@ -183,58 +184,59 @@ public class SettingsView extends View {
             .padBottom(20f)
             .row();
 
-        table.add(
+        Table actions = new Table();
+
+        actions.add(
+                brownButton(
+                    "RESTORE DEFAULTS",
+                    () -> showConfirmation(
+                        "RESTORE DEFAULTS",
+                        "Reset difficulty to 3, game speed to 1, "
+                            + "and turn Grid and Debug Mode off?",
+                        () -> {
+                            Settings controller = (Settings) menu;
+                            String result = controller.restoreDefaults();
+
+                            if (result.startsWith("Error:")) {
+                                showMessage(result);
+                                return;
+                            }
+
+                            reloadWithMessage(result);
+                        }
+                    )
+                )
+            )
+            .width(280f)
+            .height(58f)
+            .padRight(14f);
+
+        actions.add(
                 greenButton(
                     "SAVE SETTINGS",
                     () -> {
+                        Settings controller = (Settings) menu;
 
-                        Settings controller =
-                            (Settings) menu;
-
-                        String first =
-                            controller
-                                .ChangeHardness(
-                                    difficulty
-                                        .getSelected()
-                                );
-
-                        String second =
-                            controller
-                                .changeGameSpeed(
-                                    speed
-                                        .getSelected()
-                                );
-
-                        String third =
-                            controller
-                                .setGridVisible(
-                                    showGrid
-                                        .isChecked()
-                                );
-
-                        String fourth =
-                            controller
-                                .setDebugMode(
-                                    debug
-                                        .isChecked()
-                                );
-
-                        showMessage(
-                            first
-                                + "\n"
-                                + second
-                                + "\n"
-                                + third
-                                + "\n"
-                                + fourth
+                        String result = controller.applySettings(
+                            difficulty.getSelected(),
+                            speed.getSelected(),
+                            showGrid.isChecked(),
+                            debug.isChecked()
                         );
 
-                        refreshResourceLabels();
+                        if (result.startsWith("Error:")) {
+                            showMessage(result);
+                            return;
+                        }
+
+                        reloadWithMessage(result);
                     }
                 )
             )
-            .width(300f)
+            .width(280f)
             .height(58f);
+
+        table.add(actions);
     }
 
     private void addOption(
@@ -260,5 +262,18 @@ public class SettingsView extends View {
             .height(44f)
             .pad(14f)
             .row();
+    }
+
+    private void reloadWithMessage(String message) {
+        SettingsView refreshed = new SettingsView();
+        App.setScreen(refreshed);
+
+        /*
+         * Game#setScreen calls show() synchronously. The rebuilt header now
+         * immediately reflects a Debug Mode change on the Settings screen.
+         */
+        if (refreshed.stage != null) {
+            refreshed.showMessage(message);
+        }
     }
 }

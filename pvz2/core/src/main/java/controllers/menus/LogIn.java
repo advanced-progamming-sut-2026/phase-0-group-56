@@ -3,12 +3,10 @@ package controllers.menus;
 import controllers.datacontroller.Data;
 import models.App;
 import models.User;
-import models.utils.RegexHelper;
+import models.utils.AccountValidator;
+import models.utils.CredentialHasher;
 import view.HomeView;
 import view.SignUpView;
-import controllers.menus.Menu;
-
-import java.util.regex.Pattern;
 
 public class LogIn implements Menu {
     @Override
@@ -32,10 +30,12 @@ public class LogIn implements Menu {
         if (user == null) {
             return "Error: username does not exist.";
         }
-        if (!user.getPasswordHash().equals(controllers.menus.SignUp.hashPassword(password))) {
+        if (!CredentialHasher.matches(password, user.getPasswordHash())) {
             return "Error: incorrect password.";
         }
 
+        migratePasswordHash(user, password);
+        clearPersistentSessions();
         user.setStayLoggedIn(stayLoggedIn);
         Data.setCurrentUser(user);
         Data.saveUser();
@@ -48,45 +48,90 @@ public class LogIn implements Menu {
         if (user == null) {
             return "Error: username does not exist.";
         }
-        if (email == null || !email.equalsIgnoreCase(user.getEmail())) {
+        if (!AccountValidator.isValidEmail(email)) {
+            return "Error: email format is invalid.";
+        }
+        if (!email.equalsIgnoreCase(user.getEmail())) {
             return "Error: email does not match this account.";
         }
-        return controllers.menus.SignUp.getQuestionText(user.getSecurityQuestionNumber());
+        if (user.getSecurityQuestionNumber() < 1
+            || user.getSecurityQuestionNumber() > SignUp.SECURITY_QUESTIONS.length) {
+            return "Error: this account has no valid security question.";
+        }
+        return SignUp.getQuestionText(user.getSecurityQuestionNumber());
     }
 
-    public String resetPassword(String username, String email, String answer,
-                                String newPassword, String confirmPassword) {
+    public String resetPassword(
+        String username,
+        String email,
+        String answer,
+        String newPassword,
+        String confirmPassword
+    ) {
         User user = Data.getUserByUsername(username);
-        if (user == null) {
-            return "Error: username does not exist.";
+        String identityError = validateRecoveryIdentity(user, email);
+        if (identityError != null) {
+            return identityError;
         }
-        if (email == null || !email.equalsIgnoreCase(user.getEmail())) {
-            return "Error: email does not match this account.";
-        }
-        if (!user.checkSecurityAnswer(answer == null ? "" : answer.trim())) {
+        if (!user.checkSecurityAnswer(answer)) {
             return "Error: incorrect security answer.";
         }
-        if (!newPassword.equals(confirmPassword)) {
+        if (newPassword == null || !newPassword.equals(confirmPassword)) {
             return "Error: password and confirmation do not match.";
         }
-        if (!Pattern.matches(RegexHelper.PASSWORD_PATTERN, newPassword)) {
-            return "Error: new password is weak or contains invalid characters.";
+
+        String passwordError = AccountValidator.getPasswordError(newPassword);
+        if (passwordError != null) {
+            return passwordError;
         }
-        if (user.getPasswordHash().equals(controllers.menus.SignUp.hashPassword(newPassword))) {
+        if (CredentialHasher.matches(newPassword, user.getPasswordHash())) {
             return "Error: new password must be different from the old password.";
         }
 
-        user.setPasswordHash(controllers.menus.SignUp.hashPassword(newPassword));
+        user.setPasswordHash(CredentialHasher.hash(newPassword));
         Data.saveUser();
         return "Password reset successfully. You can now log in.";
     }
 
-    /** Backward-compatible method used by the old terminal view. */
+    /** Backward-compatible method used by the terminal view. */
     public String resetPassword(String username, String answer, String newPassword) {
         User user = Data.getUserByUsername(username);
         if (user == null) {
             return "Error: username does not exist.";
         }
-        return resetPassword(username, user.getEmail(), answer, newPassword, newPassword);
+        return resetPassword(
+            username,
+            user.getEmail(),
+            answer,
+            newPassword,
+            newPassword
+        );
+    }
+
+    private String validateRecoveryIdentity(User user, String email) {
+        if (user == null) {
+            return "Error: username does not exist.";
+        }
+        if (!AccountValidator.isValidEmail(email)) {
+            return "Error: email format is invalid.";
+        }
+        if (!email.equalsIgnoreCase(user.getEmail())) {
+            return "Error: email does not match this account.";
+        }
+        return null;
+    }
+
+    private void clearPersistentSessions() {
+        for (User savedUser : Data.getAllUsers()) {
+            if (savedUser != null) {
+                savedUser.setStayLoggedIn(false);
+            }
+        }
+    }
+
+    private void migratePasswordHash(User user, String password) {
+        if (!CredentialHasher.isSha256Hash(user.getPasswordHash())) {
+            user.setPasswordHash(CredentialHasher.hash(password));
+        }
     }
 }
