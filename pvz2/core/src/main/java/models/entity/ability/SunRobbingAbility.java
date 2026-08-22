@@ -30,6 +30,7 @@ public class SunRobbingAbility implements Ability {
             }
             stolenSun += amount;
             game.removeSun(amount);
+            zombie.extra();
         }
     }
 

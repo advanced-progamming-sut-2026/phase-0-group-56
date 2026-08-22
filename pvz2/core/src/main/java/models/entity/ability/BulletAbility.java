@@ -30,6 +30,7 @@ public class BulletAbility implements Ability {
             if (target == null) return;
             Projectile projectile = new Projectile(zombie.getX(), zombie.getY(), projectileType,zombie.getLine());
             projectile.setToLockIn(target);
+            zombie.fire();
             game.getBullets().add(projectile);
         } else {
             Plant target = game.findTargetPlant(zombie, range);
@@ -37,6 +38,7 @@ public class BulletAbility implements Ability {
             Projectile projectile = new Projectile(zombie.getX(), zombie.getY(), projectileType
             , zombie.getLine());
             projectile.setToLockIn(null);
+            zombie.fire();
             game.getBullets().add(projectile);
         }
 

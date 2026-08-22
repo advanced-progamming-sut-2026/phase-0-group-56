@@ -56,6 +56,7 @@ public class MoveAbility implements Ability {
         Plant target = game.findPullablePlant(zombie);
         if (target != null) {
             game.pullPlant(zombie, target);
+            zombie.fire();
         }
     }
 

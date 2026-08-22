@@ -51,6 +51,7 @@ public class SpawnAbility implements Ability {
                 imp.setX(imp.getTileIndex() * 80 + 100);
                 imp.setY(zombie.getY());
                 game.getZombies().add(imp);
+                zombie.fire();
                 triggered = true;
             }
             return;
@@ -72,6 +73,7 @@ public class SpawnAbility implements Ability {
             ExplodeAbility explode = zombie.getAbility(ExplodeAbility.class);
             if (explode != null && explode.isTriggered()) {
                 Zombie explodedDynamite = ZombieFactory.createZombie("normal");
+                zombie.fire();
                 explodedDynamite.setLine(zombie.getLine());
                 explodedDynamite.setSpeed(explodedDynamite.getSpeed() * -1);
                 game.getZombies().add(explodedDynamite);
@@ -85,6 +87,7 @@ public class SpawnAbility implements Ability {
         if (timer >= cooldown) {
             timer = 0;
             game.spawn(zombie, spawnType, count);
+            zombie.fire();
         }
     }
 }

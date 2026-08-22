@@ -267,6 +267,7 @@ public class Zombie extends Entity{
         for (Armor armor : armors) {
             if (armor.isActive()) {
                 armor.takeDamage(damage);
+                armor.updateVisibility();
                 if (armor.isBroken() && "newspaper".equals(armor.getType())) {
                     if (newspaperObserver != null) {
                         newspaperObserver.onArmorBroken(this);
@@ -347,6 +348,7 @@ public class Zombie extends Entity{
     // ====== ARMOR ======
     public void addArmor(Armor armor) {
         armors.add(armor);
+        armor.attachTo(this);
     }
 
     public List<Armor> getArmors() {
