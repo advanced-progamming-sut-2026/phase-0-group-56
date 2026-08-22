@@ -40,8 +40,29 @@ public class News implements Menu {
         String title,
         String message
     ) {
+        if (queueNewsForUser(user, title, message)) {
+            Data.saveUser();
+        }
+    }
+
+    public static boolean queueNewsForUser(
+        User user,
+        String message
+    ) {
+        return queueNewsForUser(
+            user,
+            NewsItem.inferTitle(message),
+            message
+        );
+    }
+
+    public static boolean queueNewsForUser(
+        User user,
+        String title,
+        String message
+    ) {
         if (user == null || message == null || message.isBlank()) {
-            return;
+            return false;
         }
 
         NewsItem item = NewsItem.create(
@@ -51,7 +72,7 @@ public class News implements Menu {
         );
 
         user.getUnreadNews().add(item.toStorage());
-        Data.saveUser();
+        return true;
     }
 
     public String ShowNews() {

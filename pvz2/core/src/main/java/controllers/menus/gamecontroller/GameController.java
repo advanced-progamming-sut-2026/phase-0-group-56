@@ -358,6 +358,7 @@ public class GameController implements Controller, Menu {
         Result endResult = game.check_endGame();
 
         if (endResult.success() && "Loss".equals(endResult.message())) {
+            questSession.onGameLost();
             App.setScreen(new PlayView());
             return "You lost the level.";
         }
@@ -405,6 +406,7 @@ public class GameController implements Controller, Menu {
     // -------------------------------------------------------------------------
 
     public String gameEndCheat() {
+        questSession.markCheatUsed();
         end();
         return "game ended. you won!";
     }
@@ -414,11 +416,13 @@ public class GameController implements Controller, Menu {
     }
 
     public String cheatSunAmount(int amount) {
+        questSession.markCheatUsed();
         game.setSunCount(game.getSunCount() + amount);
         return "==== >> Suns added by Cheat code : " + amount + "\n now " + showSunAmount();
     }
 
     public String cheatZombieKiller() {
+        questSession.markCheatUsed();
         for (Zombie zombie : game.getZombies()) {
             zombie.setHp(0);
         }
@@ -486,6 +490,7 @@ public class GameController implements Controller, Menu {
     }
 
     public String cheat(String content) {
+        questSession.markCheatUsed();
         String output = null;
 
         switch (content) {

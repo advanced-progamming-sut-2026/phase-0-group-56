@@ -49,6 +49,9 @@ public class TravelLogView extends View {
             return;
         }
 
+        /* Applies daily reset/migration before the summary is calculated. */
+        ((TravelLog) menu).getSortedQuests("ALL");
+
         Label heading =
             mediumTitle(
                 "TRAVEL LOG"
@@ -407,14 +410,19 @@ public class TravelLogView extends View {
     private void buildMinigameSection(
         Table table
     ) {
+        User user = Data.getCurrentUser();
+
+        if (user == null) {
+            return;
+        }
+
         Table descriptionPanel =
             pvzInnerPanel();
 
         Label description =
             wrappedLabel(
-                "Choose one of the mandatory minigames. "
-                    + "Their graphical gameplay connections "
-                    + "will be completed in phase two.",
+                "Your unlocked minigame progress is shown here. "
+                    + "Starting minigame gameplay remains in its own menu.",
                 720f
             );
 
@@ -444,46 +452,60 @@ public class TravelLogView extends View {
             .row();
 
         minigames.add(
-                greenButton(
+                buildMinigameCard(
                     "VASE BREAKER",
-                    () ->
-                        showMessage(
-                            "Vase Breaker gameplay will be connected in phase two."
-                        )
+                    user.getVaseBreaker()
                 )
             )
             .width(250f)
-            .height(64f)
             .pad(10f);
 
         minigames.add(
-                purpleButton(
+                buildMinigameCard(
                     "WALL-NUT BOWLING",
-                    () ->
-                        showMessage(
-                            "Wall-nut Bowling gameplay will be connected in phase two."
-                        )
+                    user.getWallNutBowling()
                 )
             )
             .width(250f)
-            .height(64f)
             .pad(10f);
 
         minigames.add(
-                brownButton(
+                buildMinigameCard(
                     "I, ZOMBIE",
-                    () ->
-                        showMessage(
-                            "I, Zombie gameplay will be connected in phase two."
-                        )
+                    user.getIZombie()
                 )
             )
             .width(250f)
-            .height(64f)
             .pad(10f);
 
         table.add(minigames)
             .width(860f);
+    }
+
+    private Table buildMinigameCard(
+        String name,
+        int unlockedLevel
+    ) {
+        Table card = pvzInnerPanel();
+
+        Label nameLabel = mediumTitle(name);
+        nameLabel.setAlignment(Align.center);
+
+        Label levelLabel = secondaryLabel(
+            "UNLOCKED THROUGH LEVEL "
+                + Math.max(1, unlockedLevel)
+        );
+        levelLabel.setAlignment(Align.center);
+
+        card.add(nameLabel)
+            .width(220f)
+            .padBottom(10f)
+            .row();
+
+        card.add(levelLabel)
+            .width(220f);
+
+        return card;
     }
 
     private void rebuild() {

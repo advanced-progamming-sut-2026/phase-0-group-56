@@ -12,17 +12,23 @@ import models.gameadventure.levels.Level;
 import models.games.BaseGame;
 
 import java.util.Collections;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.IdentityHashMap;
+import java.util.Map;
 import java.util.Set;
 
-/**
- * Keeps the temporary statistics of one level and converts them to quest events.
- */
+/** Collects one level's temporary statistics and emits exact quest events. */
 public final class QuestGameSession {
-
     private static final int ROW_COUNT = 5;
     private static final int COLUMN_COUNT = 9;
+
+    private static final String[] SINGLE_LEVEL_COUNTERS = {
+        "USE_EXPLOSIVE_PLANT",
+        "EARLY_WAVE_KILL",
+        "ONLY_SELECTED_PLANT_KILL",
+        "ONLY_CACTUS_KILL"
+    };
 
     private final BaseGame game;
     private final Chapters chapter;
@@ -30,33 +36,33 @@ public final class QuestGameSession {
 
     private final Set<Zombie> observedZombies =
         Collections.newSetFromMap(new IdentityHashMap<>());
-
     private final Set<Zombie> countedZombies =
         Collections.newSetFromMap(new IdentityHashMap<>());
-
     private final Set<Plant> observedPlants =
         Collections.newSetFromMap(new IdentityHashMap<>());
-
     private final Set<Plant> countedLostPlants =
         Collections.newSetFromMap(new IdentityHashMap<>());
 
     private final Set<PlantType> offensivePlantTypes =
         EnumSet.noneOf(PlantType.class);
-
     private final Set<PlantCategory> offensiveFamilies =
         EnumSet.noneOf(PlantCategory.class);
+    private final Set<PlantCategory> usedFamilies =
+        EnumSet.noneOf(PlantCategory.class);
 
+    private final boolean[] plantedRows = new boolean[ROW_COUNT];
+    private final boolean[] plantedColumns = new boolean[COLUMN_COUNT];
+
+    private Map<String, Float> startingQuestProgress = Collections.emptyMap();
     private float elapsedTime;
     private float firstWaveStartTime = -1f;
     private int plantsLost;
+    private int sunProducerPlantsUsed;
     private boolean plantedMushroom;
     private boolean winEvaluated;
+    private boolean cheatUsed;
 
-    public QuestGameSession(
-        BaseGame game,
-        Chapters chapter,
-        Level level
-    ) {
+    public QuestGameSession(BaseGame game, Chapters chapter, Level level) {
         if (game == null) {
             throw new IllegalArgumentException("game cannot be null");
         }
@@ -70,8 +76,10 @@ public final class QuestGameSession {
         elapsedTime = 0f;
         firstWaveStartTime = -1f;
         plantsLost = 0;
+        sunProducerPlantsUsed = 0;
         plantedMushroom = false;
         winEvaluated = false;
+        cheatUsed = false;
 
         observedZombies.clear();
         countedZombies.clear();
@@ -79,15 +87,30 @@ public final class QuestGameSession {
         countedLostPlants.clear();
         offensivePlantTypes.clear();
         offensiveFamilies.clear();
+        usedFamilies.clear();
+        Arrays.fill(plantedRows, false);
+        Arrays.fill(plantedColumns, false);
+
+        QuestProgress.setSuppressed(false);
+        QuestProgress.resetActions(SINGLE_LEVEL_COUNTERS);
+        startingQuestProgress = QuestProgress.snapshotProgress();
     }
 
     public void beforeUpdate() {
+        if (cheatUsed) {
+            return;
+        }
+
         observedZombies.addAll(game.getZombies());
         observedPlants.addAll(game.getPlantsInField());
     }
 
     public void afterUpdate(float delta) {
         elapsedTime += Math.max(0f, delta);
+
+        if (cheatUsed) {
+            return;
+        }
 
         if (firstWaveStartTime < 0f && game.getWaveID() > 0) {
             firstWaveStartTime = elapsedTime;
@@ -98,18 +121,29 @@ public final class QuestGameSession {
     }
 
     public void onSunCollected(int amount) {
-        QuestProgress.add(
-            "COLLECT_SUN",
-            Math.max(0, amount)
-        );
+        if (!cheatUsed) {
+            QuestProgress.add("COLLECT_SUN", Math.max(0, amount));
+        }
     }
 
     public void onPlantPlaced(Plant plant) {
-        if (plant == null) {
+        if (cheatUsed || plant == null) {
             return;
         }
 
         observedPlants.add(plant);
+
+        if (plant.getLine() >= 0 && plant.getLine() < ROW_COUNT) {
+            plantedRows[plant.getLine()] = true;
+        }
+
+        if (plant.getTileIndex() >= 0 && plant.getTileIndex() < COLUMN_COUNT) {
+            plantedColumns[plant.getTileIndex()] = true;
+        }
+
+        if (plant.getCategory() != null) {
+            usedFamilies.add(plant.getCategory());
+        }
 
         if (plant.getTags() != null) {
             if (plant.getTags().contains(PlantTags.EXPLOSIVE)) {
@@ -118,6 +152,10 @@ public final class QuestGameSession {
 
             if (plant.getTags().contains(PlantTags.Shroom)) {
                 plantedMushroom = true;
+            }
+
+            if (plant.getTags().contains(PlantTags.SUN)) {
+                sunProducerPlantsUsed++;
             }
         }
 
@@ -133,13 +171,13 @@ public final class QuestGameSession {
     }
 
     public void onGameWon() {
-        if (winEvaluated) {
+        if (winEvaluated || cheatUsed) {
             return;
         }
 
         winEvaluated = true;
 
-        if (plantsLost <= 5) {
+        if (plantsLost <= configuredNumber("ECONOMIC_WIN", 5)) {
             QuestProgress.complete("ECONOMIC_WIN");
         }
 
@@ -151,6 +189,8 @@ public final class QuestGameSession {
 
         if (user != null && user.getDifficultyLevel() == 5) {
             QuestProgress.add("MAX_DIFFICULTY_WIN", 1);
+        } else {
+            QuestProgress.setProgress("MAX_DIFFICULTY_WIN", 0f);
         }
 
         if (isSymmetricLawn()) {
@@ -159,34 +199,58 @@ public final class QuestGameSession {
             QuestProgress.complete("ASYMMETRIC_WIN");
         }
 
-        if (offensiveFamilies.size() == 1) {
+        if (offensiveFamilies.size() == 1
+            && matchesConfiguredFamily("ONLY_FAMILY_WIN", offensiveFamilies)) {
             QuestProgress.complete("ONLY_FAMILY_WIN");
+        }
+
+        if (!matchesConfiguredFamily("EXCLUDE_FAMILY_WIN", usedFamilies)) {
+            QuestProgress.complete("EXCLUDE_FAMILY_WIN");
         }
 
         if (game.isDay() && plantedMushroom) {
             QuestProgress.complete("DAY_LEVEL_WITH_MUSHROOMS");
         }
 
-        int producerCount = countFinalSunProducers();
-
-        if (producerCount > 0 && producerCount <= 3) {
+        if (sunProducerPlantsUsed > 0 && sunProducerPlantsUsed <= 3) {
             QuestProgress.complete("THREE_PRODUCER_WIN");
         }
 
-        boolean emptyRow = hasEmptyRow();
-        boolean emptyColumn = hasEmptyColumn();
+        int configuredRow = configuredNumber("EMPTY_ROW_WIN", 1) - 1;
+        int configuredColumn = configuredNumber("EMPTY_COLUMN_WIN", 1) - 1;
+        int configuredCross = configuredNumber("EMPTY_CROSS_WIN", 1) - 1;
 
-        if (emptyRow) {
+        if (wasRowNeverPlanted(configuredRow)) {
             QuestProgress.complete("EMPTY_ROW_WIN");
         }
 
-        if (emptyColumn) {
+        if (wasColumnNeverPlanted(configuredColumn)) {
             QuestProgress.complete("EMPTY_COLUMN_WIN");
         }
 
-        if (emptyRow && emptyColumn) {
+        if (wasRowNeverPlanted(configuredCross)
+            && wasColumnNeverPlanted(configuredCross)) {
             QuestProgress.complete("EMPTY_CROSS_WIN");
         }
+    }
+
+    public void onGameLost() {
+        if (!cheatUsed) {
+            QuestProgress.resetActions(SINGLE_LEVEL_COUNTERS);
+        }
+
+        QuestProgress.setProgress("MAX_DIFFICULTY_WIN", 0f);
+    }
+
+    /** Rolls back all quest changes made during a game that used any cheat. */
+    public void markCheatUsed() {
+        if (cheatUsed) {
+            return;
+        }
+
+        cheatUsed = true;
+        QuestProgress.setSuppressed(true);
+        QuestProgress.restoreProgress(startingQuestProgress);
     }
 
     private void countNewZombieDeaths() {
@@ -199,21 +263,25 @@ public final class QuestGameSession {
 
             countedZombies.add(zombie);
 
-            QuestProgress.add("KILL_CHAPTER_ZOMBIE", 1);
+            if (matchesConfiguredValue("KILL_CHAPTER_ZOMBIE", chapterName())) {
+                QuestProgress.add("KILL_CHAPTER_ZOMBIE", 1);
+            }
 
             if (isInsideEarlyWaveWindow()) {
                 QuestProgress.add("EARLY_WAVE_KILL", 1);
             }
 
-            if (offensivePlantTypes.size() == 1) {
+            if (offensivePlantTypes.size() == 1
+                && matchesConfiguredPlant("ONLY_SELECTED_PLANT_KILL")) {
                 QuestProgress.add("ONLY_SELECTED_PLANT_KILL", 1);
-
-                if (offensivePlantTypes.contains(PlantType.CACTUS)) {
-                    QuestProgress.add("ONLY_CACTUS_KILL", 1);
-                }
             }
 
-            if (zombie.getTileIndex() == 0 && isMowerUsed(zombie.getLine())) {
+            if (offensivePlantTypes.size() == 1
+                && offensivePlantTypes.contains(PlantType.CACTUS)) {
+                QuestProgress.add("ONLY_CACTUS_KILL", 1);
+            }
+
+            if (zombie.getTileIndex() == 0 && isMowerGone(zombie.getLine())) {
                 QuestProgress.add("DANGER_COLUMN_KILL", 1);
             }
         }
@@ -238,7 +306,7 @@ public final class QuestGameSession {
             && elapsedTime - firstWaveStartTime <= 30f;
     }
 
-    private boolean isMowerUsed(int row) {
+    private boolean isMowerGone(int row) {
         if (game.getField() == null
             || row < 0
             || row >= game.getField().getMoaners().size()) {
@@ -246,7 +314,7 @@ public final class QuestGameSession {
         }
 
         LawnMower mower = game.getField().getMoaners().get(row);
-        return mower != null && mower.isUsed();
+        return mower != null && mower.getState() != LawnMower.State.IDLE;
     }
 
     private boolean isOffensivePlant(Plant plant) {
@@ -269,8 +337,7 @@ public final class QuestGameSession {
     }
 
     private PlantType[][] buildFinalGrid() {
-        PlantType[][] grid =
-            new PlantType[ROW_COUNT][COLUMN_COUNT];
+        PlantType[][] grid = new PlantType[ROW_COUNT][COLUMN_COUNT];
 
         for (Plant plant : game.getPlantsInField()) {
             if (plant == null || plant.getHp() <= 0) {
@@ -280,10 +347,8 @@ public final class QuestGameSession {
             int row = plant.getLine();
             int column = plant.getTileIndex();
 
-            if (row >= 0
-                && row < ROW_COUNT
-                && column >= 0
-                && column < COLUMN_COUNT) {
+            if (row >= 0 && row < ROW_COUNT
+                && column >= 0 && column < COLUMN_COUNT) {
                 grid[row][column] = plant.getType();
             }
         }
@@ -329,20 +394,60 @@ public final class QuestGameSession {
         return true;
     }
 
-    private boolean hasEmptyRow() {
-        boolean[] occupied = new boolean[ROW_COUNT];
-
-        for (Plant plant : game.getPlantsInField()) {
-            if (plant != null
-                && plant.getHp() > 0
-                && plant.getLine() >= 0
-                && plant.getLine() < ROW_COUNT) {
-                occupied[plant.getLine()] = true;
-            }
+    private boolean wasRowNeverPlanted(int targetRow) {
+        if (targetRow < 0 || targetRow >= ROW_COUNT) {
+            return false;
         }
 
-        for (boolean value : occupied) {
-            if (!value) {
+        return !plantedRows[targetRow];
+    }
+
+    private boolean wasColumnNeverPlanted(int targetColumn) {
+        if (targetColumn < 0 || targetColumn >= COLUMN_COUNT) {
+            return false;
+        }
+
+        return !plantedColumns[targetColumn];
+    }
+
+    private int configuredNumber(String action, int fallback) {
+        Quest quest = QuestProgress.find(action);
+        return quest == null || quest.getVariableName().isBlank()
+            ? fallback
+            : quest.getVariableNumber();
+    }
+
+    private boolean matchesConfiguredValue(String action, String actual) {
+        Quest quest = QuestProgress.find(action);
+        return quest != null
+            && actual != null
+            && quest.getVariableValue().equalsIgnoreCase(actual);
+    }
+
+    private boolean matchesConfiguredPlant(String action) {
+        Quest quest = QuestProgress.find(action);
+
+        if (quest == null || offensivePlantTypes.size() != 1) {
+            return false;
+        }
+
+        PlantType used = offensivePlantTypes.iterator().next();
+        return quest.getVariableValue().equalsIgnoreCase(used.name());
+    }
+
+    private boolean matchesConfiguredFamily(
+        String action,
+        Set<PlantCategory> families
+    ) {
+        Quest quest = QuestProgress.find(action);
+
+        if (quest == null || families == null || families.isEmpty()) {
+            return false;
+        }
+
+        for (PlantCategory family : families) {
+            if (family != null
+                && quest.getVariableValue().equalsIgnoreCase(family.name())) {
                 return true;
             }
         }
@@ -350,40 +455,7 @@ public final class QuestGameSession {
         return false;
     }
 
-    private boolean hasEmptyColumn() {
-        boolean[] occupied = new boolean[COLUMN_COUNT];
-
-        for (Plant plant : game.getPlantsInField()) {
-            if (plant != null
-                && plant.getHp() > 0
-                && plant.getTileIndex() >= 0
-                && plant.getTileIndex() < COLUMN_COUNT) {
-                occupied[plant.getTileIndex()] = true;
-            }
-        }
-
-        for (boolean value : occupied) {
-            if (!value) {
-                return true;
-            }
-        }
-
-        return false;
+    private String chapterName() {
+        return chapter == null ? "" : chapter.name();
     }
-
-    private int countFinalSunProducers() {
-        int count = 0;
-
-        for (Plant plant : game.getPlantsInField()) {
-            if (plant != null
-                && plant.getHp() > 0
-                && plant.getTags() != null
-                && plant.getTags().contains(PlantTags.SUN)) {
-                count++;
-            }
-        }
-
-        return count;
-    }
-
 }
