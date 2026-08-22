@@ -1,7 +1,9 @@
 package view;
 
 import com.badlogic.gdx.Screen;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.scenes.scene2d.Actor;
+import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.SelectBox;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
@@ -9,6 +11,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.Array;
+import com.badlogic.gdx.utils.Scaling;
 
 import controllers.datacontroller.PlantData;
 import controllers.menus.secondarymenus.Collection;
@@ -16,6 +19,7 @@ import models.entity.PlantCategory;
 import models.entity.Zombie;
 import models.entity.ZombieRegistry;
 import models.factory.builder.PlantType;
+import view.components.CollectionAssetCatalog;
 
 public class CollectionView extends View {
 
@@ -27,8 +31,43 @@ public class CollectionView extends View {
     private PlantType selectedPlant;
     private ZombieRegistry.ZombieType selectedZombie;
 
+    private CollectionAssetCatalog assetCatalog;
+
     public CollectionView() {
         menu = new Collection();
+    }
+
+    @Override
+    public void show() {
+        assetCatalog = CollectionAssetCatalog.create();
+        super.show();
+    }
+
+    @Override
+    public void render(float delta) {
+        if (assetCatalog != null) {
+            assetCatalog.update();
+        }
+        super.render(delta);
+    }
+
+    @Override
+    public void hide() {
+        closeAssetCatalog();
+        super.hide();
+    }
+
+    @Override
+    public void dispose() {
+        closeAssetCatalog();
+        super.dispose();
+    }
+
+    private void closeAssetCatalog() {
+        if (assetCatalog != null) {
+            assetCatalog.close();
+            assetCatalog = null;
+        }
     }
 
     @Override
@@ -362,11 +401,11 @@ public class CollectionView extends View {
                         : "\nLOCKED"
                 );
 
-            TextButton card;
+            TextButton actionButton;
 
             if (!unlocked) {
 
-                card =
+                actionButton =
                     brownButton(
                         text,
                         () -> {
@@ -384,7 +423,7 @@ public class CollectionView extends View {
                 )
             ) {
 
-                card =
+                actionButton =
                     purpleButton(
                         text,
                         () -> {
@@ -398,7 +437,7 @@ public class CollectionView extends View {
 
             } else {
 
-                card =
+                actionButton =
                     greenButton(
                         text,
                         () -> {
@@ -411,9 +450,16 @@ public class CollectionView extends View {
                     );
             }
 
-            panel.add(card)
+            panel.add(
+                    collectionCard(
+                        actionButton,
+                        assetCatalog == null
+                            ? null
+                            : assetCatalog.plantPortrait(type)
+                    )
+                )
                 .width(205f)
-                .height(120f)
+                .height(180f)
                 .pad(6f);
 
             shown++;
@@ -563,6 +609,13 @@ public class CollectionView extends View {
             .colspan(2)
             .padBottom(14f)
             .row();
+
+        addPortrait(
+            detail,
+            assetCatalog == null
+                ? null
+                : assetCatalog.plantPortrait(type)
+        );
 
         addDetail(
             detail,
@@ -814,7 +867,7 @@ public class CollectionView extends View {
                     )
                     : "???\nUNDISCOVERED";
 
-            TextButton card =
+            TextButton actionButton =
                 unlocked
                     ? purpleButton(
                     text,
@@ -837,9 +890,16 @@ public class CollectionView extends View {
                     }
                 );
 
-            list.add(card)
+            list.add(
+                    collectionCard(
+                        actionButton,
+                        assetCatalog == null
+                            ? null
+                            : assetCatalog.zombiePortrait(type)
+                    )
+                )
                 .width(205f)
-                .height(92f)
+                .height(160f)
                 .pad(6f);
 
             index++;
@@ -958,6 +1018,13 @@ public class CollectionView extends View {
             .padBottom(12f)
             .row();
 
+        addPortrait(
+            detail,
+            assetCatalog == null
+                ? null
+                : assetCatalog.zombiePortrait(selectedZombie)
+        );
+
         Zombie preview =
             controller
                 .createZombiePreview(
@@ -1037,6 +1104,50 @@ public class CollectionView extends View {
         }
 
         return detail;
+    }
+
+    private void addPortrait(
+        Table detail,
+        TextureRegion region
+    ) {
+        if (region == null) {
+            return;
+        }
+
+        Image portrait = new Image(region);
+        portrait.setScaling(Scaling.fit);
+
+        detail.add(portrait)
+            .colspan(2)
+            .size(128f)
+            .center()
+            .padBottom(12f)
+            .row();
+    }
+
+    private Table collectionCard(
+        TextButton actionButton,
+        TextureRegion region
+    ) {
+        Table card = pvzInnerPanel();
+
+        if (region != null) {
+            Image portrait = new Image(region);
+            portrait.setScaling(Scaling.fit);
+
+            card.add(portrait)
+                .size(58f)
+                .center()
+                .padBottom(4f)
+                .row();
+        }
+
+        card.add(actionButton)
+            .width(185f)
+            .height(region == null ? 86f : 78f)
+            .center();
+
+        return card;
     }
 
     private void addDetail(
