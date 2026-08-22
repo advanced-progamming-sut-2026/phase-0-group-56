@@ -12,6 +12,8 @@ import controllers.menus.secondarymenus.TravelLog;
 import models.App;
 import models.Quest;
 import models.User;
+import view.gameview.VaseBreakerView;
+import view.gameview.WallnutBowlingView;
 
 import java.util.List;
 
@@ -454,7 +456,12 @@ public class TravelLogView extends View {
         minigames.add(
                 buildMinigameCard(
                     "VASE BREAKER",
-                    user.getVaseBreaker()
+                    user.getVaseBreaker(),
+                    () -> App.setScreen(
+                        new VaseBreakerView(
+                            safeMinigameLevel(user.getVaseBreaker())
+                        )
+                    )
                 )
             )
             .width(250f)
@@ -463,7 +470,12 @@ public class TravelLogView extends View {
         minigames.add(
                 buildMinigameCard(
                     "WALL-NUT BOWLING",
-                    user.getWallNutBowling()
+                    user.getWallNutBowling(),
+                    () -> App.setScreen(
+                        new WallnutBowlingView(
+                            safeMinigameLevel(user.getWallNutBowling())
+                        )
+                    )
                 )
             )
             .width(250f)
@@ -472,7 +484,10 @@ public class TravelLogView extends View {
         minigames.add(
                 buildMinigameCard(
                     "I, ZOMBIE",
-                    user.getIZombie()
+                    user.getIZombie(),
+                    () -> showMessage(
+                        "I, Zombie is not connected yet because its game class is empty."
+                    )
                 )
             )
             .width(250f)
@@ -484,7 +499,8 @@ public class TravelLogView extends View {
 
     private Table buildMinigameCard(
         String name,
-        int unlockedLevel
+        int unlockedLevel,
+        Runnable playAction
     ) {
         Table card = pvzInnerPanel();
 
@@ -503,9 +519,24 @@ public class TravelLogView extends View {
             .row();
 
         card.add(levelLabel)
-            .width(220f);
+            .width(220f)
+            .padBottom(12f)
+            .row();
+
+        boolean available = !"I, ZOMBIE".equals(name);
+        TextButton play = available
+            ? greenSmallButton("PLAY", playAction)
+            : brownButton("NOT AVAILABLE", playAction);
+
+        card.add(play)
+            .width(150f)
+            .height(42f);
 
         return card;
+    }
+
+    private int safeMinigameLevel(int level) {
+        return Math.max(1, Math.min(16, level));
     }
 
     private void rebuild() {

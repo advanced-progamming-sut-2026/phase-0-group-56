@@ -6,6 +6,7 @@ import models.entity.Plant;
 import models.entity.Zombie;
 import models.factory.builder.PlantType;
 import models.gamepanes.Tile;
+import models.gamepanes.Field;
 import models.games.BaseGame;
 import models.utils.Result;
 
@@ -21,10 +22,14 @@ public class VaseBraker extends BaseGame {
 
     int plantVaseCount;
     public  VaseBraker(MinigameLevel level) {
-        availablePlants = level.getPlants();
-        field.initField(Chapters.AncientEgypt , level.getId());
-        initVases(level.getId() , 5 *(4  + level.getId()));
-        plantVaseCount = level.getId() + 2;
+        int safeLevel = Math.max(1, Math.min(2, level == null ? 1 : level.getId()));
+        availablePlants = level == null || level.getPlants() == null
+            ? new ArrayList<>()
+            : level.getPlants();
+        field = new Field();
+        field.initField(Chapters.AncientEgypt, safeLevel);
+        plantVaseCount = safeLevel + 2;
+        initVases(safeLevel, 5 * (4 + safeLevel));
     }
 
     public String breakVase(int x , int y){

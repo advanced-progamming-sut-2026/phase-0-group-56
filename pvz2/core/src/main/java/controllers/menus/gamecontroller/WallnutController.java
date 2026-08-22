@@ -1,6 +1,7 @@
 package controllers.menus.gamecontroller;
 
 import controllers.datacontroller.MiniGameLevelManager;
+import controllers.datacontroller.Data;
 import models.App;
 import models.games.minigames.MinigameLevel;
 import models.games.minigames.WallnutBowling;
@@ -21,9 +22,11 @@ public class WallnutController implements Controller{
         game.playGame(delta);
         Result end = game.check_endGame();
         if(end.success()){
-           if(end.message().equals("Won")){
-               App.getCurrentuser().setWallNutBowling(App.getCurrentuser().getWallNutBowling() + 1);
-           }
+            if(end.message().equals("Won")){
+                App.getCurrentuser().setWallNutBowling(App.getCurrentuser().getWallNutBowling() + 1);
+                Data.saveUser();
+            }
+            endGame();
         }
         return "My brother , My captain , My King!\n    - Boromir to Aragorn";
     }

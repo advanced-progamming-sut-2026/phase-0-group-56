@@ -1,12 +1,20 @@
 package controllers.menus.gamecontroller;
 
+import controllers.datacontroller.MiniGameLevelManager;
 import models.App;
+import models.games.minigames.MinigameLevel;
 import models.games.minigames.VaseBraker;
 import models.utils.Result;
 import view.TravelLogView;
 
 public class VaseBreakerController implements Controller{
-    VaseBraker game;
+    private final VaseBraker game;
+
+    public VaseBreakerController(int level) {
+        MinigameLevel minigameLevel =
+            MiniGameLevelManager.getLevelById(Math.max(1, level));
+        game = new VaseBraker(minigameLevel);
+    }
     @Override
     public String playGame(float delta) {
         game.playGame(delta);
@@ -30,6 +38,10 @@ public class VaseBreakerController implements Controller{
 
     public String plant(String plantNamt , int x , int y){
         return game.plant(plantNamt, x, y);
+    }
+
+    public String breakVase(int x, int y) {
+        return game.breakVase(x, y);
     }
 
     public String showVases(){

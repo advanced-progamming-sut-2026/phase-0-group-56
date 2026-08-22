@@ -6,6 +6,7 @@ import models.gameadventure.Chapters;
 import models.gameadventure.levels.Level;
 import models.entity.Zombie;
 import models.gamepanes.Field;
+import models.gamepanes.Wave;
 import models.games.NormalGame;
 import models.utils.Result;
 
@@ -14,10 +15,19 @@ import java.util.Random;
 
 public class WallnutBowling extends NormalGame {
     public  WallnutBowling(MinigameLevel level) {
-                field = new Field().initField(Chapters.AncientEgypt
-                        , App.getCurrentuser().getWallNutBowling());
-        Level level1 = new Level(App.getCurrentuser().getWallNutBowling()
-        , Chapters.AncientEgypt , "normal" , 4 , 1000);
+        int safeLevel = Math.max(1, Math.min(16, level == null ? 1 : level.getId()));
+        field = new Field().initField(Chapters.AncientEgypt, safeLevel);
+        Level level1 = new Level(
+            safeLevel,
+            Chapters.AncientEgypt,
+            "normal",
+            2,
+            100
+        );
+        level1.setAllowedZombies(new ArrayList<>(java.util.List.of("normal")));
+        initGame(Chapters.AncientEgypt, level1);
+        belt.add("Wallnut");
+        belt.add("Explod'O nut");
     }
 
     ArrayList<String> belt = new ArrayList<>();
@@ -39,8 +49,8 @@ public class WallnutBowling extends NormalGame {
         for (BowlingNut x : nuts){
             x.go(delta, this);
         }
-       Result result = attack(delta);
-        return result.message();
+        Result result = attack(delta);
+        return result == null ? "No wave transition." : result.message();
     }
 
     @Override
@@ -74,8 +84,21 @@ public class WallnutBowling extends NormalGame {
 
     @Override
     protected Result attack(float delta) {
+        if (currentWave == null) {
+            if (waves.isEmpty()) {
+                won = true;
+                return new Result(true, "Won", null);
+            }
+            currentWave = waves.get(waveID);
+            zombies.addAll(currentWave.getZombies());
+            waveID += 1;
+            return new Result(true, "Wave started", null);
+        }
         if(currentWave.isFinished()){
-            if(waveID == waves.size() - 1) return null;
+            if(waveID >= waves.size()) {
+                won = true;
+                return new Result(true, "Won", null);
+            }
             previousWave = currentWave;
             currentWave = waves.get(waveID);
             zombies.addAll(currentWave.getZombies());
