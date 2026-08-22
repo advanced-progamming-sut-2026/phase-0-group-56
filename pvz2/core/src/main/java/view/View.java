@@ -7,6 +7,7 @@ import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.Touchable;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
+import com.badlogic.gdx.scenes.scene2d.ui.ImageButton;
 import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
@@ -88,11 +89,20 @@ public class View implements Screen {
         root.setFillParent(true);
         root.top();
         root.pad(
-            16f,
-            22f,
-            20f,
-            22f
+            12f,
+            18f,
+            14f,
+            18f
         );
+
+        Drawable screenBackground =
+            getSkinDrawableSafe(
+                "image_ui_quests_panel_edge_to_edge_ten"
+            );
+
+        if (screenBackground != null) {
+            root.setBackground(screenBackground);
+        }
 
         stage.addActor(root);
 
@@ -129,6 +139,17 @@ public class View implements Screen {
     private void buildHeader() {
 
         Table header = new Table();
+
+        header.pad(7f, 10f, 7f, 10f);
+
+        Drawable headerBackground =
+            getSkinDrawableSafe(
+                "image_ui_mainmenu_mm_settings_tab_10"
+            );
+
+        if (headerBackground != null) {
+            header.setBackground(headerBackground);
+        }
 
         Screen backScreen = getBackScreen();
 
@@ -191,7 +212,7 @@ public class View implements Screen {
 
         root.add(header)
             .growX()
-            .height(62f)
+            .minHeight(74f)
             .row();
     }
 
@@ -204,6 +225,17 @@ public class View implements Screen {
     private Table buildResourceBar() {
 
         Table bar = new Table();
+
+        bar.pad(5f, 8f, 5f, 8f);
+
+        Drawable resourceBackground =
+            getSkinDrawableSafe(
+                "image_ui_dialog_asset_inner_bkgd_10"
+            );
+
+        if (resourceBackground != null) {
+            bar.setBackground(resourceBackground);
+        }
 
         User user = Data.getCurrentUser();
 
@@ -226,7 +258,7 @@ public class View implements Screen {
             );
 
         bar.add(coinLabel)
-            .padRight(18f);
+            .padRight(12f);
 
         bar.add(diamondLabel);
 
@@ -405,6 +437,107 @@ public class View implements Screen {
             "purple",
             action
         );
+    }
+
+    /**
+     * Creates a compact visual shortcut using one of the official
+     * pvz-skin ImageButton styles. The action is deliberately attached
+     * only to the icon so the surrounding menu layout remains unchanged.
+     */
+    protected Table menuShortcut(
+        String iconStyle,
+        String caption,
+        Runnable action
+    ) {
+        Table shortcut = pvzInnerPanel();
+
+        ImageButton icon;
+
+        try {
+            icon = new ImageButton(skin, iconStyle);
+        } catch (Exception exception) {
+            icon = new ImageButton(skin);
+        }
+
+        icon.addListener(
+            new ClickListener() {
+                @Override
+                public void clicked(
+                    InputEvent event,
+                    float x,
+                    float y
+                ) {
+                    if (action != null) {
+                        action.run();
+                    }
+                }
+            }
+        );
+
+        shortcut.add(icon)
+            .size(62f)
+            .center()
+            .padBottom(4f)
+            .row();
+
+        Label label = secondaryLabel(caption);
+        label.setAlignment(Align.center);
+
+        shortcut.add(label)
+            .width(116f)
+            .center();
+
+        return shortcut;
+    }
+
+    /**
+     * Builds a non-interactive section banner for menu screens. It uses only
+     * official skin controls and keeps the screen-specific content untouched.
+     */
+    protected Table menuSectionHeader(
+        String iconStyle,
+        String titleText,
+        String subtitleText
+    ) {
+        Table banner = pvzInnerPanel();
+
+        ImageButton icon;
+
+        try {
+            icon = new ImageButton(skin, iconStyle);
+        } catch (Exception exception) {
+            icon = new ImageButton(skin);
+        }
+
+        icon.setTouchable(Touchable.disabled);
+
+        Table text = new Table();
+
+        Label title = mediumTitle(titleText);
+        title.setAlignment(Align.left);
+
+        Label subtitle = secondaryLabel(subtitleText);
+        subtitle.setWrap(true);
+        subtitle.setAlignment(Align.left);
+
+        text.add(title)
+            .left()
+            .growX()
+            .row();
+
+        text.add(subtitle)
+            .left()
+            .growX();
+
+        banner.add(icon)
+            .size(62f)
+            .padRight(12f);
+
+        banner.add(text)
+            .growX()
+            .left();
+
+        return banner;
     }
 
     private TextButton styledButton(

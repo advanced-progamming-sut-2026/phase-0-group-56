@@ -23,6 +23,7 @@ import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 
 import controllers.datacontroller.Data;
+import controllers.datacontroller.LevelProgressService;
 import controllers.menus.gamecontroller.PlayMenu;
 import models.App;
 import models.User;
@@ -192,6 +193,10 @@ public class PlayView extends View {
 
         User user =
             App.getCurrentuser();
+
+        if (user != null && LevelProgressService.normalizeUserProgress(user)) {
+            Data.saveUser();
+        }
 
         if (user != null &&
             user.getChapter() != null) {
@@ -1284,11 +1289,7 @@ public class PlayView extends View {
         }
 
 
-        /*
-         * Same rule currently used by PlayMenu.
-         */
-        return user.getLevelsPassed()
-            >= level.getId() - 1;
+        return LevelProgressService.isLevelUnlocked(user, level);
     }
 
 

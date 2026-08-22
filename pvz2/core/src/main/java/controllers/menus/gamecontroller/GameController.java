@@ -1,9 +1,11 @@
 package controllers.menus.gamecontroller;
 
 import controllers.datacontroller.Data;
+import controllers.datacontroller.LevelProgressService;
 import controllers.datacontroller.SeedPackage;
 import controllers.menus.Menu;
 import models.App;
+import models.QuestGameSession;
 import models.User;
 import models.entity.*;
 import models.entity.Projectile;
@@ -41,6 +43,7 @@ public class GameController implements Controller, Menu {
     private final BaseGame game;
     private final Level level;
     private final Chapters chapter;
+    private final QuestGameSession questSession;
 
     public GameController(Chapters chapter, Level level) {
         if (chapter == null) {
@@ -66,6 +69,10 @@ public class GameController implements Controller, Menu {
         };
 
         game.initGame(chapter, level);
+        questSession = new QuestGameSession(game, chapter, level);
+        if (game.getState() == BaseGame.GameState.PLAYING) {
+            questSession.onGameStarted();
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -91,7 +98,12 @@ public class GameController implements Controller, Menu {
 
         // ConveyorBelt owns availability itself; it does not use SeedPackage cooldowns.
         if (game instanceof ConveyorBelt) {
-            return game.plant(type.name(), x, y);
+            int before = game.getPlantsInField().size();
+            boolean planted = game.plant(type.name(), x, y);
+            if (planted) {
+                notifyNewPlants(before);
+            }
+            return planted;
         }
 
         SeedPackage packet = game.getAvailable_plants().get(type);
@@ -118,6 +130,7 @@ public class GameController implements Controller, Menu {
             if (recharged != null) {
                 game.getAvailable_plants().put(type, recharged);
             }
+            notifyNewPlants(before);
         }
 
         return result;
@@ -169,13 +182,18 @@ public class GameController implements Controller, Menu {
 
         game.setSunCount(game.getSunCount() + sun.getPrice());
 
-        if (App.getCurrentuser() != null) {
-            App.getCurrentuser().updateQuestProgress("COLLECT_SUN", sun.getPrice());
-        }
+        questSession.onSunCollected(sun.getPrice());
 
         int price = sun.getPrice();
         iterator.remove();
         return "Sun collected: +" + price;
+    }
+
+    private void notifyNewPlants(int previousCount) {
+        List<Plant> plants = game.getPlantsInField();
+        for (int i = Math.max(0, previousCount); i < plants.size(); i++) {
+            questSession.onPlantPlaced(plants.get(i));
+        }
     }
 
 
@@ -332,6 +350,7 @@ public class GameController implements Controller, Menu {
         }
 
         game.setState(BaseGame.GameState.PLAYING);
+        questSession.onGameStarted();
         return "Game started.";
     }
 
@@ -345,15 +364,19 @@ public class GameController implements Controller, Menu {
             return "";
         }
 
+        questSession.beforeUpdate();
         String log = game.playGame(delta);
+        questSession.afterUpdate(delta);
         Result endResult = game.check_endGame();
 
         if (endResult.success() && "Loss".equals(endResult.message())) {
+            questSession.onGameLost();
             App.setScreen(new PlayView());
             return "You lost the level.";
         }
 
         if (game.isWon()) {
+            questSession.onGameWon();
             end();
             return "Level completed.";
         }
@@ -368,29 +391,12 @@ public class GameController implements Controller, Menu {
             return;
         }
 
-        if (chapter == user.getChapter() && level.getId() == user.getLevelId()) {
-            user.setLevelId(user.getLevelId() + 1);
-            user.setLevelsPassed(user.getLevelsPassed() + 1);
-
-            for (PlantType type : level.getUnlockingPlants()) {
-                user.getUnlockedPlants().add(type);
-                user.getLevels().put(type, 1);
-                user.getUnreadNews().add(
-                    "Congratulations, you've unlocked a new plant: " + type.name()
-                );
-            }
-        }
-
-        if (user.getLevelId() == 5) {
-            user.setLevelId(1);
-            Chapters newChapter = switch (user.getChapter()) {
-                case AncientEgypt -> Chapters.FrozenCaves;
-                case FrozenCaves -> Chapters.BigWaveBeach;
-                case BigWaveBeach -> Chapters.DarkAge;
-                default -> user.getChapter();
-            };
-            user.setChapter(newChapter);
-        }
+        /*
+         * Level ids are global (1..16).  Keep all unlock, chapter-transition
+         * and replay protection in one service instead of maintaining a
+         * second, chapter-local counter here.
+         */
+        LevelProgressService.completeLevel(user, chapter, level);
 
         Data.saveUser();
         App.setScreen(new PlayView());
@@ -417,6 +423,7 @@ public class GameController implements Controller, Menu {
     // -------------------------------------------------------------------------
 
     public String gameEndCheat() {
+        questSession.markCheatUsed();
         end();
         return "game ended. you won!";
     }
@@ -426,11 +433,13 @@ public class GameController implements Controller, Menu {
     }
 
     public String cheatSunAmount(int amount) {
+        questSession.markCheatUsed();
         game.setSunCount(game.getSunCount() + amount);
         return "==== >> Suns added by Cheat code : " + amount + "\n now " + showSunAmount();
     }
 
     public String cheatZombieKiller() {
+        questSession.markCheatUsed();
         for (Zombie zombie : game.getZombies()) {
             zombie.setHp(0);
         }

@@ -6,7 +6,6 @@ import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.SelectBox;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextField;
-import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.Array;
 
 import controllers.menus.SignUp;
@@ -33,10 +32,14 @@ public class SignUpView extends View {
 
         SignUp controller = (SignUp) menu;
 
-        Label subtitle = mediumTitle("JOIN THE ADVENTURE");
-        subtitle.setAlignment(Align.center);
-
-        table.add(subtitle)
+        table.add(
+                menuSectionHeader(
+                    "almanac",
+                    "JOIN THE ADVENTURE",
+                    "Create your account and save your garden progress."
+                )
+            )
+            .width(840f)
             .padTop(4f)
             .padBottom(14f)
             .row();

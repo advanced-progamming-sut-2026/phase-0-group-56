@@ -1,6 +1,7 @@
 package controllers.menus.gamecontroller;
 
 import controllers.datacontroller.Data;
+import controllers.datacontroller.LevelProgressService;
 import controllers.menus.Menu;
 import models.App;
 import models.gameadventure.Chapters;
@@ -14,7 +15,12 @@ public class PlayMenu implements Menu {
     private Chapters currentChapter;
 
     public PlayMenu() {
-        currentChapter = App.getCurrentuser().getChapter();
+        if (App.getCurrentuser() != null) {
+            LevelProgressService.normalizeUserProgress(App.getCurrentuser());
+            currentChapter = App.getCurrentuser().getChapter();
+        } else {
+            currentChapter = Chapters.AncientEgypt;
+        }
     }
 
     @Override
@@ -41,6 +47,13 @@ public class PlayMenu implements Menu {
     }
 
     public String changeChapter(Chapters chapter) {
+        if (chapter == null) {
+            return "Invalid chapter";
+        }
+
+        if (App.getCurrentuser() != null) {
+            LevelProgressService.normalizeUserProgress(App.getCurrentuser());
+        }
         currentChapter = chapter;
         StringBuilder output = new StringBuilder();
 
@@ -52,7 +65,10 @@ public class PlayMenu implements Menu {
 
         for (Level level : chapterLevels) {
             int levelId = level.getId();
-            boolean unlocked = App.getCurrentuser().getLevelsPassed() >= (levelId - 1);
+            boolean unlocked = LevelProgressService.isLevelUnlocked(
+                App.getCurrentuser(),
+                level
+            );
 
             output.append("═════════════════════════ LEVEL ").append(levelId).append(" : ").append(unlocked ? "Unlocked" : "Locked");
 
@@ -84,7 +100,10 @@ public class PlayMenu implements Menu {
             return "Error: Level " + levelId + " does not exist in " + currentChapter.name() + ".";
         }
 
-        boolean isUnlocked = App.getCurrentuser().getLevelsPassed() >= (levelId - 1);
+        boolean isUnlocked = LevelProgressService.isLevelUnlocked(
+            App.getCurrentuser(),
+            toPlay
+        );
 
         if (!isUnlocked) {
             return "Error: You haven't unlocked Level " + levelId + " yet!";

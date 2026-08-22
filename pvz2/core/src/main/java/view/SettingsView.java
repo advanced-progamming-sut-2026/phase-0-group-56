@@ -48,16 +48,14 @@ public class SettingsView extends View {
             return;
         }
 
-        Label heading =
-            mediumTitle(
-                "GAME SETTINGS"
-            );
-
-        heading.setAlignment(
-            Align.center
-        );
-
-        table.add(heading)
+        table.add(
+                menuSectionHeader(
+                    "settings",
+                    "GAME SETTINGS",
+                    "Tune difficulty, speed, grid visibility, and debug tools."
+                )
+            )
+            .width(700f)
             .padTop(10f)
             .padBottom(16f)
             .row();

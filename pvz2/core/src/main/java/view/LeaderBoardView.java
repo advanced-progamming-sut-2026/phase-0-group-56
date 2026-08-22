@@ -38,17 +38,15 @@ public class LeaderBoardView extends View {
         Table table
     ) {
 
-        Label subtitle =
-            mediumTitle(
-                "TOP PLAYERS"
-            );
-
-        subtitle.setAlignment(
-            Align.center
-        );
-
-        table.add(subtitle)
-            .padBottom(10f)
+        table.add(
+                menuSectionHeader(
+                    "almanac",
+                    "TOP PLAYERS",
+                    "Compare progress, minigame wins, quests, and Meowpoint."
+                )
+            )
+            .width(900f)
+            .padBottom(12f)
             .row();
 
         Table hintPanel =

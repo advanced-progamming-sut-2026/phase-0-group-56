@@ -41,6 +41,17 @@ public class NewsView extends View {
             return;
         }
 
+        table.add(
+                menuSectionHeader(
+                    "hud_quests",
+                    "NEWS",
+                    "Stay up to date with the latest garden announcements."
+                )
+            )
+            .width(800f)
+            .padBottom(12f)
+            .row();
+
         int unreadCount =
             user.getUnreadNews().size();
 
