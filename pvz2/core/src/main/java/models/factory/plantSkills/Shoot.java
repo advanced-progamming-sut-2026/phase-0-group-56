@@ -3,9 +3,9 @@ package models.factory.plantSkills;
 import models.App;
 import models.Constants;
 import models.entity.*;
+import models.factory.builder.PlantType;
 import models.factory.plantSkills.skillDatas.ShootingData;
 import models.factory.plantSkills.skillDatas.ShootingMood;
-import models.factory.builder.PlantLevel;
 import models.gamepanes.Tile;
 import models.games.BaseGame;
 
@@ -68,6 +68,12 @@ public class Shoot implements Skill {
             projectile.setDamage(shooter.getDamage());
             projectile.setTags(shooter.getTags());
             projectile.setSourcePlantType(shooter.getType());
+            // Snow Pea must remain an ice attack even when a hand-built plant
+            // or an older save omitted the Ice data tag.
+            if (shooter.getType() == PlantType.SNOW_PEA
+                && !projectile.getTags().contains(Projectile.Tag.ICE)) {
+                projectile.getTags().add(Projectile.Tag.ICE);
+            }
         }
     }
 
@@ -75,7 +81,7 @@ public class Shoot implements Skill {
     float onionChange;
     public void oneLineShoot(Plant shooter, ShootingData data , BaseGame game) throws CloneNotSupportedException {
         onionChange += 2;
-        int level = PlantLevel.current(shooter.getType());
+        int level = App.getCurrentuser().getLevels().get(shooter.getType());
         if(data.getBullet() == ProjectileType.ONION_1 || data.getBullet() == ProjectileType.ONION_3){
             if(onionChange >= (level >= 2 ? 9 : 10)) {
                 data.setBullet(ProjectileType.ONION_2);
@@ -108,7 +114,7 @@ public class Shoot implements Skill {
 
         if(data.getBulletNumber() >= 50){
             Projectile projectile1 = new Projectile(x , y , Constants.BULLET_VELOCITY_X, ProjectileType.GIANT_PEA
-                    , shooter.getDamage(),shooter.getLine());
+                , shooter.getDamage(),shooter.getLine());
             game.getBullets().add(projectile1);
         }
     }
@@ -144,12 +150,11 @@ public class Shoot implements Skill {
 
     private void frontBackShoot(Plant shooter , ShootingData data , BaseGame game) throws CloneNotSupportedException {
         ShootingData front = new ShootingData(data.getBullet() , data.getMood() ,
-                data.getBulletNumber() / 2);
+            data.getBulletNumber() / 2);
         oneLineShoot(shooter , front , game);
-        Projectile projectileBack = new Projectile(
-                shooter.getX(), shooter.getY() + shooter.getHeight() * MOUTH_EXITPOINT
-                ,Constants.BULLET_VELOCITY_X * -1
-                , data.getBullet(), shooter.getDamage() ,  shooter.getLine());
+        Projectile projectileBack = new Projectile(shooter.getX() , shooter.getY() + shooter.getHeight() * MOUTH_EXITPOINT
+            ,Constants.BULLET_VELOCITY_X * -1
+            , data.getBullet(), shooter.getDamage() ,  shooter.getLine());
         for (int i = 0; i < data.getBulletNumber() / 2; i++) {
             Projectile b = (Projectile) projectileBack.clone();
             b.setX(b.getX() - i * 4);
@@ -159,11 +164,10 @@ public class Shoot implements Skill {
 
     private void starShoot(Plant shooter , ShootingData data , BaseGame game) throws CloneNotSupportedException {
         oneLineShoot(shooter, new ShootingData(data.getBullet() , data.getMood()
-                , data.getBulletNumber() / 5), game);///right
-        Projectile projectileStar2 = new Projectile(
-            shooter.getX(), shooter.getY() + shooter.getHeight() * MOUTH_EXITPOINT,
-               Constants.BULLET_VELOCITY_X * -1 , data.getBullet() , shooter.getDamage()
-        ,  shooter.getLine());
+            , data.getBulletNumber() / 5), game);///right
+        Projectile projectileStar2 = new Projectile(shooter.getX() , shooter.getY() + shooter.getHeight() * MOUTH_EXITPOINT ,
+            Constants.BULLET_VELOCITY_X * -1 , data.getBullet() , shooter.getDamage()
+            ,  shooter.getLine());
         Projectile projectileStar3 = (Projectile) projectileStar2.clone();
         projectileStar3.setVelocityY(projectileStar3.getVelocityX());
         projectileStar3.setY(shooter.getY());
@@ -185,10 +189,9 @@ public class Shoot implements Skill {
 
 
     private void diagonal(Plant shooter , ShootingData  data , BaseGame game) throws CloneNotSupportedException {
-        Projectile projectile1 = new Projectile(
-            shooter.getX() + shooter.getWidth(), shooter.getY() + shooter.getHeight() * 0.9f,
-                Constants.BULLET_VELOCITY_X, data.getBullet() , shooter.getDamage()
-        ,   shooter.getLine());
+        Projectile projectile1 = new Projectile(shooter.getX() + shooter.getWidth() , shooter.getY() + shooter.getHeight() * 0.9f ,
+            Constants.BULLET_VELOCITY_X, data.getBullet() , shooter.getDamage()
+            ,   shooter.getLine());
         projectile1.setVelocityY(projectile1.getVelocityX());
         Projectile projectile2 = (Projectile) projectile1.clone();
         projectile2.setVelocityX(projectile2.getVelocityX() * -1);
@@ -255,23 +258,45 @@ public class Shoot implements Skill {
             }
         }
 
-       if(target != null) game.getBullets().add(lobberShoot(shooter , target));
+        if(target != null) game.getBullets().add(lobberShoot(shooter , target));
     }
     private Projectile lobberShoot(Plant shooter , Zombie target){
-        Projectile projectile = new Projectile(shooter.getX() - 30, shooter.getY() + shooter.getHeight() / 2
-                , data.getBullet(),shooter.getLine());
+        // Lobbers launch from the plant's mouth and follow an actual arc.  The
+        // old calculation divided by (bullet speed + zombie speed); zombie
+        // speeds are negative in the normal game, so that could produce a
+        // negative flight time and immediately drive the projectile into the
+        // ground.
+        float startX = shooter.getX() + shooter.getWidth() * 0.75f;
+        float startY = shooter.getY() + shooter.getHeight() * 0.70f;
+        Projectile projectile = new Projectile(startX, startY
+            , data.getBullet(),shooter.getLine());
         if(data.getBullet() == ProjectileType.CORN){
             Random rand = new Random();
-            boolean changeIncrease = PlantLevel.current(shooter.getType()) >= 2;
+            boolean changeIncrease = App.getCurrentuser().getLevels().get(shooter.getType()) >= 2;
             int a = rand.nextInt(100); // probability = 20%
             if((a >= 1 && a <= 40) || (changeIncrease && a >= 41 && a <= 45)) projectile.setType(ProjectileType.BUTTER);
         }
         projectile.setVelocityX(Constants.LOBBER_BULLET_VELOCITY_X);
-        float t = (target.getX() - shooter.getX()) / (projectile.getVelocityX() + target.getVelocityX());
-        float dy =  target.getY() - shooter.getY();
-        float vy = dy / t + Constants.GRAVITY * t / 2;
+        float targetVelocityX = target.getVelocityX();
+        if (Math.abs(targetVelocityX) < 0.001f) {
+            targetVelocityX = target.getSpeed();
+        }
+
+        float horizontalDistance = target.getX() - startX;
+        if (horizontalDistance < 1f) {
+            horizontalDistance = Tile.getWidth();
+        }
+
+        // Intercept the zombie's current horizontal path.  This remains
+        // positive for the game's right-to-left zombie speeds.
+        float relativeSpeed = projectile.getVelocityX() - targetVelocityX;
+        float t = horizontalDistance / Math.max(1f, relativeSpeed);
+        t = Math.max(0.25f, t);
+        float dy = target.getY() - startY;
+        float vy = dy / t + Constants.GRAVITY * t / 2f;
         projectile.setVelocityY(vy);
         projectile.setGrounded(false);
+        projectile.setIgnoresObstacles(true);
         return projectile;
     }
 
@@ -323,7 +348,6 @@ public class Shoot implements Skill {
 
     @Override
     public void setAll(boolean all) {
-            this.all = all;
+        this.all = all;
     }
-
-}
+    }

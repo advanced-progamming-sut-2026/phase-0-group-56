@@ -9,7 +9,7 @@ import models.games.minigames.VaseBreakResult;
 import models.games.minigames.VaseBraker;
 import models.games.minigames.VaseSeedDrop;
 import models.utils.Result;
-import view.TravelLogView;
+import view.MiniGamesView;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,6 +21,11 @@ public class VaseBreakerController implements Controller {
 
     public VaseBreakerController() {
         this(buildCurrentLevel());
+    }
+
+    /** Starts the level selected in the minigame menu. */
+    public VaseBreakerController(int level) {
+        this(buildLevel(level));
     }
 
     public VaseBreakerController(MinigameLevel level) {
@@ -96,15 +101,19 @@ public class VaseBreakerController implements Controller {
             Data.saveUser();
         }
 
-        App.setScreen(new TravelLogView());
+        App.setScreen(new MiniGamesView());
     }
 
     private static MinigameLevel buildCurrentLevel() {
         User user = App.getCurrentuser();
+        return buildLevel(user == null ? 1 : user.getVaseBreaker());
+    }
+
+    private static MinigameLevel buildLevel(int requestedLevel) {
+        User user = App.getCurrentuser();
         MinigameLevel level = new MinigameLevel();
 
-        int id = user == null ? 1 : user.getVaseBreaker();
-        level.setId(Math.max(1, Math.min(3, id)));
+        level.setId(Math.max(1, Math.min(3, requestedLevel)));
 
         ArrayList<PlantType> plants = new ArrayList<>();
         if (user != null) {

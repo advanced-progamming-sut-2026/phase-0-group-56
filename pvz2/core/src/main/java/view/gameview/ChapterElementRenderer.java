@@ -6,6 +6,7 @@ import com.badlogic.gdx.graphics.g2d.Batch;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.utils.Disposable;
 import models.gameadventure.Chapters;
+import models.gameadventure.IcyWind;
 import models.gameadventure.Tornado;
 import models.entity.Zombie;
 import models.gamepanes.Tile;
@@ -54,6 +55,8 @@ public final class ChapterElementRenderer implements Disposable {
         "768/FULL/EFFECTS/TILESLIDER_ICEAGE_UP/TILESLIDER_ICEAGE_UP.PAM";
     private static final String SLIPPERY_DOWN =
         "768/FULL/EFFECTS/TILESLIDER_ICEAGE_DOWN/TILESLIDER_ICEAGE_DOWN.PAM";
+    private static final String FROSTBITE_CHILL_WIND =
+        "768/FULL/EFFECTS/FROSTBITE_CHILL_WIND/FROSTBITE_CHILL_WIND.PAM";
 
     // Big Wave Beach
     private static final String WATER_SQUARE =
@@ -120,6 +123,7 @@ public final class ChapterElementRenderer implements Disposable {
             case FrozenCaves -> {
                 request(SLIPPERY_UP);
                 request(SLIPPERY_DOWN);
+                request(FROSTBITE_CHILL_WIND);
             }
             case BigWaveBeach -> {
                 request(WATER_SQUARE);
@@ -179,7 +183,9 @@ public final class ChapterElementRenderer implements Disposable {
                 batch, game, lawnX, lawnY, lawnWidth, lawnHeight, cellWidth, cellHeight
             );
             case FrozenCaves -> {
-                // Slider tiles belong below plants, so this pass is intentionally empty.
+                renderFrozenCavesForeground(
+                    batch, game, lawnX, lawnY, cellWidth, cellHeight
+                );
             }
             case BigWaveBeach -> renderBigWaveBeachForeground(
                 batch, game, lawnX, lawnY, cellWidth, cellHeight
@@ -282,9 +288,20 @@ public final class ChapterElementRenderer implements Disposable {
                 continue;
             }
 
-            float tileWidth = Math.max(1f, Tile.getWidth());
+            // Zombie/Tornado coordinates use the same tile-width model as the
+            // rest of the game.  The old 100+column*50 conversion belonged to
+            // the pre-scaling renderer and placed the storm outside the lawn.
+            float logicalBoardWidth = COLUMN_COUNT * Math.max(1f, Tile.getWidth());
             float modelCenterX = zombie.getX() + zombie.getWidth() * 0.5f;
-            float centerX = lawnX + (modelCenterX / tileWidth) * cellWidth;
+            float normalizedX = modelCenterX / logicalBoardWidth;
+
+            // Do not pin an off-screen tornado to the lawn edge. It becomes visible
+            // naturally once the carried zombie reaches the playable area.
+            if (normalizedX < -0.25f || normalizedX > 1.25f) {
+                continue;
+            }
+
+            float centerX = lawnX + normalizedX * cellWidth * COLUMN_COUNT;
             float centerY = lawnY + (row + 0.5f) * cellHeight;
 
             drawPamFit(
@@ -331,6 +348,34 @@ public final class ChapterElementRenderer implements Disposable {
                 }
             }
         }
+    }
+
+    private void renderFrozenCavesForeground(
+        Batch batch,
+        BaseGame game,
+        float lawnX,
+        float lawnY,
+        float cellWidth,
+        float cellHeight
+    ) {
+        if (!(game.getEvent() instanceof IcyWind wind) || !wind.isBlowing()) {
+            return;
+        }
+
+        // The wind is a chapter-wide overlay, not a tile effect.  Keeping it in
+        // the foreground pass makes it visible over plants and zombies while
+        // retaining the map and icy slider tiles underneath it.
+        drawPamFit(
+            batch,
+            FROSTBITE_CHILL_WIND,
+            animationTime,
+            lawnX + cellWidth * COLUMN_COUNT * 0.5f,
+            lawnY + cellHeight * ROW_COUNT * 0.5f,
+            cellWidth * COLUMN_COUNT * 1.18f,
+            cellHeight * ROW_COUNT * 1.12f,
+            false,
+            true
+        );
     }
 
     private void renderBigWaveBeachBackground(

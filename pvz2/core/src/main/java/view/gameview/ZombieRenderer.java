@@ -32,6 +32,11 @@ public final class ZombieRenderer implements Disposable {
     private static final String TAG = "ZombieRenderer";
     private static final int COLUMN_COUNT = 9;
     private static final int ROW_COUNT = 5;
+    // Zombie PAMs include considerably more transparent canvas than plant
+    // PAMs.  Filling only the old 1.05 x 1.50 cell target made ordinary
+    // zombies look undersized beside plants and tiles, so give the visible
+    // frame a little more room while keeping special sizes relative.
+    private static final float ZOMBIE_FILL = 1.22f;
 
     private static final String DEFAULT_PAM =
         "768/INITIAL/ZOMBIE/ZOMBIE_EGYPT_BASIC/ZOMBIE_EGYPT_BASIC.PAM";
@@ -341,12 +346,12 @@ public final class ZombieRenderer implements Disposable {
         VisualSpec spec
     ) {
         if (bounds == null || bounds.width <= 0f || bounds.height <= 0f) {
-            return Math.min(cellWidth, rowHeight) / 390f * 1.45f;
+            return Math.min(cellWidth, rowHeight) / 390f * 1.45f * ZOMBIE_FILL;
         }
 
         float byWidth = cellWidth * spec.widthInCells / bounds.width;
         float byHeight = rowHeight * spec.heightInRows / bounds.height;
-        return Math.min(byWidth, byHeight);
+        return Math.min(byWidth, byHeight) * ZOMBIE_FILL;
     }
 
     private static Map.Entry<String, VisualSpec> entry(

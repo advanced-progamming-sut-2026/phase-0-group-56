@@ -36,6 +36,8 @@ public final class ProjectileRenderer implements Disposable {
 
     private static final String PEA =
         "768/INITIAL/EFFECTS/T_PEA_PROJECTILE/T_PEA_PROJECTILE.PAM";
+    private static final String SNOW_PEA =
+        "768/INITIAL/EFFECTS/T_SNOW_PEA/T_SNOW_PEA.PAM";
     private static final String PEA_HIT =
         "768/INITIAL/EFFECTS/SPLAT_PEA/SPLAT_PEA.PAM";
     private static final String SNOW_PEA_HIT =
@@ -346,7 +348,7 @@ public final class ProjectileRenderer implements Disposable {
                 return new VisualSpec(GOO, null, 1.00f);
             }
             if (source == PlantType.SNOW_PEA) {
-                return new VisualSpec(PEA, SNOW_PEA_HIT, 0.95f);
+                return new VisualSpec(SNOW_PEA, SNOW_PEA_HIT, 0.95f);
             }
             return new VisualSpec(PEA, PEA_HIT, 0.95f);
         }
@@ -358,7 +360,7 @@ public final class ProjectileRenderer implements Disposable {
             case PLASMA -> new VisualSpec(CITRON_PF, CITRON_PF_HIT, 1.55f);
             case STAR -> new VisualSpec(STAR, STAR_HIT, 0.95f);
             case POISON -> new VisualSpec(GOO, null, 1.00f);
-            case ICE -> new VisualSpec(PEA, SNOW_PEA_HIT, 0.95f);
+            case ICE -> new VisualSpec(SNOW_PEA, SNOW_PEA_HIT, 0.95f);
 
             case ONION_1 -> new VisualSpec(BOWLING_1, null, 1.15f);
             case ONION_2 -> new VisualSpec(BOWLING_2, null, 1.15f);

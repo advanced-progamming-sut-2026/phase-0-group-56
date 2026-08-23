@@ -35,7 +35,7 @@ import models.games.minigames.VaseBreakResult;
 import models.games.minigames.VaseSeedDrop;
 import pvz.libpvz.textures.TextureBank;
 import pvz.skin.PvzSkin;
-import view.TravelLogView;
+import view.MiniGamesView;
 import view.View;
 
 
@@ -99,6 +99,10 @@ public final class VaseBreakerView extends View {
 
     public VaseBreakerView() {
         this(new VaseBreakerController());
+    }
+
+    public VaseBreakerView(int level) {
+        this(new VaseBreakerController(level));
     }
 
     public VaseBreakerView(VaseBreakerController controller) {
@@ -421,7 +425,7 @@ public final class VaseBreakerView extends View {
                     if (mode != InteractionMode.NORMAL) {
                         setNormalMode(true);
                     } else {
-                        App.setScreen(new TravelLogView());
+                        App.setScreen(new MiniGamesView());
                     }
                     return true;
                 }
@@ -589,7 +593,7 @@ public final class VaseBreakerView extends View {
         back.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
-                App.setScreen(new TravelLogView());
+                App.setScreen(new MiniGamesView());
             }
         });
 

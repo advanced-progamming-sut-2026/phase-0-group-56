@@ -16,17 +16,17 @@
   },
   {
     "id": 201,
-    "plants": ["BOWLING_WALLNUT"],
+    "plants": ["WALL_NUT"],
     "zombiesNames": ["RegularZombie", "RegularZombie", "ConeheadZombie", "ConeheadZombie"]
   },
   {
     "id": 202,
-    "plants": ["BOWLING_WALLNUT", "EXPLODE_O_NUT"],
+    "plants": ["WALL_NUT", "EXPLODE_O_NUT"],
     "zombiesNames": ["ConeheadZombie", "BucketheadZombie", "NewspaperZombie", "AllStarZombie"]
   },
   {
     "id": 203,
-    "plants": ["BOWLING_WALLNUT", "EXPLODE_O_NUT", "GIANT_WALLNUT"],
+    "plants": ["WALL_NUT", "EXPLODE_O_NUT", "TALL_NUT"],
     "zombiesNames": ["BucketheadZombie", "KnightZombie", "Gargantuar", "Gargantuar"]
   },
   {
