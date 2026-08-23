@@ -17,8 +17,8 @@ public class Projectile implements Cloneable {
     private PlantType sourcePlantType;
     private float velocityX;
     private float velocityY;
-    private float width = 30;
-    private float height = 30;
+    private float width = 50;
+    private float height = 50;
     private float destinationX;
     private float destinationY;
     private float damage;
@@ -27,10 +27,11 @@ public class Projectile implements Cloneable {
     private float y;
     private float pierce = 1;
     private boolean grounded = true;
+    private boolean ignoresObstacles;
     private boolean active;
     private float poisonDamage = Constants.POISON_BASE_DAMAGE;
     private final ArrayList<ProjectileType> bowling = new ArrayList<>(Arrays.asList(ProjectileType.ONION_1,
-            ProjectileType.ONION_2 , ProjectileType.ONION_3 , ProjectileType.Explosive_Onion));
+        ProjectileType.ONION_2 , ProjectileType.ONION_3 , ProjectileType.Explosive_Onion));
 
 
     /// ------------BOOLEANS------------
@@ -39,10 +40,10 @@ public class Projectile implements Cloneable {
     private boolean proved = false;
     /// for homing plantsInField of course!
     private Zombie toLockIn;
-    public Projectile setTags(ArrayList<PlantTags> tags) {
+    public void setTags(ArrayList<PlantTags> tags) {
         this.tags.clear();
         if (tags == null) {
-            return this;
+            return;
         }
 
         if (tags.contains(PlantTags.Fire)) {
@@ -60,7 +61,6 @@ public class Projectile implements Cloneable {
         if (tags.contains(PlantTags.AoE)) {
             this.tags.add(Tag.AoE);
         }
-        return this;
     }
 
 
@@ -73,7 +73,7 @@ public class Projectile implements Cloneable {
     }
 
     public Projectile(float x, float y , float velocityX , ProjectileType type , float damage
-    , int line) {
+        , int line) {
         this.x = x;
         this.y = y;
         this.velocityX = velocityX;
@@ -106,9 +106,18 @@ public class Projectile implements Cloneable {
             return;
         }
 
+        // Keep the previous position so a fast projectile cannot tunnel through
+        // a zombie between two simulation ticks.  This is especially noticeable
+        // when a zombie reaches a plant and the projectile starts very close to
+        // its hit box.
+        float previousX = x;
+        float previousY = y;
         updateLocation(delta, game);
 
-        if (!tags.contains(Tag.MAGICAL) && toLockIn == null) {
+        // Airborne lobber shots travel over tiles/plants; their obstacle-ignore
+        // flag remains set after landing so the impact is not consumed by the
+        // landing tile before collision resolution.
+        if (!ignoresObstacles && !tags.contains(Tag.MAGICAL) && toLockIn == null && grounded) {
             block(game);
         }
 
@@ -116,58 +125,81 @@ public class Projectile implements Cloneable {
             bowling(game.getField());
         }
 
-        checkHit(game);
+        checkHit(game, previousX, previousY);
     }
 
-    private void checkHit(BaseGame game){
+    private void checkHit(BaseGame game, float previousX, float previousY){
         if (toLockIn != null) {
 
-            if (overlaps(toLockIn)) {
+            if (!toLockIn.isDead()
+                && (overlaps(toLockIn)
+                || sweptOverlaps(toLockIn, previousX, previousY))) {
                 hitZombie(toLockIn);
             }
             return;
         }
 
         Zombie target = null;
+        float targetDistance = Float.MAX_VALUE;
         for (Zombie z : game.getZombies()) {
-            if(z.line != this.line){
+            if (z == null || z.isDead() || z.getHp() <= 0 || z.getLine() != this.line) {
                 continue;
             }
-            float dx = Math.abs(x - z.getX());
-            float d = 0;
-            if(target != null){
-              d = Math.abs(x - target.x);
-           }
-            if (target == null ||
-           dx < d ) {
-                target = z;
+
+            // Only select a zombie after proving that this projectile crossed
+            // its hit box.  The previous implementation selected the globally
+            // closest zombie first, even when it was behind the projectile;
+            // that caused the real target in front of it to be skipped.
+            if (overlaps(z) || sweptOverlaps(z, previousX, previousY)) {
+                float distance = Math.abs((x + width * 0.5f)
+                    - (z.getX() + z.getWidth() * 0.5f));
+                if (target == null || distance < targetDistance) {
+                    target = z;
+                    targetDistance = distance;
+                }
             }
         }
-       if(target != null &&
-       overlaps(target)){
-           hitZombie(target);
-           if(tags.contains(Tag.AoE)){
-               damageOnArea(1 , game);
-           }
-       }
 
+        if(target != null){
+            hitZombie(target);
+            if(tags.contains(Tag.AoE)){
+                damageOnArea(1 , game);
+            }
+        }
+
+    }
+
+    private boolean sweptOverlaps(Zombie zombie, float previousX, float previousY) {
+        if (zombie == null) {
+            return false;
+        }
+
+        float minX = Math.min(previousX, x);
+        float maxX = Math.max(previousX + width, x + width);
+        float minY = Math.min(previousY, y);
+        float maxY = Math.max(previousY + height, y + height);
+
+        return minX < zombie.getX() + zombie.getWidth()
+            && maxX > zombie.getX()
+            && minY < zombie.getY() + zombie.getHeight()
+            && maxY > zombie.getY();
     }
 
     private void hitZombie(Zombie z){
         this.pierce -= 1;
         z.notifyBulletObservers(this);
 
-            z.takeDamage((int) this.damage);
-            if (this.getTags().contains(Tag.ICE)) {
-                z.addEffect(new Effect(EffectType.FROZEN, 3.0f));
-            }
-            if (this.getTags().contains(Tag.POISON)) {
-                z.addEffect(new Effect(EffectType.POISONED, 5.0f));
-            }
-            if (this.getTags().contains(Tag.FIRE)) {
-                z.setFrozen(false);
-                z.setDynamiteFrozen(false);
-            }
+        z.takeDamage((int) this.damage);
+        if (this.getTags().contains(Tag.ICE)) {
+            z.addEffect(new Effect(EffectType.FROZEN, 3.0f));
+        }
+        if (this.getTags().contains(Tag.POISON)) {
+            z.addEffect(new Effect(EffectType.POISONED, 5.0f));
+        }
+        if (this.getTags().contains(Tag.FIRE)) {
+            z.setFrozen(false);
+            z.setDynamiteFrozen(false);
+        }
 
     }
 
@@ -189,6 +221,12 @@ public class Projectile implements Cloneable {
     private void block(BaseGame game){
         Rectangle bounds = new Rectangle(x , y , width, height);
         for (int i = 0; i < 5; i++) {
+            // A straight shot belongs to one lane. Checking every row made a
+            // projectile at a row boundary consume its pierce on the adjacent
+            // lane's tile before it could reach the zombie in front of it.
+            if (i != line) {
+                continue;
+            }
             for (Tile tile : game.getField().getTiles().get(i)){
                 if(bounds.overlaps(tile.getBounds())) {
                     if(tile.getTileType() == TileType.FROZEN && this.tags.contains(Tag.FIRE)){
@@ -204,6 +242,9 @@ public class Projectile implements Cloneable {
         }
 
         for (Plant p : game.getPlantsInField()){
+            if (p == null || p.getLine() != line) {
+                continue;
+            }
             if(p.isFrozen()){
                 if(this.tags.contains(Tag.FIRE)){
                     p.setFreezeHp(0);
@@ -318,18 +359,16 @@ public class Projectile implements Cloneable {
         return x;
     }
 
-    public Projectile setX(float x) {
+    public void setX(float x) {
         this.x = x;
-        return this;
     }
 
     public float getY() {
         return y;
     }
 
-    public Projectile setY(float y) {
+    public void setY(float y) {
         this.y = y;
-        return this;
     }
 
     public boolean isProved() {
@@ -390,6 +429,7 @@ public class Projectile implements Cloneable {
         clone.aoEDamage = this.aoEDamage;
         clone.pierce = this.pierce;
         clone.grounded = this.grounded;
+        clone.ignoresObstacles = this.ignoresObstacles;
         clone.active = this.active;
         clone.poisonDamage = this.poisonDamage;
         clone.toLockIn = this.toLockIn;
@@ -402,9 +442,9 @@ public class Projectile implements Cloneable {
         }
 
         return (this.x < tile.getX() + Tile.getWidth()) &&
-                (this.x + this.width > tile.getX()) &&
-                (this.y < tile.getY() + Tile.getHeight()) &&
-                (this.y + this.height > tile.getY());
+            (this.x + this.width > tile.getX()) &&
+            (this.y < tile.getY() + Tile.getHeight()) &&
+            (this.y + this.height > tile.getY());
     }
 
     public boolean overlaps(Zombie zombie){
@@ -413,9 +453,9 @@ public class Projectile implements Cloneable {
         }
 
         return (this.getX() < zombie.getX() + zombie.getWidth()) &&
-                (this.getX() + width > zombie.getX()) &&
-                (this.getY() < zombie.getY() + zombie.getHeight()) &&
-                (this.getY() + height > zombie.getY());
+            (this.getX() + width > zombie.getX()) &&
+            (this.getY() < zombie.getY() + zombie.getHeight()) &&
+            (this.getY() + height > zombie.getY());
 
     }
 
@@ -440,5 +480,13 @@ public class Projectile implements Cloneable {
 
     public boolean isGrounded() {
         return grounded;
+    }
+
+    public void setIgnoresObstacles(boolean ignoresObstacles) {
+        this.ignoresObstacles = ignoresObstacles;
+    }
+
+    public boolean isIgnoresObstacles() {
+        return ignoresObstacles;
     }
 }

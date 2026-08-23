@@ -20,7 +20,12 @@ public class PlantSelection {
         this.plantsToChoose = plantsToChoose;
     }
     public PlantSelection(){
-        plantsToChoose.addAll(App.getCurrentuser().getUnlockedPlants());
+        // Headless model tests and a freshly booted app can create a game
+        // before a user has been attached.  Keep the selection empty instead
+        // of making every BaseGame constructor throw a NullPointerException.
+        if (App.getCurrentuser() != null) {
+            plantsToChoose.addAll(App.getCurrentuser().getUnlockedPlants());
+        }
     }
 
 

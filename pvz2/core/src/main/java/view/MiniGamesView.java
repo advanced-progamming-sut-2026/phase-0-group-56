@@ -12,9 +12,18 @@ import models.App;
 import models.User;
 import view.gameview.BeghouledView;
 import view.gameview.IZombieView;
+import view.gameview.VaseBreakerView;
+import view.gameview.WallnutBowlingView;
 
 /** Menu and level selector for the implemented graphical minigames. */
 public final class MiniGamesView extends View {
+    private enum MiniGameKind {
+        BEGHOULED,
+        I_ZOMBIE,
+        VASE_BREAKER,
+        WALLNUT_BOWLING
+    }
+
     @Override
     protected String getScreenTitle() {
         return "MINIGAMES";
@@ -29,15 +38,17 @@ public final class MiniGamesView extends View {
     protected void buildContent(Table table) {
         table.top().pad(12f);
         Label hint = new Label(
-            "Match plants in Beghouled, or command the zombie side in I, Zombie.",
+            "Match plants, command zombies, break vases, or roll Wall-Nuts.",
             skin,
             "medium_outline"
         );
         hint.setAlignment(Align.center);
         table.add(hint).colspan(2).expandX().center().padBottom(18f).row();
 
-        table.add(buildBeghouledCard()).width(520f).height(390f).pad(12f);
-        table.add(buildIZombieCard()).width(520f).height(390f).pad(12f);
+        table.add(buildBeghouledCard()).width(520f).height(350f).pad(12f);
+        table.add(buildIZombieCard()).width(520f).height(350f).pad(12f).row();
+        table.add(buildVaseBreakerCard()).width(520f).height(350f).pad(12f);
+        table.add(buildWallnutBowlingCard()).width(520f).height(350f).pad(12f);
     }
 
     private Table buildBeghouledCard() {
@@ -46,7 +57,7 @@ public final class MiniGamesView extends View {
             "Swap adjacent plants only when the move forms 3 or more. "
                 + "Matches earn sun for upgrades while endless zombies attack."
         );
-        addLevelButtons(card, false);
+        addLevelButtons(card, MiniGameKind.BEGHOULED);
         return card;
     }
 
@@ -56,7 +67,26 @@ public final class MiniGamesView extends View {
             "Spend zombie sun beyond the red line, protect your five producers, "
                 + "and eat all five brains."
         );
-        addLevelButtons(card, true);
+        addLevelButtons(card, MiniGameKind.I_ZOMBIE);
+        return card;
+    }
+
+    private Table buildVaseBreakerCard() {
+        Table card = createCard(
+            "VASE BREAKER",
+            "Break vases with the glove, discover plants or zombies, and use "
+                + "dropped seed packets to survive the lawn."
+        );
+        addLevelButtons(card, MiniGameKind.VASE_BREAKER);
+        return card;
+    }
+
+    private Table buildWallnutBowlingCard() {
+        Table card = createCard(
+            "WALL-NUT BOWLING",
+            "Roll Wall-Nuts and Explode-O-Nuts from the first three columns and stop every zombie wave."
+        );
+        addLevelButtons(card, MiniGameKind.WALLNUT_BOWLING);
         return card;
     }
 
@@ -80,9 +110,9 @@ public final class MiniGamesView extends View {
         return card;
     }
 
-    private void addLevelButtons(Table card, boolean iZombie) {
+    private void addLevelButtons(Table card, MiniGameKind kind) {
         User user = App.getCurrentuser();
-        int unlocked = iZombie && user != null ? user.getIZombie() : 3;
+        int unlocked = unlockedLevel(user, kind);
         Table levels = new Table();
 
         for (int level = 1; level <= 3; level++) {
@@ -98,14 +128,33 @@ public final class MiniGamesView extends View {
                 button.addListener(new ClickListener() {
                     @Override
                     public void clicked(InputEvent event, float x, float y) {
-                        App.setScreen(iZombie
-                            ? new IZombieView(selectedLevel)
-                            : new BeghouledView(selectedLevel));
+                        App.setScreen(createScreen(kind, selectedLevel));
                     }
                 });
             }
             levels.add(button).size(130f, 62f).pad(5f);
         }
         card.add(levels).center();
+    }
+
+    private static int unlockedLevel(User user, MiniGameKind kind) {
+        if (user == null) {
+            return 1;
+        }
+        return switch (kind) {
+            case BEGHOULED -> 3;
+            case I_ZOMBIE -> user.getIZombie();
+            case VASE_BREAKER -> user.getVaseBreaker();
+            case WALLNUT_BOWLING -> user.getWallNutBowling();
+        };
+    }
+
+    private static Screen createScreen(MiniGameKind kind, int level) {
+        return switch (kind) {
+            case BEGHOULED -> new BeghouledView(level);
+            case I_ZOMBIE -> new IZombieView(level);
+            case VASE_BREAKER -> new VaseBreakerView(level);
+            case WALLNUT_BOWLING -> new WallnutBowlingView(level);
+        };
     }
 }

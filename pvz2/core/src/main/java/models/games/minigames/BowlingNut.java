@@ -8,65 +8,78 @@ import models.games.BaseGame;
 
 import java.util.ArrayList;
 
+/** A rolling Wall-Nut projectile used by Wall-Nut Bowling. */
 public class BowlingNut extends Entity {
-    private float damage;
-    private boolean explosive;
+    private final float damage;
+    private final boolean explosive;
+
     public BowlingNut(float damage, boolean explosive) {
         this.damage = damage;
+        this.explosive = explosive;
+        width = Tile.getWidth() * 0.62f;
+        height = Tile.getHeight() * 0.62f;
     }
+
     public BowlingNut(float damage) {
-        this.damage = damage;
+        this(damage, false);
     }
 
     public void go(float delta, BaseGame game) {
-        this.x += velocityX * delta;
-        this.y += velocityY * delta;
-        if(block()) velocityY *= -1;
-        else if(hit(game.getZombies())){
-            if(explosive){
+        float safeDelta = Math.max(0f, delta);
+        x += velocityX * safeDelta;
+        y += velocityY * safeDelta;
+
+        if (block()) {
+            y = Math.max(0f, Math.min(y, 5f * Tile.getHeight() - height));
+            velocityY *= -1f;
+        } else if (hit(game.getZombies())) {
+            if (explosive) {
                 dispose(game);
                 return;
             }
-            velocityY *= -1;
+            velocityY *= -1f;
         }
-        if(this.x >= 9 * Tile.getWidth()) dispose(game);
+
+        tileIndex = Math.max(0, Math.min(8, (int) (x / Tile.getWidth())));
+        line = Math.max(0, Math.min(4, (int) (y / Tile.getHeight())));
+        if (x >= 9f * Tile.getWidth() || x < -Tile.getWidth()) {
+            dispose(game);
+        }
     }
 
     protected void dispose(BaseGame game) {
         WallnutBowling wallnutBowling = (WallnutBowling) game;
-        wallnutBowling.nuts.remove(this);
-        if(explosive){
-            for (Zombie zombie : game.getZombies()) {
-                int dx = Math.abs(this.tileIndex - zombie.getTileIndex());
-                int dy = Math.abs(this.line - zombie.getLine());
-                if(dx <= 1 && dy <= 1){
-                    zombie.setHp(zombie.getHp() - damage);
-                    zombie.takeDamage((int) damage);
-                    zombie.setHurt(true);
-                }
+        wallnutBowling.getNuts().remove(this);
+        if (!explosive) {
+            return;
+        }
+
+        for (Zombie zombie : game.getZombies()) {
+            int dx = Math.abs(tileIndex - zombie.getTileIndex());
+            int dy = Math.abs(line - zombie.getLine());
+            if (dx <= 1 && dy <= 1) {
+                zombie.takeDamage((int) damage);
+                zombie.setHurt(true);
             }
         }
-
     }
 
-    private boolean block(){
-        if(this.y <= 0){
-            return true;
-        }
-        else return this.y + this.height >= 5 * Tile.getHeight();
+    private boolean block() {
+        return y <= 0f || y + height >= 5f * Tile.getHeight();
     }
 
-    private boolean hit(ArrayList<Zombie> zombies){
-        for (Zombie z : zombies) {
-            if(Constants.overlap(this , z)){
-                z.takeDamage((int) this.damage);
-                z.setHurt(true);
-                z.setAlive(false);
+    private boolean hit(ArrayList<Zombie> zombies) {
+        for (Zombie zombie : zombies) {
+            if (Constants.overlap(this, zombie)) {
+                zombie.takeDamage((int) damage);
+                zombie.setHurt(true);
                 return true;
             }
         }
         return false;
     }
 
-
+    public boolean isExplosive() {
+        return explosive;
+    }
 }
