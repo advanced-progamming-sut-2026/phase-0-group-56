@@ -1,10 +1,10 @@
 package models.gamepanes;
 
-import models.entity.LawnMower;
 import models.gameadventure.Chapters;
 import models.entity.LawnMower;
 import models.entity.Plant;
 import models.entity.PlantTags;
+import models.entity.Zombie;
 import models.games.BaseGame;
 
 import java.util.ArrayList;
@@ -73,6 +73,8 @@ public class Field {
 
 
             private void initWater(){
+                WaveLimitColumn = 7;
+                waterCurrentSurface = WaveLimitColumn;
                 for (int i = 8; i > 6 ; i--) {
                     for (int j = 0; j < 5; j++) {
                         tiles.get(j).get(i).setWater(true);
@@ -92,6 +94,24 @@ public class Field {
                                 }
                             }
                         }
+                    }
+                }
+
+                // Slider tiles move a zombie once per tile contact. The cooldown
+                // prevents a zombie from bouncing between rows every frame.
+                for (Zombie zombie : game.getZombies()) {
+                    if (zombie == null || zombie.isDead() || !zombie.canSlide()) {
+                        continue;
+                    }
+                    int row = zombie.getLine();
+                    int col = Math.max(0, Math.min(8, zombie.getTileIndex()));
+                    Tile tile = tiles.get(row).get(col);
+                    if (tile.getTileType() == TileType.SLIPPERY_UP && row < 4) {
+                        zombie.setLine(row + 1);
+                        zombie.startSlideCooldown(0.45f);
+                    } else if (tile.getTileType() == TileType.SLIPPERY_DOWN && row > 0) {
+                        zombie.setLine(row - 1);
+                        zombie.startSlideCooldown(0.45f);
                     }
                 }
             }

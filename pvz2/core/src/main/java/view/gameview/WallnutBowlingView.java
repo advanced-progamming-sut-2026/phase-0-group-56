@@ -7,6 +7,7 @@ import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
+import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
@@ -16,6 +17,7 @@ import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.ScreenUtils;
 import controllers.menus.gamecontroller.WallnutController;
 import models.App;
+import models.Constants;
 import models.entity.Zombie;
 import models.gamepanes.Tile;
 import models.games.minigames.BowlingNut;
@@ -35,9 +37,8 @@ public final class WallnutBowlingView extends MinigameBoardView {
     private final WallnutController controller;
     private MinigamePamVisual wallnutVisual;
     private MinigamePamVisual explodeNutVisual;
-    private TextButton wallnutButton;
-    private TextButton explodeNutButton;
-    private TextButton bigNutButton;
+    private Table conveyorRow;
+    private String beltSignature = "";
     private Label statusLabel;
     private Label progressLabel;
     private Table resultPanel;
@@ -82,6 +83,7 @@ public final class WallnutBowlingView extends MinigameBoardView {
 
         ScreenUtils.clear(0.04f, 0.08f, 0.06f, 1f);
         renderMap();
+        renderBoundaryLine();
         renderNutFallbacks();
         renderWorld(safeDelta);
 
@@ -149,6 +151,20 @@ public final class WallnutBowlingView extends MinigameBoardView {
         Gdx.gl.glDisable(GL20.GL_BLEND);
     }
 
+    private void renderBoundaryLine() {
+        if (shapes == null || lawnBounds.width <= 0f || lawnBounds.height <= 0f) {
+            return;
+        }
+        worldViewport.apply();
+        worldCamera.update();
+        shapes.setProjectionMatrix(worldCamera.combined);
+        shapes.begin(ShapeRenderer.ShapeType.Filled);
+        shapes.setColor(new Color(0.95f, 0.18f, 0.12f, 0.95f));
+        float x = lawnBounds.x + Constants.WALLNUT_LIMIT_LINE * lawnBounds.width / 9f;
+        shapes.rect(x - 2f, lawnBounds.y, 4f, lawnBounds.height);
+        shapes.end();
+    }
+
     private float nutCenterX(BowlingNut nut) {
         return lawnBounds.x
             + (nut.getX() + nut.getWidth() * 0.5f)
@@ -182,12 +198,8 @@ public final class WallnutBowlingView extends MinigameBoardView {
         hud.add(progressLabel).width(210f).right().row();
 
         Table controls = new Table();
-        wallnutButton = button("WALL-NUT", "green", () -> selectNut("Wallnut"));
-        explodeNutButton = button("EXPLODE-O-NUT", "brown", () -> selectNut("Explod'O nut"));
-        bigNutButton = button("BIG NUT", "brown", () -> selectNut("Big Nut"));
-        controls.add(wallnutButton).size(170f, 58f).padRight(8f);
-        controls.add(explodeNutButton).size(190f, 58f).padRight(8f);
-        controls.add(bigNutButton).size(150f, 58f);
+        conveyorRow = new Table();
+        controls.add(conveyorRow).center();
         hud.add(controls).colspan(3).center().padTop(4f).row();
         hud.add(statusLabel).colspan(3).expandX().fillX().padTop(4f);
         stage.addActor(hud);
@@ -223,15 +235,7 @@ public final class WallnutBowlingView extends MinigameBoardView {
         progressLabel.setText("NUTS: " + game.getNuts().size()
             + "   ZOMBIES: " + game.getZombies().size());
         boolean playing = game.getState() == models.games.BaseGame.GameState.PLAYING;
-        wallnutButton.setDisabled(!controller.hasNutType("Wallnut") || !playing);
-        explodeNutButton.setDisabled(!controller.hasNutType("Explod'O nut") || !playing);
-        bigNutButton.setDisabled(!controller.hasNutType("Big Nut") || !playing);
-        wallnutButton.setColor("Wallnut".equals(selectedNut)
-            ? new Color(0.72f, 1f, 0.72f, 1f) : Color.WHITE);
-        explodeNutButton.setColor("Explod'O nut".equals(selectedNut)
-            ? new Color(1f, 0.75f, 0.60f, 1f) : Color.WHITE);
-        bigNutButton.setColor("Big Nut".equals(selectedNut)
-            ? new Color(1f, 0.88f, 0.52f, 1f) : Color.WHITE);
+        refreshConveyor(game, playing);
 
         boolean ended = game.getState() == models.games.BaseGame.GameState.END;
         resultPanel.setVisible(ended);
@@ -239,6 +243,38 @@ public final class WallnutBowlingView extends MinigameBoardView {
             boolean won = game.check_endGame().message() != null
                 && "Won".equals(game.check_endGame().message());
             resultLabel.setText(won ? "WALL-NUTS WIN!" : "ZOMBIES WIN");
+        }
+    }
+
+    private void refreshConveyor(WallnutBowling game, boolean playing) {
+        StringBuilder signature = new StringBuilder();
+        for (String type : game.getBelt()) {
+            signature.append(type).append('|');
+        }
+        signature.append("SELECTED=").append(selectedNut);
+        String nextSignature = signature.toString();
+        if (conveyorRow == null) {
+            return;
+        }
+        if (nextSignature.equals(beltSignature)) {
+            for (Actor actor : conveyorRow.getChildren()) {
+                if (actor instanceof TextButton button) {
+                    button.setDisabled(!playing);
+                }
+            }
+            return;
+        }
+        beltSignature = nextSignature;
+        conveyorRow.clearChildren();
+        for (String type : game.getBelt()) {
+            TextButton card = button(type.toUpperCase(Locale.ROOT),
+                "brown", () -> selectNut(type));
+            card.getLabel().setWrap(true);
+            card.getLabel().setAlignment(Align.center);
+            card.setDisabled(!playing);
+            card.setColor(type.equals(selectedNut)
+                ? new Color(0.72f, 1f, 0.72f, 1f) : Color.WHITE);
+            conveyorRow.add(card).size(166f, 58f).padRight(6f);
         }
     }
 
@@ -270,7 +306,7 @@ public final class WallnutBowlingView extends MinigameBoardView {
                 boolean placed = controller.plant(selectedNut, pointerColumn(), pointerRow());
                 statusLabel.setText(placed
                     ? pretty(selectedNut) + " launched."
-                    : "Place the nut in one of the first three columns.");
+                    : "Select a nut on the conveyor and place it before the red line.");
                 return true;
             }
         };

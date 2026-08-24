@@ -47,42 +47,18 @@ public class WallnutBowling extends NormalGame {
     }
 
     private void initialiseBelt(MinigameLevel level) {
-        // Minigame JSON uses BOWLING_WALLNUT and GIANT_WALLNUT, which are
-        // minigame names rather than regular PlantType values. Use the level
-        // id for progression and accept EXPLODE_O_NUT from hand-built levels.
-        int progress = level == null ? 1 : Math.max(1, Math.min(3, level.getId() % 100));
+        // Minigame JSON uses names that differ from regular PlantType values.
+        // Keep all three nut variants on one shared conveyor.
         availableNutTypes.add(BOWLING_NUT);
-        if (progress >= 2 || containsExplosive(level)) {
-            availableNutTypes.add(EXPLOSIVE_BOWLING_NUT);
-        }
-        if (progress >= 3 || containsBig(level)) {
-            availableNutTypes.add(BIG_NUT);
-        }
+        availableNutTypes.add(EXPLOSIVE_BOWLING_NUT);
+        availableNutTypes.add(BIG_NUT);
 
-        // Guarantee one card for every unlocked nut type. This keeps an
-        // explosive/big nut plantable immediately while the remaining slots
-        // still follow the weighted random distribution.
+        // Guarantee one card for every nut type; remaining slots are weighted.
         belt.addAll(availableNutTypes);
         while (belt.size() < CONVEYOR_CAPACITY) {
             belt.add(randomNutType());
         }
         Collections.shuffle(belt, random);
-    }
-
-    private boolean containsExplosive(MinigameLevel level) {
-        if (level == null || level.getPlants() == null) {
-            return false;
-        }
-        return level.getPlants().stream().anyMatch(type ->
-            type != null && type.name().equalsIgnoreCase("EXPLODE_O_NUT"));
-    }
-
-    private boolean containsBig(MinigameLevel level) {
-        if (level == null || level.getPlants() == null) {
-            return false;
-        }
-        return level.getPlants().stream().anyMatch(type ->
-            type != null && type.name().equalsIgnoreCase("GIANT_WALLNUT"));
     }
 
     private String randomNutType() {

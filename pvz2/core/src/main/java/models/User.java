@@ -11,6 +11,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 
 public class User implements Serializable, QuestObserver {
     private static final long serialVersionUID = 1L;
@@ -84,13 +85,7 @@ public class User implements Serializable, QuestObserver {
         this.zombieRegistry = new ZombieRegistry();
         this.levels = new HashMap<>();
 
-        this.unlockedPlants = new ArrayList<>(Arrays.asList(
-            PlantType.PEASHOOTER,
-            PlantType.SNOW_PEA,
-            PlantType.REPEATER,
-            PlantType.CHOMPER,
-            PlantType.WALL_NUT
-        ));
+        this.unlockedPlants = new ArrayList<>(List.of(PlantType.values()));
 
         for (PlantType plant : this.unlockedPlants) {
             this.levels.put(plant, 1);

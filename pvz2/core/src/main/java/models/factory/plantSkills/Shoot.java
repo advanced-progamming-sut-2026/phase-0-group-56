@@ -248,13 +248,16 @@ public class Shoot implements Skill {
     private void lobber(Plant shooter , BaseGame game){
         Zombie target = null;
         for (Zombie z : game.getZombies()) {
-            if(z.getLine() == shooter.getLine()){
-                if(target == null){
-                    target = z;
-                }
-                else if(target.getTileIndex() > z.getTileIndex()){
-                    target = z;
-                }
+            if (z == null || z.isDead() || z.getLine() != shooter.getLine()) {
+                continue;
+            }
+            // Zombies walk right-to-left. A lobber must choose the closest
+            // zombie still in front of the plant, not one already behind it.
+            if (z.getX() + z.getWidth() < shooter.getX()) {
+                continue;
+            }
+            if (target == null || z.getX() < target.getX()) {
+                target = z;
             }
         }
 
@@ -292,11 +295,12 @@ public class Shoot implements Skill {
         float relativeSpeed = projectile.getVelocityX() - targetVelocityX;
         float t = horizontalDistance / Math.max(1f, relativeSpeed);
         t = Math.max(0.25f, t);
-        float dy = target.getY() - startY;
+        float dy = target.getY() + target.getHeight() * 0.20f - startY;
         float vy = dy / t + Constants.GRAVITY * t / 2f;
         projectile.setVelocityY(vy);
         projectile.setGrounded(false);
         projectile.setIgnoresObstacles(true);
+        projectile.setImpactTarget(target);
         return projectile;
     }
 

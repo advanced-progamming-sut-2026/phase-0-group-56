@@ -85,9 +85,8 @@ public class WallnutController implements Controller{
         fallback.setId(200 + progress);
         ArrayList<PlantType> plants = new ArrayList<>();
         plants.add(PlantType.BOWLING_BULB);
-        if (progress >= 2) {
-            plants.add(PlantType.EXPLODE_O_NUT);
-        }
+        plants.add(PlantType.EXPLODE_O_NUT);
+        plants.add(PlantType.TALL_NUT);
         fallback.setPlants(plants);
         fallback.setZombiesNames(new ArrayList<>(List.of(
             "normal", "cone", "bucket", "imp"

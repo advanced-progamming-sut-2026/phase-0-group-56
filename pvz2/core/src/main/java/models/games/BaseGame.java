@@ -502,6 +502,23 @@ public class BaseGame implements Game {
         sunCount += amount;
     }
 
+    /** Breaks ice encasing zombies near a fire plant. */
+    public void meltFrozenZombiesNear(Plant source, float radius) {
+        if (source == null) {
+            return;
+        }
+        float maxDistance = Math.max(0f, radius) * Tile.getWidth();
+        for (Zombie zombie : zombies) {
+            if (zombie == null || !zombie.isEncasedInIce()
+                || zombie.getLine() != source.getLine()) {
+                continue;
+            }
+            if (Math.abs(zombie.getX() - source.getX()) <= maxDistance) {
+                zombie.breakIce();
+            }
+        }
+    }
+
     public boolean isDay() {
         return day;
     }

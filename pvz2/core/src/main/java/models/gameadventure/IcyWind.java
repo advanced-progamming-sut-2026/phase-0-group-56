@@ -1,6 +1,7 @@
 package models.gameadventure;
 
 import models.entity.Plant;
+import models.entity.Zombie;
 import models.games.BaseGame;
 
 import java.util.Random;
@@ -11,6 +12,7 @@ public class IcyWind implements ChapterSpecialEvent{
     private float remaining = BLOW_DURATION_SECONDS;
     private boolean freezeApplied;
     private int affectedRow = -1;
+    private boolean zombiesFrozen;
 
     public IcyWind(BaseGame game) {
 
@@ -27,6 +29,20 @@ public class IcyWind implements ChapterSpecialEvent{
                 }
             }
             freezeApplied = true;
+        }
+
+        if (!zombiesFrozen) {
+            Random random = new Random();
+            int count = Math.min(game.getZombies().size(), 2 + random.nextInt(3));
+            java.util.Collections.shuffle(game.getZombies(), random);
+            for (int i = 0; i < count; i++) {
+                Zombie zombie = game.getZombies().get(i);
+                if (zombie != null && !zombie.isDead()) {
+                    zombie.setEncasedInIce(true);
+                    zombie.setFrozen(true);
+                }
+            }
+            zombiesFrozen = true;
         }
 
         remaining -= Math.max(0f, delta);

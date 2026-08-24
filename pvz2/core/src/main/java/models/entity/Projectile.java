@@ -40,6 +40,8 @@ public class Projectile implements Cloneable {
     private boolean proved = false;
     /// for homing plantsInField of course!
     private Zombie toLockIn;
+    /** Optional lobber target: collision is resolved only after the arc lands. */
+    private Zombie impactTarget;
     public void setTags(ArrayList<PlantTags> tags) {
         this.tags.clear();
         if (tags == null) {
@@ -114,6 +116,22 @@ public class Projectile implements Cloneable {
         float previousY = y;
         updateLocation(delta, game);
 
+        if (impactTarget != null) {
+            if (impactTarget.isDead()) {
+                dispose(game);
+                return;
+            }
+            if (!grounded) {
+                return;
+            }
+            // Lobbers land on the target's head, so a moving zombie cannot make
+            // the projectile pass through its old predicted position.
+            x = impactTarget.getX() + impactTarget.getWidth() * 0.5f - width * 0.5f;
+            y = impactTarget.getY() + impactTarget.getHeight() * 0.20f;
+            hitZombie(impactTarget);
+            return;
+        }
+
         // Airborne lobber shots travel over tiles/plants; their obstacle-ignore
         // flag remains set after landing so the impact is not consumed by the
         // landing tile before collision resolution.
@@ -187,6 +205,9 @@ public class Projectile implements Cloneable {
 
     private void hitZombie(Zombie z){
         this.pierce -= 1;
+        if (z.isEncasedInIce()) {
+            z.breakIce();
+        }
         z.notifyBulletObservers(this);
 
         z.takeDamage((int) this.damage);
@@ -387,6 +408,14 @@ public class Projectile implements Cloneable {
         this.toLockIn = toLockIn;
     }
 
+    public Zombie getImpactTarget() {
+        return impactTarget;
+    }
+
+    public void setImpactTarget(Zombie impactTarget) {
+        this.impactTarget = impactTarget;
+    }
+
     public ProjectileType getType() {
         return type;
     }
@@ -433,6 +462,7 @@ public class Projectile implements Cloneable {
         clone.active = this.active;
         clone.poisonDamage = this.poisonDamage;
         clone.toLockIn = this.toLockIn;
+        clone.impactTarget = this.impactTarget;
 
         return clone;
     }

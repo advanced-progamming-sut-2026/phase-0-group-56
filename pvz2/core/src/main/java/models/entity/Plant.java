@@ -144,6 +144,9 @@ public class Plant extends Entity {
 
     public void update(float delta , BaseGame game){
         stateTime += delta;
+        if (tags != null && tags.contains(PlantTags.Fire)) {
+            game.meltFrozenZombiesNear(this, 1.5f);
+        }
         if(tags.contains(PlantTags.Day) && !game.isDay()){
             System.out.println("This plant is for the day.");
             return;

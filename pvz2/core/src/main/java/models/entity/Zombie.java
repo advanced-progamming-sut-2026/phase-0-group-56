@@ -49,6 +49,8 @@ public class Zombie extends Entity{
     // ====== STATE FLAGS ======
     private boolean isTorchOn = false;
     private boolean isDynamiteFrozen = false;
+    private boolean encasedInIce;
+    private float slipperyCooldown;
 
     // ====== ANIMATION HANDLING FIELDS ======
     private ZombieState currentState = ZombieState.IDLE;
@@ -139,6 +141,11 @@ public class Zombie extends Entity{
         this.currentTile = game.getField().getTileByCoordinats(this.tileIndex , this.line);
         this.inWater = currentTile.isWater();
 
+        slipperyCooldown = Math.max(0f, slipperyCooldown - Math.max(0f, deltaTime));
+        if (encasedInIce) {
+            return;
+        }
+
         this.velocityX = this.speed;
         updateEffects(deltaTime);
 
@@ -202,6 +209,28 @@ public class Zombie extends Entity{
         removeEffect(EffectType.FROZEN);
     }
 
+    public boolean isEncasedInIce() {
+        return encasedInIce;
+    }
+
+    public void setEncasedInIce(boolean encasedInIce) {
+        this.encasedInIce = encasedInIce;
+    }
+
+    public void breakIce() {
+        encasedInIce = false;
+        frozen = false;
+        removeEffect(EffectType.FROZEN);
+    }
+
+    public boolean canSlide() {
+        return slipperyCooldown <= 0f;
+    }
+
+    public void startSlideCooldown(float seconds) {
+        slipperyCooldown = Math.max(0f, seconds);
+    }
+
     public float getActualSpeed() {
         if (hasEffect(EffectType.FROZEN)) {
             return speed * 0.3f;
@@ -240,7 +269,7 @@ public class Zombie extends Entity{
             return;
 
         x += getActualSpeed() * movingDirection() * deltaTime /15;
-        int newTile = (int) (x/ 100);
+        int newTile = (int) (x / Tile.getWidth());
         if (newTile < 0) newTile = 0;
         if (newTile > 8) newTile = 8;
 

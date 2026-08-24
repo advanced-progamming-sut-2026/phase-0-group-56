@@ -438,6 +438,22 @@ public class GameController implements Controller, Menu {
         return "==== >> Suns added by Cheat code : " + amount + "\n now " + showSunAmount();
     }
 
+    /** Applies the in-game debug resource controls without exposing the model to the view. */
+    public String debugAddResources(int suns, int plantFood) {
+        if (suns <= 0 && plantFood <= 0) {
+            return "Debug values must be positive.";
+        }
+        questSession.markCheatUsed();
+        if (suns > 0) {
+            game.addSun(suns);
+        }
+        if (plantFood > 0) {
+            game.setPlantFoodsCount(game.getPlantFoodsCount() + plantFood);
+        }
+        return "DEBUG: +" + Math.max(0, suns) + " sun, +"
+            + Math.max(0, plantFood) + " plant food";
+    }
+
     public String cheatZombieKiller() {
         questSession.markCheatUsed();
         for (Zombie zombie : game.getZombies()) {

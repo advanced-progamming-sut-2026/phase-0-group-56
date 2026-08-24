@@ -56,6 +56,8 @@ public final class ToolsStack extends Table {
     private final ImageButton plantFoodButton;
     private final ImageButton pauseButton;
     private final ImageButton speedButton;
+    private final TextButton debugButton;
+    private final Table debugControls;
 
     private final Map<PlantType, TextButton> seedButtons = new EnumMap<>(PlantType.class);
 
@@ -100,6 +102,9 @@ public final class ToolsStack extends Table {
         plantFoodButton = new ImageButton(skin, "plantfood");
         pauseButton = new ImageButton(skin, "ingame_pause");
         speedButton = new ImageButton(skin, "ingame_2x");
+        debugButton = new TextButton("DEBUG", skin, "brown");
+        debugControls = new Table();
+        debugControls.setVisible(false);
 
         waveProgress = new ProgressBar(
             0f,
@@ -112,6 +117,7 @@ public final class ToolsStack extends Table {
         waveProgress.setAnimateDuration(0.15f);
 
         hookToolButtons();
+        hookDebugControls();
 
         Table plantFoodHolder = new Table();
         plantFoodHolder.add(plantFoodButton).size(55f);
@@ -127,6 +133,7 @@ public final class ToolsStack extends Table {
         hud.add(plantFoodHolder).padLeft(6f);
         hud.add(pauseButton).size(58f).padLeft(6f);
         hud.add(speedHolder).padLeft(6f);
+        hud.add(debugButton).width(88f).height(52f).padLeft(6f);
 
         add(hud).expandX().fillX().top().row();
 
@@ -139,6 +146,7 @@ public final class ToolsStack extends Table {
             .expandX()
             .fillX()
             .padTop(4f);
+        add(debugControls).right().padTop(4f).row();
 
         refresh();
     }
@@ -198,6 +206,32 @@ public final class ToolsStack extends Table {
         });
     }
 
+    private void hookDebugControls() {
+        TextButton addSunButton = new TextButton("+50 SUN", skin, "green_small");
+        TextButton addFoodButton = new TextButton("+1 FOOD", skin, "green_small");
+        addSunButton.addListener(new ClickListener() {
+            @Override public void clicked(InputEvent event, float x, float y) {
+                setStatus(controller.debugAddResources(50, 0));
+                refresh();
+            }
+        });
+        addFoodButton.addListener(new ClickListener() {
+            @Override public void clicked(InputEvent event, float x, float y) {
+                setStatus(controller.debugAddResources(0, 1));
+                refresh();
+            }
+        });
+        debugControls.add(addSunButton).size(92f, 42f).padRight(4f);
+        debugControls.add(addFoodButton).size(92f, 42f);
+        debugButton.addListener(new ClickListener() {
+            @Override public void clicked(InputEvent event, float x, float y) {
+                boolean visible = !debugControls.isVisible();
+                debugControls.setVisible(visible);
+                setStatus(visible ? "Debug controls opened" : "Debug controls closed");
+            }
+        });
+    }
+
     public void refresh() {
         BaseGame game = controller.getGame();
 
@@ -207,6 +241,10 @@ public final class ToolsStack extends Table {
         boolean playing = game.getState() == BaseGame.GameState.PLAYING;
         shovelButton.setDisabled(!playing);
         plantFoodButton.setDisabled(!playing || game.getPlantFoodsCount() <= 0);
+        debugButton.setDisabled(!playing);
+        if (!playing) {
+            debugControls.setVisible(false);
+        }
 
         refreshSeedRow();
         refreshSeedButtons();

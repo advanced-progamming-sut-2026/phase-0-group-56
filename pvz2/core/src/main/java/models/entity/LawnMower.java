@@ -54,13 +54,18 @@ public class LawnMower extends Entity {
         String message = null;
 
         if (state == State.IDLE) {
+            boolean activated = false;
             for (Zombie zombie : game.getZombies()) {
                 if (canHit(zombie) && Constants.overlap(zombie, this)) {
-                    activate();
+                    if (!activated) {
+                        activate();
+                        activated = true;
+                    }
                     kill(zombie);
-                    message = "Lawn Mawner turned on at line " + line;
-                    break;
                 }
+            }
+            if (activated) {
+                message = "Lawn Mawner turned on at line " + line;
             }
         }
 

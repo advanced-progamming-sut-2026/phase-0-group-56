@@ -57,6 +57,8 @@ public final class ChapterElementRenderer implements Disposable {
         "768/FULL/EFFECTS/TILESLIDER_ICEAGE_DOWN/TILESLIDER_ICEAGE_DOWN.PAM";
     private static final String FROSTBITE_CHILL_WIND =
         "768/FULL/EFFECTS/FROSTBITE_CHILL_WIND/FROSTBITE_CHILL_WIND.PAM";
+    private static final String ICE_BLOCK_ZOMBIE =
+        "768/INITIAL/EFFECTS/ICEBLOOM_ICE_BLOCK_ZOMBIE/ICEBLOOM_ICE_BLOCK_ZOMBIE.PAM";
 
     // Big Wave Beach
     private static final String WATER_SQUARE =
@@ -65,6 +67,10 @@ public final class ChapterElementRenderer implements Disposable {
         "768/FULL/EFFECTS/WATER_FOAM/WATER_FOAM.PAM";
     private static final String WATER_UNDERLAYER =
         "768/FULL/BACKGROUNDS/WATER_UNDERLAYER/WATER_UNDERLAYER.PAM";
+    private static final String WATER_UPPERLAYER =
+        "768/FULL/BACKGROUNDS/WAVE_UPPERLAYER/WAVE_UPPERLAYER.PAM";
+    private static final String WATER_TIDE_LINE =
+        "768/FULL/BACKGROUNDS/WATER_TIDE_LINE/WATER_TIDE_LINE.PAM";
 
     // Dark Age
     private static final String DARK_GRAVE =
@@ -124,11 +130,14 @@ public final class ChapterElementRenderer implements Disposable {
                 request(SLIPPERY_UP);
                 request(SLIPPERY_DOWN);
                 request(FROSTBITE_CHILL_WIND);
+                request(ICE_BLOCK_ZOMBIE);
             }
             case BigWaveBeach -> {
                 request(WATER_SQUARE);
                 request(WATER_FOAM);
                 request(WATER_UNDERLAYER);
+                request(WATER_UPPERLAYER);
+                request(WATER_TIDE_LINE);
             }
             case DarkAge -> {
                 request(DARK_GRAVE);
@@ -358,6 +367,7 @@ public final class ChapterElementRenderer implements Disposable {
         float cellWidth,
         float cellHeight
     ) {
+        renderFrozenZombieBlocks(batch, game, lawnX, lawnY, cellWidth, cellHeight);
         if (!(game.getEvent() instanceof IcyWind wind) || !wind.isBlowing()) {
             return;
         }
@@ -376,6 +386,36 @@ public final class ChapterElementRenderer implements Disposable {
             false,
             true
         );
+    }
+
+    private void renderFrozenZombieBlocks(
+        Batch batch,
+        BaseGame game,
+        float lawnX,
+        float lawnY,
+        float cellWidth,
+        float cellHeight
+    ) {
+        float logicalBoardWidth = COLUMN_COUNT * Math.max(1f, Tile.getWidth());
+        for (Zombie zombie : game.getZombies()) {
+            if (zombie == null || zombie.isDead() || !zombie.isEncasedInIce()) {
+                continue;
+            }
+            float centerX = lawnX + (zombie.getX() + zombie.getWidth() * 0.5f)
+                / logicalBoardWidth * cellWidth * COLUMN_COUNT;
+            float centerY = lawnY + (zombie.getLine() + 0.5f) * cellHeight;
+            drawPamFit(
+                batch,
+                ICE_BLOCK_ZOMBIE,
+                animationTime,
+                centerX,
+                centerY,
+                cellWidth * 1.12f,
+                cellHeight * 1.20f,
+                true,
+                false
+            );
+        }
     }
 
     private void renderBigWaveBeachBackground(
@@ -410,6 +450,18 @@ public final class ChapterElementRenderer implements Disposable {
                 centerY,
                 runWidth * 1.02f,
                 cellHeight * 1.08f,
+                false,
+                true
+            );
+
+            drawPamFit(
+                batch,
+                WATER_UPPERLAYER,
+                animationTime,
+                runCenterX,
+                centerY - cellHeight * 0.10f,
+                runWidth * 1.04f,
+                cellHeight * 1.10f,
                 false,
                 true
             );
@@ -470,6 +522,21 @@ public final class ChapterElementRenderer implements Disposable {
                 true
             );
         }
+
+        int maxColumn = Math.max(0, Math.min(COLUMN_COUNT - 1,
+            game.getField().getWaveLimitColumn()));
+        float boundaryX = lawnX + maxColumn * cellWidth;
+        drawPamFit(
+            batch,
+            WATER_TIDE_LINE,
+            animationTime,
+            boundaryX,
+            lawnY + cellHeight * ROW_COUNT * 0.5f,
+            cellWidth * 1.05f,
+            cellHeight * ROW_COUNT * 1.02f,
+            false,
+            true
+        );
     }
 
     private void renderDarkAgeForeground(
