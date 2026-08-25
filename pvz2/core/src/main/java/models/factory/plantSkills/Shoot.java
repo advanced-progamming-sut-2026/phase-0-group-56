@@ -256,7 +256,9 @@ public class Shoot implements Skill {
             if (z.getX() + z.getWidth() < shooter.getX()) {
                 continue;
             }
-            if (target == null || z.getX() < target.getX()) {
+            if (target == null
+                || z.getX() + z.getWidth() * 0.5f
+                < target.getX() + target.getWidth() * 0.5f) {
                 target = z;
             }
         }
@@ -264,15 +266,17 @@ public class Shoot implements Skill {
         if(target != null) game.getBullets().add(lobberShoot(shooter , target));
     }
     private Projectile lobberShoot(Plant shooter , Zombie target){
-        // Lobbers launch from the plant's mouth and follow an actual arc.  The
-        // old calculation divided by (bullet speed + zombie speed); zombie
-        // speeds are negative in the normal game, so that could produce a
-        // negative flight time and immediately drive the projectile into the
-        // ground.
-        float startX = shooter.getX() + shooter.getWidth() * 0.75f;
-        float startY = shooter.getY() + shooter.getHeight() * 0.70f;
-        Projectile projectile = new Projectile(startX, startY
+        // Projectile.x/y are the hitbox's lower-left corner, while PAM
+        // animations are drawn around their centre.  Start the hitbox half a
+        // projectile before the plant's mouth so the rendered ball leaves the
+        // mouth itself instead of appearing offset to the right/below it.
+        float mouthX = shooter.getX() + shooter.getWidth();
+        float mouthY = shooter.getY() + shooter.getHeight() * 0.70f;
+        Projectile projectile = new Projectile(mouthX, mouthY
             , data.getBullet(),shooter.getLine());
+        float startX = mouthX - projectile.getWidth() * 0.5f;
+        float startY = mouthY - projectile.getHeight() * 0.5f;
+        projectile.setPosition(startX, startY);
         if(data.getBullet() == ProjectileType.CORN){
             Random rand = new Random();
             boolean changeIncrease = App.getCurrentuser().getLevels().get(shooter.getType()) >= 2;
@@ -285,19 +289,31 @@ public class Shoot implements Skill {
             targetVelocityX = target.getSpeed();
         }
 
-        float horizontalDistance = target.getX() - startX;
-        if (horizontalDistance < 1f) {
-            horizontalDistance = Tile.getWidth();
-        }
+        // Aim at the zombie's visual centre/head.  Using the hitbox's left
+        // edge made the flight arc miss the sprite even though the impact was
+        // later snapped onto the target.
+        float targetX = target.getX() + target.getWidth() * 0.5f;
+        float targetY = target.getY()
+            + target.getHeight() * Projectile.ZOMBIE_HEAD_AIM_FRACTION;
+        float horizontalDistance = targetX - (startX + projectile.getWidth() * 0.5f);
+        horizontalDistance = Math.max(1f, horizontalDistance);
 
         // Intercept the zombie's current horizontal path.  This remains
         // positive for the game's right-to-left zombie speeds.
         float relativeSpeed = projectile.getVelocityX() - targetVelocityX;
+        // If a special zombie is moving at or above the lobber's horizontal
+        // speed, use the sum of the speeds as a conservative closing speed;
+        // this keeps the flight time positive and still predicts its motion.
+        if (relativeSpeed <= 1f) {
+            relativeSpeed = projectile.getVelocityX() + Math.abs(targetVelocityX);
+        }
         float t = horizontalDistance / Math.max(1f, relativeSpeed);
-        t = Math.max(0.25f, t);
-        float dy = target.getY() + target.getHeight() * 0.20f - startY;
+        t = Math.max(0.25f, Math.min(6f, t));
+        float dy = targetY - (startY + projectile.getHeight() * 0.5f);
         float vy = dy / t + Constants.GRAVITY * t / 2f;
         projectile.setVelocityY(vy);
+        projectile.setDestinationX(targetX + targetVelocityX * t);
+        projectile.setDestinationY(targetY);
         projectile.setGrounded(false);
         projectile.setIgnoresObstacles(true);
         projectile.setImpactTarget(target);
@@ -354,4 +370,4 @@ public class Shoot implements Skill {
     public void setAll(boolean all) {
         this.all = all;
     }
-    }
+}

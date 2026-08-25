@@ -13,6 +13,9 @@ import java.util.Arrays;
 
 
 public class Projectile implements Cloneable {
+    /** Point on a zombie's hit box that a lobber aims for (the head). */
+    public static final float ZOMBIE_HEAD_AIM_FRACTION = 0.82f;
+
     private ProjectileType type;
     private PlantType sourcePlantType;
     private float velocityX;
@@ -117,7 +120,7 @@ public class Projectile implements Cloneable {
         updateLocation(delta, game);
 
         if (impactTarget != null) {
-            if (impactTarget.isDead()) {
+            if (impactTarget.isDead() || impactTarget.getHp() <= 0f) {
                 dispose(game);
                 return;
             }
@@ -127,7 +130,7 @@ public class Projectile implements Cloneable {
             // Lobbers land on the target's head, so a moving zombie cannot make
             // the projectile pass through its old predicted position.
             x = impactTarget.getX() + impactTarget.getWidth() * 0.5f - width * 0.5f;
-            y = impactTarget.getY() + impactTarget.getHeight() * 0.20f;
+            y = zombieHeadY(impactTarget) - height * 0.5f;
             hitZombie(impactTarget);
             return;
         }
@@ -143,15 +146,15 @@ public class Projectile implements Cloneable {
             bowling(game.getField());
         }
 
-        checkHit(game, previousX, previousY);
+        checkHit(game, previousX, previousY, delta);
     }
 
-    private void checkHit(BaseGame game, float previousX, float previousY){
+    private void checkHit(BaseGame game, float previousX, float previousY, float delta){
         if (toLockIn != null) {
 
-            if (!toLockIn.isDead()
+            if (!toLockIn.isDead() && toLockIn.getHp() > 0f
                 && (overlaps(toLockIn)
-                || sweptOverlaps(toLockIn, previousX, previousY))) {
+                || sweptOverlaps(toLockIn, previousX, previousY, delta))) {
                 hitZombie(toLockIn);
             }
             return;
@@ -159,21 +162,27 @@ public class Projectile implements Cloneable {
 
         Zombie target = null;
         float targetDistance = Float.MAX_VALUE;
+        float targetHitTime = Float.MAX_VALUE;
         for (Zombie z : game.getZombies()) {
             if (z == null || z.isDead() || z.getHp() <= 0 || z.getLine() != this.line) {
                 continue;
             }
 
-            // Only select a zombie after proving that this projectile crossed
-            // its hit box.  The previous implementation selected the globally
-            // closest zombie first, even when it was behind the projectile;
-            // that caused the real target in front of it to be skipped.
-            if (overlaps(z) || sweptOverlaps(z, previousX, previousY)) {
+            // Choose the first hit along the travelled segment.  Looking only
+            // at the projectile's final position (or at the globally nearest
+            // zombie) lets a fast shot tunnel through the front zombie and hit
+            // one behind it, or miss both when the target moved between ticks.
+            float hitTime = sweptCollisionTime(z, previousX, previousY, delta);
+            if (hitTime >= 0f) {
                 float distance = Math.abs((x + width * 0.5f)
                     - (z.getX() + z.getWidth() * 0.5f));
-                if (target == null || distance < targetDistance) {
+                if (target == null
+                    || hitTime < targetHitTime - 0.0001f
+                    || (Math.abs(hitTime - targetHitTime) <= 0.0001f
+                        && distance < targetDistance)) {
                     target = z;
                     targetDistance = distance;
+                    targetHitTime = hitTime;
                 }
             }
         }
@@ -187,20 +196,86 @@ public class Projectile implements Cloneable {
 
     }
 
-    private boolean sweptOverlaps(Zombie zombie, float previousX, float previousY) {
+    /**
+     * Returns the first normalized time at which this projectile's hitbox
+     * intersects the zombie, or {@code -1} when the whole segment misses.
+     * The slab test is continuous, so it remains reliable at high game speeds
+     * and at row/plant boundaries.
+     */
+    private float sweptCollisionTime(
+        Zombie zombie, float previousX, float previousY, float delta
+    ) {
         if (zombie == null) {
-            return false;
+            return -1f;
         }
 
-        float minX = Math.min(previousX, x);
-        float maxX = Math.max(previousX + width, x + width);
-        float minY = Math.min(previousY, y);
-        float maxY = Math.max(previousY + height, y + height);
+        float startX = previousX + width * 0.5f;
+        float startY = previousY + height * 0.5f;
+        float endX = x + width * 0.5f;
+        float endY = y + height * 0.5f;
+        float dx = endX - startX;
+        float dy = endY - startY;
 
-        return minX < zombie.getX() + zombie.getWidth()
-            && maxX > zombie.getX()
-            && minY < zombie.getY() + zombie.getHeight()
-            && maxY > zombie.getY();
+        // Expand the zombie rectangle by the projectile's half extents and
+        // cast the projectile centre through that rectangle.
+        float zombieMotionPadding = Math.abs(zombie.getVelocityX())
+            * Math.max(0f, delta);
+        float minX = zombie.getX() - width * 0.5f - zombieMotionPadding;
+        float maxX = zombie.getX() + zombie.getWidth()
+            + width * 0.5f + zombieMotionPadding;
+        float minY = zombie.getY() - height * 0.5f;
+        float maxY = zombie.getY() + zombie.getHeight() + height * 0.5f;
+
+        if (startX >= minX && startX <= maxX
+            && startY >= minY && startY <= maxY) {
+            return 0f;
+        }
+
+        return sweptCollisionTimeScalar(startX, startY, dx, dy, minX, maxX, minY, maxY);
+    }
+
+    private float sweptCollisionTimeScalar(
+        float startX, float startY, float dx, float dy,
+        float minX, float maxX, float minY, float maxY
+    ) {
+        float enter = 0f;
+        float exit = 1f;
+
+        if (Math.abs(dx) < 0.00001f) {
+            if (startX < minX || startX > maxX) return -1f;
+        } else {
+            float tx1 = (minX - startX) / dx;
+            float tx2 = (maxX - startX) / dx;
+            float near = Math.min(tx1, tx2);
+            float far = Math.max(tx1, tx2);
+            enter = Math.max(enter, near);
+            exit = Math.min(exit, far);
+            if (enter > exit) return -1f;
+        }
+
+        if (Math.abs(dy) < 0.00001f) {
+            if (startY < minY || startY > maxY) return -1f;
+        } else {
+            float ty1 = (minY - startY) / dy;
+            float ty2 = (maxY - startY) / dy;
+            float near = Math.min(ty1, ty2);
+            float far = Math.max(ty1, ty2);
+            enter = Math.max(enter, near);
+            exit = Math.min(exit, far);
+            if (enter > exit) return -1f;
+        }
+
+        return enter >= 0f && enter <= 1f ? enter : -1f;
+    }
+
+    private boolean sweptOverlaps(
+        Zombie zombie, float previousX, float previousY, float delta
+    ) {
+        return sweptCollisionTime(zombie, previousX, previousY, delta) >= 0f;
+    }
+
+    private static float zombieHeadY(Zombie zombie) {
+        return zombie.getY() + zombie.getHeight() * ZOMBIE_HEAD_AIM_FRACTION;
     }
 
     private void hitZombie(Zombie z){
@@ -287,7 +362,21 @@ public class Projectile implements Cloneable {
         this.x += velocityX * delta;
         this.y += velocityY * delta;
         if (!grounded) {
+            // Scene2D/world coordinates grow upward; gravity pulls the arc
+            // toward decreasing Y after the upward launch.
             this.velocityY -= Constants.GRAVITY * delta;
+        }
+
+        if (impactTarget != null) {
+            // y is the projectile hitbox's lower-left corner.  Subtract half
+            // its height so the rendered centre lands on the zombie's head.
+            float landingY = zombieHeadY(impactTarget) - height * 0.5f;
+            if (!grounded && velocityY < 0f && this.y <= landingY) {
+                this.y = landingY;
+                this.velocityY = 0f;
+                grounded = true;
+            }
+            return;
         }
 
         float groundY = line * Tile.getHeight() + 30f;
@@ -370,6 +459,14 @@ public class Projectile implements Cloneable {
 
     public float getDamage() {
         return damage;
+    }
+
+    public float getWidth() {
+        return width;
+    }
+
+    public float getHeight() {
+        return height;
     }
 
     public void setDamage(float damage) {

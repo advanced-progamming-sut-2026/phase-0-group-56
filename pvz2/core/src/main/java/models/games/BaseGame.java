@@ -108,25 +108,26 @@ public class BaseGame implements Game {
         output = new StringBuilder();
 
 
-            for (SeedPackage x : availablePlants.values()){
-                x.update(delta);
-            }
+        for (SeedPackage x : availablePlants.values()){
+            x.update(delta);
+        }
 
-            updateSuns(output , delta);
+        updateSuns(output , delta);
 
-            updateZombies(delta);
-            updatePlants(delta);
-            updateScene(delta);
-            Result result = attack(delta);
-            if(result != null){
-                output.append(result.message());
-            }
-            if(event!=null){
-               event.run(this , delta);
-            }
+        updatePendingWaveZombies(delta);
+        updateZombies(delta);
+        updatePlants(delta);
+        updateScene(delta);
+        Result result = attack(delta);
+        if(result != null){
+            output.append(result.message());
+        }
+        if(event!=null){
+            event.run(this , delta);
+        }
 
 
-            return output.toString();
+        return output.toString();
 
     }
 
@@ -163,9 +164,9 @@ public class BaseGame implements Game {
                 iterator.remove();
 
                 output.append("\n").append("Plant ")
-                        .append(p.getType()).append(" died at (")
-                        .append(p.getTileIndex()).append(" , ")
-                        .append(p.getLine()).append(")");
+                    .append(p.getType()).append(" died at (")
+                    .append(p.getTileIndex()).append(" , ")
+                    .append(p.getLine()).append(")");
 
                 Tile tile = field.getTileByCoordinats(p.getTileIndex(), p.getLine());
 
@@ -244,7 +245,7 @@ public class BaseGame implements Game {
 
     @Override
     public String pluck(int x, int y) {
-       return null;
+        return null;
     }
 
     protected boolean won = false;
@@ -262,43 +263,220 @@ public class BaseGame implements Game {
     public void endGame() {}
 
     protected int waveID = 0;
+    /** Zombies which belong to the active wave but have not entered the lawn yet. */
+    private final ArrayDeque<Zombie> pendingWaveZombies = new ArrayDeque<>();
+    /** Only zombies released from the current wave are used by the release gate. */
+    private final Set<Zombie> spawnedWaveZombies =
+        Collections.newSetFromMap(new IdentityHashMap<>());
+    private float waveSpawnTimer;
+    private float waveSpawnElapsed;
+    private float waveSpawnInterval = 1.25f;
+    private float waveSpawnHealthThreshold;
+
+    private static final float MIN_INITIAL_WAVE_RATIO = 0.15f;
+    private static final float MAX_INITIAL_WAVE_RATIO = 0.75f;
+    private static final float RELEASE_HEALTH_RATIO = 0.65f;
+    private static final float RELEASE_MAX_WAIT = 6f;
+
     protected Result attack(float delta) {
-        if(currentWave == null || currentWave.isFinished()){
-            if(currentWave!= null && currentWave == waves.getLast()){
+        if (currentWave == null
+            || (currentWave.isFinished() && pendingWaveZombies.isEmpty())) {
+            if (currentWave != null && waves != null && !waves.isEmpty()
+                && currentWave == waves.getLast()) {
                 won = true;
                 return new Result(true , "Won" , null);
             }
+            if (waves == null || waveID >= waves.size()) {
+                won = true;
+                return new Result(true, "Won", null);
+            }
             previousWave = currentWave;
             currentWave = waves.get(waveID);
-            zombies.addAll(currentWave.getZombies());
+            boolean lastWave = waveID == waves.size() - 1;
             waveID += 1;
-         event = switch (chapter){
-               case AncientEgypt -> new Tornado(this);
-               case FrozenCaves -> new IcyWind(this);
-               case BigWaveBeach -> new Water(this);
-               default -> new GraveSpawner(this);
+            StringBuilder spawnLog = startWave(currentWave, lastWave);
+            event = switch (chapter){
+                case AncientEgypt -> new Tornado(this);
+                case FrozenCaves -> new IcyWind(this);
+                case BigWaveBeach -> new Water(this);
+                default -> new GraveSpawner(this);
             };
-           return new Result(true , setTheWaveZombies(waveID == waves.size()) , null);
+            StringBuilder announcement = new StringBuilder(
+                setTheWaveZombies(lastWave)
+            );
+            if (spawnLog.length() > 0) {
+                announcement.append('\n').append(spawnLog);
+            }
+            String eventMessage = eventMessage(chapter);
+            if (!eventMessage.isBlank()) {
+                announcement.append('\n').append(eventMessage);
+            }
+            return new Result(true , announcement.toString() , null);
         }
         return new  Result(false, null,null);
     }
 
-    protected String setTheWaveZombies(boolean last) {
-        StringBuilder output = new StringBuilder();
-        int line = 0;
-        for (Zombie z : zombies) {
-            z.setLine(line % 5);
-            z.setTileIndex(8);
-            z.setX((int)(9 * Tile.getWidth() + 200));
-            z.setY((int)(line * Tile.getHeight()));
-            output.append("Zombie spawned at line " + line % 5 + " , watch out human!\n");
-            line++;
+    /**
+     * Starts a wave with a wave-id-dependent burst, then schedules the rest.
+     * The final wave intentionally bypasses the queue and enters in full.
+     */
+    private StringBuilder startWave(Wave wave, boolean last) {
+        pendingWaveZombies.clear();
+        spawnedWaveZombies.clear();
+        waveSpawnTimer = 0f;
+        waveSpawnElapsed = 0f;
+        waveSpawnHealthThreshold = 0f;
+
+        StringBuilder spawnLog = new StringBuilder();
+
+        ArrayList<Zombie> waveZombies = wave == null ? null : wave.getZombies();
+        if (waveZombies == null || waveZombies.isEmpty()) {
+            return spawnLog;
         }
-        String waveFlag = "wave " + waveID + " is approaching ... ";
-        String lastWave = "final Wave is coming , be ready to be eaten!!! ar ara rararararara";
-        if(!last) output.append(waveFlag);
-        else output.append(lastWave);
-        return output.toString();
+
+        ArrayList<Zombie> validWaveZombies = new ArrayList<>();
+        for (Zombie zombie : waveZombies) {
+            if (zombie != null) {
+                validWaveZombies.add(zombie);
+            }
+        }
+        int total = validWaveZombies.size();
+        if (total == 0) {
+            return spawnLog;
+        }
+
+        // Later wave ids open with a larger burst.  The final wave is the one
+        // deliberate exception: all of its zombies enter simultaneously.
+        int waveNumber = wave.getId() > 0
+            ? wave.getId()
+            : Math.max(1, waveID);
+        int totalWaves = Math.max(1, waves.size());
+        float idProgress = totalWaves <= 1
+            ? 1f
+            : (waveNumber - 1f) / (totalWaves - 1f);
+        float initialRatio = last
+            ? 1f
+            : Math.min(
+            MAX_INITIAL_WAVE_RATIO,
+            MIN_INITIAL_WAVE_RATIO
+                + (MAX_INITIAL_WAVE_RATIO - MIN_INITIAL_WAVE_RATIO) * idProgress
+        );
+        int initialCount = last
+            ? total
+            : total <= 1
+            ? 1
+            : Math.max(
+            1,
+            Math.min(total - 1, (int) Math.ceil(total * initialRatio))
+        );
+
+        // Make releases visibly staggered; the health gate below can release a
+        // zombie sooner when the lawn is being cleared quickly.
+        waveSpawnInterval = last
+            ? 0f
+            : Math.max(0.65f, 2.0f - waveNumber * 0.05f);
+        for (int index = 0; index < total; index++) {
+            Zombie zombie = validWaveZombies.get(index);
+            placeWaveZombie(zombie, index);
+            if (index < initialCount) {
+                zombies.add(zombie);
+                spawnedWaveZombies.add(zombie);
+                appendSpawnMessage(spawnLog, zombie);
+            } else {
+                pendingWaveZombies.addLast(zombie);
+            }
+        }
+
+        float initialHealth = activeWaveHealth();
+        waveSpawnHealthThreshold = initialHealth * RELEASE_HEALTH_RATIO;
+        waveSpawnTimer = waveSpawnInterval;
+        return spawnLog;
+    }
+
+    private void updatePendingWaveZombies(float delta) {
+        if (pendingWaveZombies.isEmpty()) {
+            return;
+        }
+
+        float safeDelta = Math.max(0f, delta);
+        waveSpawnTimer -= safeDelta;
+        waveSpawnElapsed += safeDelta;
+
+        if (waveSpawnTimer > 0f) {
+            return;
+        }
+
+        float activeHealth = activeWaveHealth();
+        boolean healthReady = activeHealth <= waveSpawnHealthThreshold;
+        boolean timeReady = waveSpawnElapsed >= RELEASE_MAX_WAIT;
+        if (!healthReady && !timeReady) {
+            // Check the health gate frequently without spinning a release on
+            // every frame while the timer is waiting.
+            waveSpawnTimer = 0.25f;
+            return;
+        }
+
+        Zombie zombie = pendingWaveZombies.removeFirst();
+        zombies.add(zombie);
+        spawnedWaveZombies.add(zombie);
+        appendSpawnMessage(output, zombie);
+
+        activeHealth = activeWaveHealth();
+        waveSpawnHealthThreshold = activeHealth * RELEASE_HEALTH_RATIO;
+        waveSpawnTimer = waveSpawnInterval;
+        waveSpawnElapsed = 0f;
+    }
+
+    private float activeWaveHealth() {
+        float health = 0f;
+        for (Zombie zombie : spawnedWaveZombies) {
+            if (zombie != null && !zombie.isDead()) {
+                health += Math.max(0f, zombie.getHp());
+            }
+        }
+        return health;
+    }
+
+    private void appendSpawnMessage(StringBuilder destination, Zombie zombie) {
+        if (destination == null || zombie == null) {
+            return;
+        }
+        destination.append("Zombie ")
+            .append(zombie.getType())
+            .append(" spawned at wave ")
+            .append(waveID)
+            .append(" in lane ")
+            .append(zombie.getLine())
+            .append(".\n");
+    }
+
+    private void placeWaveZombie(Zombie zombie, int index) {
+        if (zombie == null) {
+            return;
+        }
+        int line = Math.floorMod(index, 5);
+        zombie.setLine(line);
+        zombie.setTileIndex(8);
+        zombie.setX((int) (9 * Tile.getWidth() + 200));
+        zombie.setY((int) (line * Tile.getHeight()));
+    }
+
+    protected String setTheWaveZombies(boolean last) {
+        return last
+            ? "The final wave has come."
+            : "Wave " + waveID + " started.";
+    }
+
+    private String eventMessage(Chapters currentChapter) {
+        if (currentChapter == null) {
+            return "";
+        }
+        return switch (currentChapter) {
+            case AncientEgypt -> "Tornado is coming!";
+            case FrozenCaves -> "Wind is blowing! ready to be frozen!";
+            case BigWaveBeach -> "Water surface is changing!";
+            default -> "Zombies are coming from the graves!";
+        };
     }
 
     public void addCat(Zombie wizard, Plant plant) {
@@ -481,7 +659,7 @@ public class BaseGame implements Game {
 
     public boolean hasKilledPlant(Zombie zombie) {
         return zombie.getAllStarObserver() != null &&
-                zombie.getAllStarObserver().isSlowed();
+            zombie.getAllStarObserver().isSlowed();
     }
 
     public boolean isArmorBroken(Zombie zombie, String armorType) {

@@ -89,6 +89,15 @@ public final class ProjectileRenderer implements Disposable {
     private static final String CABBAGE_HIT =
         "768/INITIAL/EFFECTS/SPLAT_CABBAGEPULT/SPLAT_CABBAGEPULT.PAM";
 
+    private static final String KERNEL =
+        "768/INITIAL/EFFECTS/T_KERNALPULT_PROJECTILE/T_KERNALPULT_PROJECTILE.PAM";
+    private static final String KERNEL_HIT =
+        "768/INITIAL/EFFECTS/SPLAT_KERNALPULT_KERNAL/SPLAT_KERNALPULT_KERNAL.PAM";
+    private static final String BUTTER =
+        "768/INITIAL/EFFECTS/BUTTERCUP_BUTTER/BUTTERCUP_BUTTER.PAM";
+    private static final String BUTTER_HIT =
+        "768/INITIAL/EFFECTS/SPLAT_KERNALPULT_BUTTER/SPLAT_KERNALPULT_BUTTER.PAM";
+
     private static final String PEPPER =
         "768/FULL/EFFECTS/PEPPERPULT_PROJECTILE/PEPPERPULT_PROJECTILE.PAM";
     private static final String PEPPER_HIT =
@@ -177,8 +186,35 @@ public final class ProjectileRenderer implements Disposable {
                 continue;
             }
 
-            float worldX = lawnBounds.x + projectile.getX() * worldPerModelX;
-            float worldY = lawnBounds.y + projectile.getY() * worldPerModelY;
+            // Gameplay collision uses the projectile hitbox's lower-left
+            // corner, whereas PamPlayer draws an animation around its
+            // centre.  Lobbers are the only projectiles that travel through
+            // the air, so convert their live position to the same centre used
+            // by the target/impact marker.  Without this, the arc appears to
+            // finish beside the zombie and then the impact effect snaps onto
+            // it.
+            float modelX = projectile.getX();
+            float modelY = projectile.getY();
+            if (projectile.getImpactTarget() != null
+                && projectile.getPierce() > 0f
+                && !projectile.isGrounded()) {
+                modelX += projectile.getWidth() * 0.5f;
+                modelY += projectile.getHeight() * 0.5f;
+            }
+
+            // Impact effects are anchored directly to the target's head, not
+            // to the hitbox corner left behind by the flight simulation.
+            if (projectile.getPierce() <= 0f
+                && projectile.getImpactTarget() != null) {
+                modelX = projectile.getImpactTarget().getX()
+                    + projectile.getImpactTarget().getWidth() * 0.5f;
+                modelY = projectile.getImpactTarget().getY()
+                    + projectile.getImpactTarget().getHeight()
+                        * Projectile.ZOMBIE_HEAD_AIM_FRACTION;
+            }
+
+            float worldX = lawnBounds.x + modelX * worldPerModelX;
+            float worldY = lawnBounds.y + modelY * worldPerModelY;
             float scale = basePamScale * spec.scaleMultiplier;
 
             if (projectile.getPierce() <= 0f) {
@@ -372,6 +408,8 @@ public final class ProjectileRenderer implements Disposable {
                 : new VisualSpec(MELON, MELON_HIT, 1.15f);
 
             case CABBAGE -> new VisualSpec(CABBAGE, CABBAGE_HIT, 1.00f);
+            case CORN -> new VisualSpec(KERNEL, KERNEL_HIT, 1.00f);
+            case BUTTER -> new VisualSpec(BUTTER, BUTTER_HIT, 1.05f);
             case PEPPER -> new VisualSpec(PEPPER, PEPPER_HIT, 1.10f);
             case CACTUS -> new VisualSpec(CACTUS, CACTUS_HIT, 0.95f);
             case ELECTRICAL_CACTUS -> new VisualSpec(CACTUS_PF, CACTUS_HIT, 1.05f);
@@ -387,7 +425,7 @@ public final class ProjectileRenderer implements Disposable {
             }
 
             // No supplied PAM yet for these currently-used projectile families.
-            case CORN, BUTTER, MAGIC, LIGHTNING, LETTUCE -> null;
+            case MAGIC, LIGHTNING, LETTUCE -> null;
         };
     }
 

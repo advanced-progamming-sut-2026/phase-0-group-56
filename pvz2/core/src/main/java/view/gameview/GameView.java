@@ -175,7 +175,7 @@ public final class GameView extends View {
         }
         initialiseWorldEntities();
 
-        toolsStack = new ToolsStack(controller);
+        toolsStack = new ToolsStack(controller, textureBank);
         toolsStack.setVisible(false);
         stage.addActor(toolsStack);
         buildPauseOverlay();
@@ -228,7 +228,7 @@ public final class GameView extends View {
             if (toolsStack != null) {
                 toolsStack.refresh();
                 if (log != null && !log.isBlank()) {
-                    toolsStack.setStatus(lastMeaningfulLine(log));
+                    toolsStack.setStatus(log);
                 }
             }
 
