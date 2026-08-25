@@ -48,6 +48,7 @@ public class RandomChooserAbility implements Ability {
             case GIVE_ARMOR:
                 if (target instanceof Zombie) {
                     Zombie t = (Zombie) target;
+                    zombie.fire();
                     t.addArmor(ArmorType.CROWN.create());
                     t.addArmor(ArmorType.SHOULDER.create());
                 }
@@ -55,6 +56,7 @@ public class RandomChooserAbility implements Ability {
             case TURN_TO_CAT:
                 if (target instanceof Plant) {
                     Plant p = (Plant) target;
+                    zombie.fire();
                     p.setCat(true);
                     game.addCat(zombie, p);
                 }

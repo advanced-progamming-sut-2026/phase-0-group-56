@@ -96,7 +96,7 @@ public class ZombieFactory {
         // ====== 11. TURQUOISE ======
         if (type.equals("turquoise") || type.equals("ZombieCamelDefault")) {
             Zombie z = new Zombie(type, type, row, 380, 100, -92.5f, 300, 32, 95);
-            z.addAbility(new SunRobbingAbility(250, 25));
+            z.addAbility(new SunRobbingAbility(25000, 50));
             z.addAbility(new ExplodeAbility(4, 1500, 8.0f));
             z.setPamPath("768/FULL/ZOMBIE/ZOMBIE_LOSTCITY_CRYSTALSKULL/ZOMBIE_LOSTCITY_CRYSTALSKULL.PAM");
             z.setFire("power"); // ra ability
@@ -150,7 +150,7 @@ public class ZombieFactory {
         // ====== 16. RA ======
         if (type.equals("ra") || type.equals("ZombieRa")) {
             Zombie z = new Zombie(type, type, row, 190, 100, -100f, 100, 32, 95);
-            z.addAbility(new SunRobbingAbility(250, 25));
+            z.addAbility(new SunRobbingAbility(25000, 50));
             z.setPamPath("768/INITIAL/ZOMBIE/ZOMBIE_EGYPT_RA/ZOMBIE_EGYPT_RA.PAM");
             z.setFire("power");
             return z;

@@ -34,10 +34,8 @@ public class ExplodeAbility implements Ability {
 
     @Override
     public void execute(Zombie zombie, float deltaTime, BaseGame game) {
-        if (triggered) return;
+        //if (triggered) return;
         if (zombie.isDead()) return;
-
-        // شرط
         if (!checkCondition(zombie)) return;
 
         timer += deltaTime;
@@ -46,8 +44,10 @@ public class ExplodeAbility implements Ability {
 
             if (zombie.hasEffect(EffectType.HYPNOTIZED)) {
                 game.explodeAreaOnZombies(zombie.getLine(), zombie.getX(), range, damage);
+                zombie.fire();
             } else {
                 game.explodeArea(zombie.getLine(), zombie.getX(), range, damage);
+                zombie.fire();
             }
         }
     }

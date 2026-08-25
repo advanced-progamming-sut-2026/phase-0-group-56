@@ -28,6 +28,7 @@ public class Zombie extends Entity{
     private boolean frozen;
     private boolean hypnotized;
     private boolean inWater;
+    private boolean isEating;
     private float eatCooldown;
     private float eatTimer = 0;
 
@@ -49,8 +50,6 @@ public class Zombie extends Entity{
     // ====== STATE FLAGS ======
     private boolean isTorchOn = false;
     private boolean isDynamiteFrozen = false;
-    private boolean encasedInIce;
-    private float slipperyCooldown;
 
     // ====== ANIMATION HANDLING FIELDS ======
     private ZombieState currentState = ZombieState.IDLE;
@@ -64,9 +63,10 @@ public class Zombie extends Entity{
     private String extraClip = null;
     private String dieClip = "die";
 
+    private float deathDuration = -1f;
+
     private boolean isFiringRequested = false;
     private boolean isExtraRequested = false;
-    private Plant targetPlant = null;
 
     private final Map<String, Boolean> visibilityMap = new HashMap<>();
 
@@ -141,11 +141,6 @@ public class Zombie extends Entity{
         this.currentTile = game.getField().getTileByCoordinats(this.tileIndex , this.line);
         this.inWater = currentTile.isWater();
 
-        slipperyCooldown = Math.max(0f, slipperyCooldown - Math.max(0f, deltaTime));
-        if (encasedInIce) {
-            return;
-        }
-
         this.velocityX = this.speed;
         updateEffects(deltaTime);
 
@@ -164,6 +159,7 @@ public class Zombie extends Entity{
         eatTimer += deltaTime;
         Plant plant = game.findTargetPlant(this, Tile.getWidth() * 0.72f);
         if (plant != null) {
+            this.isEating = true;
             if (eatTimer >= eatCooldown) {
                 eatTimer = 0;
                 attack(plant, game);
@@ -171,6 +167,7 @@ public class Zombie extends Entity{
             move(deltaTime, game, plant);
             return;
         }
+        this.isEating = false;
         move(deltaTime, game, null);
     }
 
@@ -201,34 +198,13 @@ public class Zombie extends Entity{
         this.hp -= 5;
         if (this.hp <= 0) {
             this.hp = 0;
-            die();
+            this.setState(ZombieState.DYING);
+            //die();
         }
     }
 
     public void meltFrozen() {
         removeEffect(EffectType.FROZEN);
-    }
-
-    public boolean isEncasedInIce() {
-        return encasedInIce;
-    }
-
-    public void setEncasedInIce(boolean encasedInIce) {
-        this.encasedInIce = encasedInIce;
-    }
-
-    public void breakIce() {
-        encasedInIce = false;
-        frozen = false;
-        removeEffect(EffectType.FROZEN);
-    }
-
-    public boolean canSlide() {
-        return slipperyCooldown <= 0f;
-    }
-
-    public void startSlideCooldown(float seconds) {
-        slipperyCooldown = Math.max(0f, seconds);
     }
 
     public float getActualSpeed() {
@@ -269,7 +245,7 @@ public class Zombie extends Entity{
             return;
 
         x += getActualSpeed() * movingDirection() * deltaTime /15;
-        int newTile = (int) (x / Tile.getWidth());
+        int newTile = (int) (x/ 100);
         if (newTile < 0) newTile = 0;
         if (newTile > 8) newTile = 8;
 
@@ -296,6 +272,7 @@ public class Zombie extends Entity{
         for (Armor armor : armors) {
             if (armor.isActive()) {
                 armor.takeDamage(damage);
+                armor.updateVisibility();
                 if (armor.isBroken() && "newspaper".equals(armor.getType())) {
                     if (newspaperObserver != null) {
                         newspaperObserver.onArmorBroken(this);
@@ -308,7 +285,8 @@ public class Zombie extends Entity{
         hp -= damage;
         if (hp <= 0) {
             hp = 0;
-            die();
+            this.setState(ZombieState.DYING);
+            //die();
         }
     }
 
@@ -338,10 +316,25 @@ public class Zombie extends Entity{
         if (user != null) {
             user.updateQuestProgress("KILL_ZOMBIE", 1);
         }
+        // TODO
+        // delete dead zombie from evry where
     }
 
     public void render(SpriteBatch batch, PamPlayer player) {
-        if (isDead() && currentState == ZombieState.DYING && stateTime >= 1.5f) {
+        if (isDead()) {
+            if (currentState == ZombieState.DYING) {
+                float duration = getDeathDuration(player);
+                if (stateTime >= duration) {
+                    this.die();
+                    return;
+                }
+                updateAnimation(Gdx.graphics.getDeltaTime());
+                String clipName = getCurrentClipName();
+                if (clipName != null && !clipName.isEmpty() && pamPath != null) {
+                    player.draw(batch, pamPath, clipName, stateTime, getX(), getY(), false, visibilityMap);
+                }
+                return;
+            }
             return;
         }
 
@@ -376,6 +369,7 @@ public class Zombie extends Entity{
     // ====== ARMOR ======
     public void addArmor(Armor armor) {
         armors.add(armor);
+        armor.attachTo(this);
     }
 
     public List<Armor> getArmors() {
@@ -403,11 +397,6 @@ public class Zombie extends Entity{
     public boolean isDynamiteFrozen() { return isDynamiteFrozen; }
     public void setDynamiteFrozen(boolean dynamiteFrozen) { this.isDynamiteFrozen = dynamiteFrozen; }
 
-    // ====== PLANT INTERACTION (placeholder) ======
-    public boolean reachedPlant() { return false; }
-    public Plant findNextPlant() { return null; }
-    public boolean isNearPlant() { return false; }
-    public Plant getTargetPlant() { return targetPlant; }
     public boolean isNearHouse() { return x < 50; }
     public int movingDirection() { return hypnotized ? -1 : 1; }
 
@@ -447,6 +436,17 @@ public class Zombie extends Entity{
         return this.inWater;
     }
     public void setInWater(boolean inWater){ this.inWater = inWater;}
+
+    private float getDeathDuration(PamPlayer player) {
+        if (deathDuration >= 0) return deathDuration;
+        if (pamPath == null || dieClip == null) {
+            throw new IllegalStateException("pamPath or dieClip is null for zombie: " + type); // impossible
+            return deathDuration;
+        }
+        deathDuration = player.clipDurationSeconds(pamPath, dieClip);
+        if (deathDuration <= 0) deathDuration = 2.5f;
+        return deathDuration;
+    }
 
     // ====== ANIMATION SETTERS & GETTERS ======
     public void setPamPath(String path) { this.pamPath = path; }
@@ -563,9 +563,7 @@ public class Zombie extends Entity{
         }
     }
 
-    public boolean isEating() {
-        return eatTimer >= eatCooldown * 0.3f && getTargetPlant() != null;
-    }
+    public boolean isEating() { return isEating; }
 
     // ====== Visibility Management ======
     public Map<String, Boolean> getVisibilityMap() { return visibilityMap; }
