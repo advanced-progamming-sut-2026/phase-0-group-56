@@ -1,11 +1,15 @@
 package models.entity;
 
+import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import models.App;
+import models.gamepanes.Field;
 import models.gamepanes.Tile;
 import models.games.BaseGame;
 import models.entity.ability.*;
 import controllers.observer.*;
 import pvz.libpvz.pam.ClipRef;
+import pvz.libpvz.pam.PamPlayer;
 
 import java.util.*;
 
@@ -57,6 +61,8 @@ public class Zombie extends Entity{
     private String fireClip = null;
     private String extraClip = null;
     private String dieClip = "die";
+
+    private float deathDuration = -1f;
 
     private boolean isFiringRequested = false;
     private boolean isExtraRequested = false;
@@ -117,7 +123,7 @@ public class Zombie extends Entity{
         return Collections.unmodifiableList(bulletObservers);
     }
 
-    public void notifyBulletObservers(Bullet bullet) {
+    public void notifyBulletObservers(Projectile bullet) {
         for (BulletObserver observer : bulletObservers) {
             observer.onBulletHit(this, bullet);
             if (!bullet.isActive()) {
@@ -134,9 +140,7 @@ public class Zombie extends Entity{
 
         this.currentTile = game.getField().getTileByCoordinats(this.tileIndex , this.line);
         this.inWater = currentTile.isWater();
-        if (this.velocityX != this.speed) {
-            throw new IllegalStateException("VelocityX does not match speed for zombie: " + this.type + "there is a problem");
-        }
+
         this.velocityX = this.speed;
         updateEffects(deltaTime);
 
@@ -153,16 +157,16 @@ public class Zombie extends Entity{
         }
 
         eatTimer += deltaTime;
-        if (eatTimer >= eatCooldown) {
-            eatTimer = 0;
-            Plant plant = game.findTargetPlant(this.line , this.tileIndex);
-            if (plant != null) {
-                attack(plant , game);
-                return;
-                // don't move while eating
+        Plant plant = game.findTargetPlant(this, Tile.getWidth() * 0.72f);
+        if (plant != null) {
+            if (eatTimer >= eatCooldown) {
+                eatTimer = 0;
+                attack(plant, game);
             }
+            move(deltaTime, game, plant);
+            return;
         }
-        move(deltaTime , game , plant);
+        move(deltaTime, game, null);
     }
 
     // ====== EFFECTS ======
@@ -192,7 +196,8 @@ public class Zombie extends Entity{
         this.hp -= 5;
         if (this.hp <= 0) {
             this.hp = 0;
-            die();
+            this.setState(ZombieState.DYING);
+            //die();
         }
     }
 
@@ -237,7 +242,7 @@ public class Zombie extends Entity{
         if(plant != null && !this.type.equals("dodo"))
             return;
 
-        x += getActualSpeed() * movingDirection() * deltaTime;
+        x += getActualSpeed() * movingDirection() * deltaTime /15;
         int newTile = (int) (x/ 100);
         if (newTile < 0) newTile = 0;
         if (newTile > 8) newTile = 8;
@@ -265,6 +270,7 @@ public class Zombie extends Entity{
         for (Armor armor : armors) {
             if (armor.isActive()) {
                 armor.takeDamage(damage);
+                armor.updateVisibility();
                 if (armor.isBroken() && "newspaper".equals(armor.getType())) {
                     if (newspaperObserver != null) {
                         newspaperObserver.onArmorBroken(this);
@@ -277,39 +283,56 @@ public class Zombie extends Entity{
         hp -= damage;
         if (hp <= 0) {
             hp = 0;
-            die();
+            this.setState(ZombieState.DYING);
+            //die();
         }
     }
 
     public void die() {
         dead = true;
+        models.User user = App.getCurrentuser();
         int random = (int)(Math.random() * 100);
-        if( random <= 10){
+        if (user != null && random <= 10) {
             int rand = random % 3;
             if(rand == 0) {
-                App.getCurrentuser().addCoins(50);
+                user.addCoins(50);
                 System.out.println("mara koshti but this 50 coins for you , be kind");
             }
             else if(rand == 1) {
-                App.getCurrentuser().addDiamonds(1);
+                user.addDiamonds(1);
                 System.out.println("mara koshti but this diamond for you , be kind");
             }
             else {
-                App.getCurrentuser().addUnlockedPots(1);
+                user.addUnlockedPots(1);
                 System.out.println("mara koshti but this pot for you , nahali beneshan be yade man");
             }
         }
-        else if(random <=  15){
-            App.getCurrentuser().addPlantFoods(1);
+        else if (user != null && random <= 15) {
+            user.addPlantFoods(1);
             System.out.println("mara koshti bedoon sabr, but eat this food patiently ");
         }
-        if (App.getCurrentuser() != null) {
-            App.getCurrentuser().updateQuestProgress("KILL_ZOMBIE", 1);
+        if (user != null) {
+            user.updateQuestProgress("KILL_ZOMBIE", 1);
         }
+        // TODO
+        // delete dead zombie from evry where
     }
 
     public void render(SpriteBatch batch, PamPlayer player) {
-        if (isDead() && currentState == ZombieState.DYING && stateTime >= 1.5f) {
+        if (isDead()) {
+            if (currentState == ZombieState.DYING) {
+                float duration = getDeathDuration(player);
+                if (stateTime >= duration) {
+                    this.die();
+                    return;
+                }
+                updateAnimation(Gdx.graphics.getDeltaTime());
+                String clipName = getCurrentClipName();
+                if (clipName != null && !clipName.isEmpty() && pamPath != null) {
+                    player.draw(batch, pamPath, clipName, stateTime, getX(), getY(), false, visibilityMap);
+                }
+                return;
+            }
             return;
         }
 
@@ -344,6 +367,7 @@ public class Zombie extends Entity{
     // ====== ARMOR ======
     public void addArmor(Armor armor) {
         armors.add(armor);
+        armor.attachTo(this);
     }
 
     public List<Armor> getArmors() {
@@ -399,12 +423,8 @@ public class Zombie extends Entity{
     public void setSpeed(float speed) { this.speed = speed; }
     public void setPosition(float x, float y) { this.x = x; this.y = y; }
     public void setLine(int line) {
-        if(line < 1)
-            line = 2;
-        else if(line > 5)
-            line = 4;
-
-        this.line = line;
+        this.line = Math.max(0, Math.min(4, line));
+        this.y = this.line * Tile.getHeight();
     }
     public void setFrozen(boolean frozen) { this.frozen = frozen; }
     public void setHypnotized(boolean hypnotized) { this.hypnotized = hypnotized; }
@@ -419,6 +439,17 @@ public class Zombie extends Entity{
         return this.inWater;
     }
     public void setInWater(boolean inWater){ this.inWater = inWater;}
+
+    private float getDeathDuration(PamPlayer player) {
+        if (deathDuration >= 0) return deathDuration;
+        if (pamPath == null || dieClip == null) {
+            throw new IllegalStateException("pamPath or dieClip is null for zombie: " + type); // impossible
+            return deathDuration;
+        }
+        deathDuration = player.clipDurationSeconds(pamPath, dieClip);
+        if (deathDuration <= 0) deathDuration = 2.5f;
+        return deathDuration;
+    }
 
     // ====== ANIMATION SETTERS & GETTERS ======
     public void setPamPath(String path) { this.pamPath = path; }
