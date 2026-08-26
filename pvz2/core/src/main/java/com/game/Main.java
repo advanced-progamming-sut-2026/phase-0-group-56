@@ -3,6 +3,7 @@ package com.game;
 import com.badlogic.gdx.Game;
 import controllers.datacontroller.Data;
 import models.App;
+import network.NetworkService;
 
 /**
  * Main LibGDX application shared by all desktop platforms.
@@ -16,6 +17,8 @@ public class Main extends Game {
         Data.loadPlantsFromJson();
         Data.loadLevelsFromJson();
         Data.setUp();
+        NetworkService.ensureEmbedded();
+        NetworkService.importLocalAccounts();
     }
 
     @Override
@@ -27,6 +30,7 @@ public class Main extends Game {
     @Override
     public void dispose() {
         Data.saveUser();
+        NetworkService.stopEmbedded();
         super.dispose();
     }
 }

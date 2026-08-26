@@ -77,7 +77,7 @@ public final class PlantLayer extends Actor {
     public void act(float delta) {
         super.act(delta);
 
-        renderer.update();
+        renderer.update(controller.getGame().getPlantsInField());
     }
 
 

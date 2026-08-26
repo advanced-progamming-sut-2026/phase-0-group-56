@@ -142,6 +142,27 @@ public class Data {
         saveUser();
     }
 
+    /**
+     * Adds a user when it is new, or replaces the cached account with the
+     * supplied one when the username already exists.
+     */
+    public static synchronized void upsertUser(User user) {
+        if (user == null || user.getName() == null || user.getName().isBlank()) {
+            return;
+        }
+        for (int index = 0; index < allUsers.size(); index++) {
+            User saved = allUsers.get(index);
+            if (saved != null && saved.getName() != null
+                && saved.getName().equalsIgnoreCase(user.getName())) {
+                allUsers.set(index, user);
+                saveUser();
+                return;
+            }
+        }
+        allUsers.add(user);
+        saveUser();
+    }
+
     public static boolean isUsernameExists(String username) {
         if (username == null || username.isBlank()) {
             return false;

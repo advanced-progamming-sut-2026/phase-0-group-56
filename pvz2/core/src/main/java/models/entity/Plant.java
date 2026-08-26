@@ -32,6 +32,19 @@ public class Plant extends Entity {
     protected ArrayList<PlantArmor> armor =  new ArrayList<>();
     protected Observer skillObserver;
 
+    /*
+     * Presentation events are deliberately represented as monotonically
+     * increasing counters instead of putting any LibGDX/PAM code in the
+     * model.  PlantRenderer observes these counters and starts the matching
+     * one-shot clip exactly once for each gameplay action.
+     */
+    private long animationActionVersion;
+    private long animationPlantFoodVersion;
+    private long animationDamageVersion;
+    private float animationActionAt = Float.NEGATIVE_INFINITY;
+    private float animationPlantFoodAt = Float.NEGATIVE_INFINITY;
+    private float animationDamageAt = Float.NEGATIVE_INFINITY;
+
     public ArrayList<PlantArmor> getArmor() {
         return armor;
     }
@@ -161,23 +174,20 @@ public class Plant extends Entity {
         }
         if(t <= 0){
             t = ActionInterval;
-           if(Trap(game)) {
-               if(skillObserver != null) {
-                   if(skillObserver.observe(this , game)){
-                       for (Skill skill : baseSkill) {
-                           skill.do_skill(this ,game);
-                       }
-                   }
-               }
-               else {
-                   for (Skill skill : baseSkill) {
-                       skill.do_skill(this ,game);
-                   }
-               }
-               if(tags.contains(PlantTags.ONCE_USAGE)){
-                   dispose(game);
-               }
-           }
+            if(Trap(game)) {
+                boolean shouldAct = skillObserver == null
+                    || skillObserver.observe(this, game);
+                if (shouldAct) {
+                    animationActionVersion++;
+                    animationActionAt = stateTime;
+                    for (Skill skill : baseSkill) {
+                        skill.do_skill(this ,game);
+                    }
+                }
+                if(tags.contains(PlantTags.ONCE_USAGE)){
+                    dispose(game);
+                }
+            }
 
         }
         else{
@@ -185,6 +195,8 @@ public class Plant extends Entity {
         }
 
         if(plantFood){
+            animationPlantFoodVersion++;
+            animationPlantFoodAt = stateTime;
             for (Skill x : plantfoodSkill) x.do_skill(this , game);
             plantFood = false;
         }
@@ -222,6 +234,10 @@ public class Plant extends Entity {
     }
 
     public void setPlantFood(boolean plantFood , BaseGame game) {
+        if (plantFood) {
+            animationPlantFoodVersion++;
+            animationPlantFoodAt = stateTime;
+        }
         for (Skill x : plantfoodSkill){
             x.do_skill(this , game);
         }
@@ -229,6 +245,33 @@ public class Plant extends Entity {
     boolean plantFood;
     public void setPlantFood(boolean plantFood) {
         this.plantFood = plantFood;
+    }
+
+    /** Number of completed base-ability activations for visual consumers. */
+    public long getAnimationActionVersion() {
+        return animationActionVersion;
+    }
+
+    /** Number of consumed Plant Food activations for visual consumers. */
+    public long getAnimationPlantFoodVersion() {
+        return animationPlantFoodVersion;
+    }
+
+    /** Number of damage events received by this plant for visual consumers. */
+    public long getAnimationDamageVersion() {
+        return animationDamageVersion;
+    }
+
+    public float getAnimationActionAt() {
+        return animationActionAt;
+    }
+
+    public float getAnimationPlantFoodAt() {
+        return animationPlantFoodAt;
+    }
+
+    public float getAnimationDamageAt() {
+        return animationDamageAt;
     }
 
 
@@ -246,6 +289,10 @@ public class Plant extends Entity {
     }
 
     public void setHp(float hp , Zombie eater , BaseGame game){
+        if (hp < this.hp && hp > 0f) {
+            animationDamageVersion++;
+            animationDamageAt = stateTime;
+        }
         this.hp = hp;
         if(hp <= 0){
             dispose(eater , game);
@@ -257,13 +304,13 @@ public class Plant extends Entity {
 
     private void dispose(Zombie eater , BaseGame game){
         if(tags.contains(PlantTags.Shroom) && tags.contains(PlantTags.MAGICAL)){
-           eater.setHypnotized(true);
-           if(plantFood){
-               game.getZombies().remove(eater);
-               Zombie zombie = ZombieFactory.createZombie("Gargantur");
-               zombie.setHypnotized(true);
-               game.getZombies().add(zombie);
-           }
+            eater.setHypnotized(true);
+            if(plantFood){
+                game.getZombies().remove(eater);
+                Zombie zombie = ZombieFactory.createZombie("Gargantur");
+                zombie.setHypnotized(true);
+                game.getZombies().add(zombie);
+            }
         }
         else if(tags.contains(PlantTags.EXPLOSIVE)){
             if (PlantLevel.current(this.type) >= 3) damage += 200;
