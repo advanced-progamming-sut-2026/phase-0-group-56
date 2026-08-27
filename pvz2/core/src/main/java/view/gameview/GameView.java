@@ -117,6 +117,8 @@ public final class GameView extends View {
     private Label preparationStatusLabel;
     private TextButton letsRockButton;
     private PlantTable plantTable;
+    private CrazyDaveIntro crazyDaveIntro;
+    private boolean crazyDaveIntroActive;
 
     private ToolsStack toolsStack;
     private Table pauseOverlay;
@@ -191,6 +193,9 @@ public final class GameView extends View {
             if (worldEntities != null) {
                 worldEntities.preloadPlants(controller.getSelectedPlants());
             }
+            if (shouldShowCrazyDaveIntro()) {
+                beginCrazyDaveIntro();
+            }
         }
 
         worldInput = createWorldInput();
@@ -221,7 +226,7 @@ public final class GameView extends View {
 
         if (cameraSliding) {
             updateCameraSlide(safeDelta);
-        } else if (state == BaseGame.GameState.PLAYING) {
+        } else if (state == BaseGame.GameState.PLAYING && !crazyDaveIntroActive) {
             float scaledDelta = safeDelta * (toolsStack == null ? 1f : toolsStack.getTimeScale());
             String log = controller.playGame(scaledDelta);
 
@@ -244,7 +249,7 @@ public final class GameView extends View {
 
         renderMap();
 
-        if (state == BaseGame.GameState.PLAYING) {
+        if (state == BaseGame.GameState.PLAYING && !crazyDaveIntroActive) {
             renderPlacementHighlight();
         }
 
@@ -532,6 +537,7 @@ public final class GameView extends View {
 
     private void updateCursorPlant(float delta, BaseGame.GameState state) {
         if (toolsStack == null
+            || crazyDaveIntroActive
             || cameraSliding
             || state != BaseGame.GameState.PLAYING
             || toolsStack.getInteractionMode() != ToolsStack.InteractionMode.PLANT) {
@@ -600,6 +606,7 @@ public final class GameView extends View {
         boolean customVisualAvailable = false;
 
         if (state == BaseGame.GameState.PLAYING
+            && !crazyDaveIntroActive
             && !cameraSliding
             && toolsStack != null) {
 
@@ -733,8 +740,11 @@ public final class GameView extends View {
                     if (worldEntities != null) {
                         worldEntities.preloadPlants(controller.getSelectedPlants());
                     }
-
-                    beginBattleCameraSlide();
+                    if (shouldShowCrazyDaveIntro()) {
+                        beginCrazyDaveIntro();
+                    } else {
+                        beginBattleCameraSlide();
+                    }
                 }
             }
         });
@@ -813,6 +823,50 @@ public final class GameView extends View {
         cameraSlideFromY = worldCamera.position.y;
     }
 
+    private boolean shouldShowCrazyDaveIntro() {
+        String type = level.getLevelType();
+        return type != null && !type.trim().equalsIgnoreCase("normal");
+    }
+
+    private void beginCrazyDaveIntro() {
+        if (crazyDaveIntroActive || stage == null) {
+            return;
+        }
+
+        if (preparationRoot != null) {
+            preparationRoot.setTouchable(Touchable.disabled);
+            preparationRoot.setVisible(false);
+        }
+        toolsStack.setVisible(false);
+        crazyDaveIntroActive = true;
+
+        Drawable bubble = safeDrawable("image_ui_quests_panel_edge_to_edge_ten");
+        crazyDaveIntro = new CrazyDaveIntro(
+            pvzAssetsRoot,
+            textureBank,
+            skin,
+            chapter,
+            level,
+            bubble,
+            this::finishCrazyDaveIntro
+        );
+        crazyDaveIntro.setBounds(0f, 0f, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+        stage.addActor(crazyDaveIntro);
+    }
+
+    private void finishCrazyDaveIntro() {
+        if (!crazyDaveIntroActive) {
+            return;
+        }
+        crazyDaveIntroActive = false;
+        if (crazyDaveIntro != null) {
+            crazyDaveIntro.remove();
+            crazyDaveIntro.dispose();
+            crazyDaveIntro = null;
+        }
+        beginBattleCameraSlide();
+    }
+
     private void updateCameraSlide(float delta) {
         cameraSlideElapsed += delta;
         float alpha = Math.min(1f, cameraSlideElapsed / CAMERA_SLIDE_DURATION);
@@ -845,6 +899,12 @@ public final class GameView extends View {
 
             @Override
             public boolean keyDown(int keycode) {
+                if (crazyDaveIntroActive) {
+                    if (keycode == Input.Keys.ENTER) {
+                        crazyDaveIntro.advance();
+                    }
+                    return true;
+                }
                 if (keycode == Input.Keys.ESCAPE) {
                     BaseGame.GameState state = controller.getGame().getState();
                     if (state == BaseGame.GameState.PLAYING || state == BaseGame.GameState.PAUSE) {
@@ -858,6 +918,9 @@ public final class GameView extends View {
 
             @Override
             public boolean touchDown(int screenX, int screenY, int pointer, int button) {
+                if (crazyDaveIntroActive) {
+                    return true;
+                }
                 if (button != Input.Buttons.LEFT
                     || cameraSliding
                     || controller.getGame().getState() != BaseGame.GameState.PLAYING) {
@@ -1297,6 +1360,12 @@ public final class GameView extends View {
         disposed = true;
 
         restoreSystemCursor();
+
+        crazyDaveIntroActive = false;
+        if (crazyDaveIntro != null) {
+            crazyDaveIntro.dispose();
+            crazyDaveIntro = null;
+        }
 
         if (stage != null) {
             stage.dispose();
