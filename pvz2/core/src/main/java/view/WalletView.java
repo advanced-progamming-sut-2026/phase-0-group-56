@@ -2,8 +2,10 @@ package view;
 
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
+import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.utils.Align;
+import com.badlogic.gdx.utils.Scaling;
 
 import controllers.menus.secondarymenus.Wallet;
 import controllers.datacontroller.Data;
@@ -102,6 +104,18 @@ public class WalletView extends View {
         int amount
     ) {
         Table card = pvzInnerPanel();
+
+        Image icon = MenuVisualAssets.image(
+            "GEMS".equals(labelText) ? "gem" : "coin"
+        );
+        if (icon != null) {
+            icon.setScaling(Scaling.fit);
+            card.add(icon)
+                .size(48f)
+                .center()
+                .padBottom(3f)
+                .row();
+        }
 
         Label label = new Label(labelText, skin, "medium_outline");
         label.setAlignment(Align.center);

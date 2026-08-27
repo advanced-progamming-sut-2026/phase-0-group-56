@@ -2,9 +2,11 @@ package view;
 
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
+import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.utils.Align;
+import com.badlogic.gdx.utils.Scaling;
 
 import controllers.datacontroller.Data;
 import controllers.menus.secondarymenus.GreenHouseController;
@@ -84,6 +86,16 @@ public class GreenHouseView extends View {
 
         Table gardenPanel =
             pvzPanel();
+
+        Image potArt = MenuVisualAssets.image("pot");
+        if (potArt != null) {
+            potArt.setScaling(Scaling.fit);
+            gardenPanel.add(potArt)
+                .size(74f)
+                .center()
+                .padBottom(3f)
+                .row();
+        }
 
         Table pots =
             new Table();

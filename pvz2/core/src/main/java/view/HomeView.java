@@ -1,6 +1,7 @@
 package view;
 
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
+import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.utils.Align;
@@ -41,17 +42,42 @@ public class HomeView extends View {
             nickname = "PLAYER";
         }
 
-        Label welcome =
-            mediumTitle(
-                "WELCOME, " + nickname.toUpperCase() + "!"
-            );
+        Table hero = pvzPanel();
+        Image pot = MenuVisualAssets.image("pot");
+        if (pot != null) {
+            pot.setScaling(com.badlogic.gdx.utils.Scaling.fit);
+            hero.add(pot)
+                .size(84f)
+                .padRight(14f)
+                .center();
+        }
 
-        welcome.setAlignment(Align.center);
+        Table heroCopy = new Table();
+        Label welcome = mediumTitle(
+            "WELCOME, " + nickname.toUpperCase() + "!"
+        );
+        welcome.setAlignment(Align.left);
+        heroCopy.add(welcome)
+            .left()
+            .growX()
+            .row();
+        Label subtitle = secondaryLabel(
+            "Your garden is ready. Choose a destination and keep the lawn growing."
+        );
+        subtitle.setWrap(true);
+        subtitle.setAlignment(Align.left);
+        heroCopy.add(subtitle)
+            .width(560f)
+            .left();
+        hero.add(heroCopy)
+            .growX()
+            .left();
 
-        table.add(welcome)
+        table.add(hero)
+            .width(820f)
             .center()
-            .padTop(8f)
-            .padBottom(12f)
+            .padTop(4f)
+            .padBottom(14f)
             .row();
 
         Table shortcutPanel = pvzInnerPanel();
@@ -180,6 +206,14 @@ public class HomeView extends View {
             .width(310f)
             .height(56f)
             .pad(7f, 12f, 7f, 12f);
+
+        mainPanel.add(
+                mediumTitle("GARDEN COMMAND CENTER")
+            )
+            .colspan(2)
+            .center()
+            .padBottom(7f)
+            .row();
 
         mainPanel.add(adventure);
         mainPanel.add(collection);

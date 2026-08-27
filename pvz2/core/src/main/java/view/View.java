@@ -3,19 +3,24 @@ package view;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.Touchable;
+import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.ImageButton;
 import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
+import com.badlogic.gdx.scenes.scene2d.ui.Stack;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.ui.TextField;
+import com.badlogic.gdx.scenes.scene2d.actions.Actions;
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.scenes.scene2d.utils.Drawable;
 import com.badlogic.gdx.utils.Align;
+import com.badlogic.gdx.utils.Scaling;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 
 import controllers.datacontroller.Data;
@@ -46,6 +51,7 @@ public class View implements Screen {
 
     private Label coinLabel;
     private Label diamondLabel;
+    private Stack screenLayers;
 
     public void input() {
         if (scanner != null && scanner.hasNextLine()) {
@@ -85,6 +91,30 @@ public class View implements Screen {
 
         Gdx.input.setInputProcessor(stage);
 
+        screenLayers = new Stack();
+        screenLayers.setFillParent(true);
+
+        Image background = MenuVisualAssets.image("background");
+        if (background != null) {
+            background.setScaling(Scaling.fill);
+            background.setTouchable(Touchable.disabled);
+            screenLayers.add(background);
+        } else {
+            Image fallbackBackground = new Image(solidDrawable(
+                new Color(0.025f, 0.09f, 0.055f, 1f)
+            ));
+            fallbackBackground.setTouchable(Touchable.disabled);
+            screenLayers.add(fallbackBackground);
+        }
+
+        // A restrained veil keeps the official space background atmospheric
+        // while preserving contrast for the supplied PvZ controls and fonts.
+        Image veil = new Image(solidDrawable(
+            new Color(0.01f, 0.025f, 0.035f, 0.30f)
+        ));
+        veil.setTouchable(Touchable.disabled);
+        screenLayers.add(veil);
+
         root = new Table();
         root.setFillParent(true);
         root.top();
@@ -95,16 +125,8 @@ public class View implements Screen {
             18f
         );
 
-        Drawable screenBackground =
-            getSkinDrawableSafe(
-                "image_ui_quests_panel_edge_to_edge_ten"
-            );
-
-        if (screenBackground != null) {
-            root.setBackground(screenBackground);
-        }
-
-        stage.addActor(root);
+        screenLayers.add(root);
+        stage.addActor(screenLayers);
 
         buildHeader();
 
@@ -121,7 +143,22 @@ public class View implements Screen {
             false
         );
 
-        root.add(scrollPane)
+        Table scrollFrame = new Table();
+        Drawable frameBackground =
+            getSkinDrawableSafe("image_ui_dialog_asset_inner_bkgd_10");
+        if (frameBackground != null) {
+            scrollFrame.setBackground(frameBackground);
+        } else {
+            scrollFrame.setBackground(solidDrawable(
+                new Color(0.02f, 0.055f, 0.045f, 0.82f)
+            ));
+        }
+
+        scrollFrame.add(scrollPane)
+            .grow()
+            .pad(8f);
+
+        root.add(scrollFrame)
             .grow()
             .padTop(12f);
 
@@ -140,7 +177,7 @@ public class View implements Screen {
 
         Table header = new Table();
 
-        header.pad(7f, 10f, 7f, 10f);
+        header.pad(6f, 10f, 6f, 10f);
 
         Drawable headerBackground =
             getSkinDrawableSafe(
@@ -152,6 +189,7 @@ public class View implements Screen {
         }
 
         Screen backScreen = getBackScreen();
+        Table navigationSlot = new Table();
 
         if (backScreen != null) {
 
@@ -177,42 +215,49 @@ public class View implements Screen {
                 }
             );
 
-            header.add(back)
-                .width(135f)
-                .height(52f)
+            navigationSlot.add(back)
+                .width(122f)
+                .height(50f)
                 .left();
-
-        } else {
-
-            header.add()
-                .width(135f);
         }
 
-        Label title =
-            new Label(
-                getScreenTitle()
-                    .toUpperCase(),
-                skin,
-                "big_outline"
-            );
+        header.add(navigationSlot)
+            .width(235f)
+            .left();
 
-        title.setAlignment(
-            Align.center
-        );
+        Table identity = new Table();
+        Image logo = MenuVisualAssets.image("logo");
+        if (logo != null) {
+            logo.setScaling(Scaling.fit);
+            identity.add(logo)
+                .width(225f)
+                .height(56f)
+                .center()
+                .row();
+        }
 
-        header.add(title)
+        Label title = mediumTitle(getScreenTitle().toUpperCase());
+        title.setAlignment(Align.center);
+        identity.add(title)
+            .center()
+            .padTop(logo == null ? 8f : -2f);
+
+        header.add(identity)
             .expandX()
-            .center();
+            .center()
+            .padLeft(8f)
+            .padRight(8f);
 
         Table resourceBar =
             buildResourceBar();
 
         header.add(resourceBar)
+            .width(235f)
             .right();
 
         root.add(header)
             .growX()
-            .minHeight(74f)
+            .minHeight(92f)
             .row();
     }
 
@@ -228,6 +273,12 @@ public class View implements Screen {
 
         bar.pad(5f, 8f, 5f, 8f);
 
+        User user = Data.getCurrentUser();
+
+        if (user == null) {
+            return bar;
+        }
+
         Drawable resourceBackground =
             getSkinDrawableSafe(
                 "image_ui_dialog_asset_inner_bkgd_10"
@@ -237,30 +288,13 @@ public class View implements Screen {
             bar.setBackground(resourceBackground);
         }
 
-        User user = Data.getCurrentUser();
+        coinLabel = resourceAmount(user.getCoins());
+        diamondLabel = resourceAmount(user.getDiamonds());
 
-        if (user == null) {
-            return bar;
-        }
+        bar.add(resourceChip("coin", "COINS", coinLabel))
+            .padRight(8f);
 
-        coinLabel =
-            new Label(
-                "COINS: " + user.getCoins(),
-                skin,
-                "medium_outline"
-            );
-
-        diamondLabel =
-            new Label(
-                "GEMS: " + user.getDiamonds(),
-                skin,
-                "medium_outline"
-            );
-
-        bar.add(coinLabel)
-            .padRight(12f);
-
-        bar.add(diamondLabel);
+        bar.add(resourceChip("gem", "GEMS", diamondLabel));
 
         /*
          * Debug resource buttons.
@@ -337,15 +371,46 @@ public class View implements Screen {
             bar.add(addCoins)
                 .width(105f)
                 .height(38f)
-                .padTop(4f);
+                .padTop(5f)
+                .padRight(4f);
 
             bar.add(addGems)
                 .width(105f)
                 .height(38f)
-                .padTop(4f);
+                .padTop(5f);
         }
 
         return bar;
+    }
+
+    private Label resourceAmount(int amount) {
+        Label label = mediumTitle(String.valueOf(amount));
+        label.setAlignment(Align.center);
+        return label;
+    }
+
+    private Table resourceChip(
+        String iconKey,
+        String caption,
+        Label amount
+    ) {
+        Table chip = new Table();
+        Image icon = MenuVisualAssets.image(iconKey);
+        if (icon != null) {
+            icon.setScaling(Scaling.fit);
+            chip.add(icon)
+                .size(26f)
+                .padRight(3f);
+        }
+
+        Table values = new Table();
+        Label captionLabel = secondaryLabel(caption);
+        captionLabel.setAlignment(Align.center);
+        values.add(captionLabel).center().row();
+        values.add(amount).center();
+
+        chip.add(values).minWidth(58f).center();
+        return chip;
     }
 
     protected void refreshResourceLabels() {
@@ -360,16 +425,14 @@ public class View implements Screen {
         if (coinLabel != null) {
 
             coinLabel.setText(
-                "COINS: "
-                    + user.getCoins()
+                String.valueOf(user.getCoins())
             );
         }
 
         if (diamondLabel != null) {
 
             diamondLabel.setText(
-                "GEMS: "
-                    + user.getDiamonds()
+                String.valueOf(user.getDiamonds())
             );
         }
     }
@@ -450,6 +513,7 @@ public class View implements Screen {
         Runnable action
     ) {
         Table shortcut = pvzInnerPanel();
+        shortcut.pad(12f, 10f, 12f, 10f);
 
         ImageButton icon;
 
@@ -475,7 +539,7 @@ public class View implements Screen {
         );
 
         shortcut.add(icon)
-            .size(62f)
+            .size(66f)
             .center()
             .padBottom(4f)
             .row();
@@ -500,6 +564,12 @@ public class View implements Screen {
         String subtitleText
     ) {
         Table banner = pvzInnerPanel();
+        Drawable bannerBackground =
+            getSkinDrawableSafe("image_ui_mainmenu_mm_settings_tab_10");
+        if (bannerBackground != null) {
+            banner.setBackground(bannerBackground);
+        }
+        banner.pad(10f, 16f, 10f, 16f);
 
         ImageButton icon;
 
@@ -570,8 +640,37 @@ public class View implements Screen {
                 );
         }
 
+        final TextButton visualButton = button;
         button.addListener(
             new ClickListener() {
+                @Override
+                public boolean touchDown(
+                    InputEvent event,
+                    float x,
+                    float y,
+                    int pointer,
+                    int buttonCode
+                ) {
+                    visualButton.setTransform(true);
+                    visualButton.setOrigin(Align.center);
+                    visualButton.clearActions();
+                    visualButton.addAction(Actions.scaleTo(0.97f, 0.97f, 0.06f));
+                    return super.touchDown(event, x, y, pointer, buttonCode);
+                }
+
+                @Override
+                public void touchUp(
+                    InputEvent event,
+                    float x,
+                    float y,
+                    int pointer,
+                    int buttonCode
+                ) {
+                    visualButton.clearActions();
+                    visualButton.addAction(Actions.scaleTo(1f, 1f, 0.08f));
+                    super.touchUp(event, x, y, pointer, buttonCode);
+                }
+
                 @Override
                 public void clicked(
                     InputEvent event,
@@ -667,12 +766,20 @@ public class View implements Screen {
         );
 
         Drawable background =
-            getSkinDrawableSafe(
+            getSkinDrawableSafe("image_ui_dialog_asset_dialogborder_10");
+
+        if (background == null) {
+            background = getSkinDrawableSafe(
                 "image_ui_quests_panel_edge_to_edge_ten"
             );
+        }
 
         if (background != null) {
             panel.setBackground(background);
+        } else {
+            panel.setBackground(solidDrawable(
+                new Color(0.06f, 0.15f, 0.12f, 0.94f)
+            ));
         }
 
         return panel;
@@ -695,6 +802,10 @@ public class View implements Screen {
 
         if (background != null) {
             panel.setBackground(background);
+        } else {
+            panel.setBackground(solidDrawable(
+                new Color(0.10f, 0.22f, 0.16f, 0.95f)
+            ));
         }
 
         return panel;
@@ -712,6 +823,14 @@ public class View implements Screen {
             return skin.getDrawable(name);
         } catch (Exception exception) {
             return null;
+        }
+    }
+
+    protected Drawable solidDrawable(Color color) {
+        try {
+            return skin.newDrawable("white-pixel", color);
+        } catch (Exception exception) {
+            return getSkinDrawableSafe("white-pixel");
         }
     }
 
@@ -790,9 +909,13 @@ public class View implements Screen {
             new Table();
 
         overlay.setFillParent(true);
+        overlay.center();
         overlay.setTouchable(
             Touchable.enabled
         );
+        overlay.setBackground(solidDrawable(
+            new Color(0.005f, 0.015f, 0.02f, 0.68f)
+        ));
 
         final Table box =
             pvzPanel();
@@ -860,9 +983,13 @@ public class View implements Screen {
             new Table();
 
         overlay.setFillParent(true);
+        overlay.center();
         overlay.setTouchable(
             Touchable.enabled
         );
+        overlay.setBackground(solidDrawable(
+            new Color(0.005f, 0.015f, 0.02f, 0.68f)
+        ));
 
         final Table box =
             pvzPanel();

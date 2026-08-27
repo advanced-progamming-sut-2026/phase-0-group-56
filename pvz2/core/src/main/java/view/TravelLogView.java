@@ -2,10 +2,12 @@ package view;
 
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
+import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.ProgressBar;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.utils.Align;
+import com.badlogic.gdx.utils.Scaling;
 
 import controllers.datacontroller.Data;
 import controllers.menus.secondarymenus.TravelLog;
@@ -242,10 +244,20 @@ public class TravelLogView extends View {
                 + quest.getPriorityName()
                 + "]";
 
-        Label questName =
-            mediumTitle(titleText);
+        Table questHeader = new Table();
+        Image questIcon = MenuVisualAssets.image("tasks");
+        if (questIcon != null) {
+            questIcon.setScaling(Scaling.fit);
+            questHeader.add(questIcon)
+                .size(42f)
+                .padRight(8f);
+        }
+        Label questName = mediumTitle(titleText);
+        questHeader.add(questName)
+            .left()
+            .growX();
 
-        card.add(questName)
+        card.add(questHeader)
             .left()
             .growX()
             .padBottom(6f)

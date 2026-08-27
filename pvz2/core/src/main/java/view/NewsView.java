@@ -2,8 +2,10 @@ package view;
 
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
+import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.utils.Align;
+import com.badlogic.gdx.utils.Scaling;
 
 import controllers.datacontroller.Data;
 import controllers.menus.secondarymenus.News;
@@ -64,7 +66,19 @@ public class NewsView extends View {
 
         status.setAlignment(Align.center);
 
-        table.add(status)
+        Table statusPanel = pvzInnerPanel();
+        Image statusIcon = MenuVisualAssets.image("tasks");
+        if (statusIcon != null) {
+            statusIcon.setScaling(Scaling.fit);
+            statusPanel.add(statusIcon)
+                .size(42f)
+                .padRight(8f);
+        }
+        statusPanel.add(status).center();
+
+        table.add(statusPanel)
+            .width(420f)
+            .center()
             .padTop(8f)
             .padBottom(16f)
             .row();

@@ -2,10 +2,12 @@ package view;
 
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
+import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.SelectBox;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.Array;
+import com.badlogic.gdx.utils.Scaling;
 
 import controllers.datacontroller.Data;
 import controllers.menus.secondarymenus.Shop;
@@ -226,6 +228,15 @@ public class ShopView extends View {
         Table card =
             pvzPanel();
 
+        Image currencyIcon = MenuVisualAssets.image("gem");
+        if (currencyIcon != null) {
+            currencyIcon.setScaling(Scaling.fit);
+            card.add(currencyIcon)
+                .size(54f)
+                .center()
+                .padRight(8f);
+        }
+
         Table text =
             new Table();
 
@@ -309,6 +320,17 @@ public class ShopView extends View {
 
         Table card =
             pvzPanel();
+
+        Image currencyIcon = MenuVisualAssets.image(
+            priceText.toUpperCase().contains("GEM") ? "gem" : "coin"
+        );
+        if (currencyIcon != null) {
+            currencyIcon.setScaling(Scaling.fit);
+            card.add(currencyIcon)
+                .size(54f)
+                .center()
+                .padRight(8f);
+        }
 
         Table text =
             new Table();
