@@ -73,7 +73,7 @@ public final class WorldEntityRenderer implements Disposable {
         initialiseZombies(pvzAssetsRoot, sharedTextureBank);
         initialiseMowers(pvzAssetsRoot, sharedTextureBank);
         initialiseChapterForeground();
-        initialiseSuns(sharedTextureBank, sunFallback);
+        initialiseSuns(pvzAssetsRoot, sharedTextureBank, sunFallback);
     }
 
     private void initialiseZombies(
@@ -304,10 +304,12 @@ public final class WorldEntityRenderer implements Disposable {
     }
 
     private void initialiseSuns(
+        FileHandle pvzAssetsRoot,
         TextureBank sharedTextureBank,
         Drawable sunFallback
     ) {
         sunRenderer = new SunRenderer(
+            pvzAssetsRoot,
             sharedTextureBank,
             sunFallback
         );
@@ -403,7 +405,9 @@ public final class WorldEntityRenderer implements Disposable {
             specialGameElementRenderer.dispose();
             specialGameElementRenderer = null;
         }
-        // SunRenderer does not own sharedTextureBank.
-        sunRenderer = null;
+        if (sunRenderer != null) {
+            sunRenderer.dispose();
+            sunRenderer = null;
+        }
     }
 }

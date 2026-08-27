@@ -7,6 +7,7 @@ import com.badlogic.gdx.scenes.scene2d.Touchable;
 
 import controllers.menus.gamecontroller.GameController;
 import models.entity.Sun;
+import models.games.BaseGame;
 
 public final class SunLayer extends Actor {
 
@@ -31,6 +32,15 @@ public final class SunLayer extends Actor {
         this.renderer = renderer;
 
         setTouchable(Touchable.disabled);
+    }
+
+    @Override
+    public void act(float delta) {
+        super.act(delta);
+        float animationDelta = controller.getGame().getState() == BaseGame.GameState.PLAYING
+            ? Math.max(0f, delta)
+            : 0f;
+        renderer.update(animationDelta, controller.getGame().getSuns());
     }
 
     @Override
