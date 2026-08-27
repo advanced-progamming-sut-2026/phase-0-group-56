@@ -176,6 +176,12 @@ public class HomeView extends View {
                 () -> openMenu("Wallet menu")
             );
 
+        TextButton network =
+            purpleButton(
+                "NETWORK PLAY",
+                () -> openMenu("Network menu")
+            );
+
         mainPanel.defaults()
             .width(310f)
             .height(56f)
@@ -199,6 +205,9 @@ public class HomeView extends View {
 
         mainPanel.add(shop);
         mainPanel.add(wallet);
+        mainPanel.row();
+
+        mainPanel.add(network).colspan(2);
         mainPanel.row();
 
         table.add(mainPanel)

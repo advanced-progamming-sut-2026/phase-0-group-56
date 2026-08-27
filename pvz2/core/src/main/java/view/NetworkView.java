@@ -13,16 +13,28 @@ import network.NetworkService;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/** Graphical view for the pre-game network features. */
 public class NetworkView extends View {
-    /*private Label statusLabel;
+    private final Network controller;
+    private Label statusLabel;
     private Label requestLabel;
     private TextButton acceptButton;
     private TextButton rejectButton;
     private String requestId;
     private boolean lastConnectionState;
 
+    /** MVC constructor: the Network menu/controller is supplied by the caller. */
+    public NetworkView(Network controller) {
+        if (controller == null) {
+            throw new IllegalArgumentException("Network controller cannot be null.");
+        }
+        this.controller = controller;
+        menu = controller;
+    }
+
+    /** Convenience overload for existing callers that create screens directly. */
     public NetworkView() {
-        menu = new Network();
+        this(new Network());
     }
 
     @Override
@@ -32,38 +44,59 @@ public class NetworkView extends View {
 
     @Override
     protected void buildContent(Table table) {
-        Network controller = (Network) menu;
-        table.add(menuSectionHeader("almanac", "NETWORK PLAY",
-                "Find a random opponent or challenge a specific player."))
-            .width(820f).padBottom(15f).row();
+        table.add(menuSectionHeader(
+                "almanac",
+                "NETWORK PLAY",
+                "Find a random opponent or challenge a specific player."
+            ))
+            .width(820f)
+            .padBottom(15f)
+            .row();
+
         lastConnectionState = NetworkService.isConnected();
-        statusLabel = secondaryLabel(lastConnectionState
-            ? "CONNECTED TO SERVER" : "NOT CONNECTED TO SERVER");
+        statusLabel = secondaryLabel(connectionText(lastConnectionState));
         table.add(statusLabel).padBottom(10f).row();
-        table.add(greenButton("FIND RANDOM OPPONENT",
-                () -> setStatus(controller.findRandomOpponent())))
-            .width(360f).height(54f).padBottom(12f).row();
+
+        table.add(greenButton(
+                "FIND RANDOM OPPONENT",
+                () -> setStatus(controller.findRandomOpponent())
+            ))
+            .width(360f)
+            .height(54f)
+            .padBottom(12f)
+            .row();
 
         Table challenge = new Table();
         TextField username = field("Opponent username");
-        challenge.add(username).width(330f).height(44f).padRight(8f);
-        challenge.add(purpleButton("CHALLENGE",
-                () -> setStatus(controller.challenge(username.getText().trim()))))
-            .width(180f).height(44f);
+        challenge.add(username)
+            .width(330f)
+            .height(44f)
+            .padRight(8f);
+        challenge.add(purpleButton(
+                "CHALLENGE",
+                () -> setStatus(controller.challenge(username.getText().trim()))
+            ))
+            .width(180f)
+            .height(44f);
         table.add(challenge).padBottom(16f).row();
 
         requestLabel = secondaryLabel("No incoming game requests.");
         table.add(requestLabel).padBottom(8f).row();
+
         Table decisions = new Table();
-        acceptButton = greenSmallButton("ACCEPT", () -> respond(controller, true));
-        rejectButton = brownButton("REJECT", () -> respond(controller, false));
+        acceptButton = greenSmallButton("ACCEPT", () -> respond(true));
+        rejectButton = brownButton("REJECT", () -> respond(false));
         decisions.add(acceptButton).width(150f).height(44f).padRight(8f);
         decisions.add(rejectButton).width(150f).height(44f);
         table.add(decisions).row();
         setRequestVisible(false);
     }
 
-    private void respond(Network controller, boolean accepted) {
+    private String connectionText(boolean connected) {
+        return connected ? "CONNECTED TO SERVER" : "NOT CONNECTED TO SERVER";
+    }
+
+    private void respond(boolean accepted) {
         if (requestId == null || requestId.isBlank()) {
             setRequestVisible(false);
             return;
@@ -75,7 +108,9 @@ public class NetworkView extends View {
 
     private void setStatus(String message) {
         if (statusLabel != null) {
-            statusLabel.setText(message == null ? "" : message);
+            statusLabel.setText(message == null || message.isBlank()
+                ? connectionText(NetworkService.isConnected())
+                : message);
         }
     }
 
@@ -95,15 +130,13 @@ public class NetworkView extends View {
         boolean connected = NetworkService.isConnected();
         if (connected != lastConnectionState) {
             lastConnectionState = connected;
-            // Do not overwrite an in-progress response while the connection is
-            // still alive; only report a newly lost connection here.
             if (!connected) {
-                setStatus("NOT CONNECTED TO SERVER");
+                setStatus(connectionText(false));
             }
         }
 
         NetworkEvent event;
-        while ((event = ((Network) menu).pollEvent()) != null) {
+        while ((event = controller.pollEvent()) != null) {
             String type = event.type();
             String[] data = event.data();
             if ("GAME_REQUEST".equals(type) && data.length >= 2
@@ -130,35 +163,10 @@ public class NetworkView extends View {
     }
 
     @Override
-    public void input() {
-        System.out.println(menu.ShowCurrentMenu());
-        super.input();
-        // The graphical screen normally has no terminal input.  Keep the
-        // legacy command path safe when stdin is closed or unavailable.
-        if (input == null || input.isBlank()) {
-            return;
-        }
-        if (handleGlobalCommands(input)) {
-            return;
-        }
-        Matcher connectMatcher = Pattern.compile(RegexHelper.NETWORK_CONNECT).matcher(input);
-        Matcher hostMatcher = Pattern.compile(RegexHelper.NETWORK_HOST).matcher(input);
-        if (connectMatcher.matches()) {
-            System.out.println(((Network) menu).connectToServer(connectMatcher.group("ip"),
-                Integer.parseInt(connectMatcher.group("port"))));
-        } else if (hostMatcher.matches()) {
-            System.out.println(((Network) menu).hostServer(Integer.parseInt(hostMatcher.group("port"))));
-        } else if (input.matches(RegexHelper.NETWORK_RANDOM_MATCH)) {
-            System.out.println(((Network) menu).findRandomOpponent());
-        } else if (input.matches(RegexHelper.NETWORK_CHALLENGE)) {
-            System.out.println(((Network) menu).challenge(input.replaceFirst("(?i)^challenge\\s+", "")));
-        } else if (input.matches(RegexHelper.NETWORK_RESPOND)) {
-            Matcher matcher = Pattern.compile(RegexHelper.NETWORK_RESPOND).matcher(input);
-            matcher.matches();
-            System.out.println(((Network) menu).respondToChallenge(matcher.group("requestId"),
-                "accept".equalsIgnoreCase(matcher.group("decision"))));
-        } else {
-            System.out.println("Invalid command!");
-        }
-    }*/
+    public void hide() {
+        controller.close();
+        super.hide();
+    }
+
+
 }
