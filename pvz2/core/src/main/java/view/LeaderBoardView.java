@@ -1,10 +1,12 @@
 package view;
 
 import com.badlogic.gdx.Screen;
+import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.utils.Align;
+import com.badlogic.gdx.utils.Scaling;
 
 import controllers.menus.secondarymenus.LeaderBoard;
 import models.User;
@@ -63,8 +65,16 @@ public class LeaderBoardView extends View {
             Align.center
         );
 
+        Image hintIcon = MenuVisualAssets.image("star");
+        if (hintIcon != null) {
+            hintIcon.setScaling(Scaling.fit);
+            hintPanel.add(hintIcon)
+                .size(34f)
+                .padRight(8f);
+        }
+
         hintPanel.add(hint)
-            .width(760f);
+            .width(710f);
 
         table.add(hintPanel)
             .width(820f)
