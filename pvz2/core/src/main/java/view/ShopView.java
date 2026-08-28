@@ -60,7 +60,7 @@ public class ShopView extends View {
 
         table.add(
                 menuSectionHeader(
-                    "hud_zg",
+                    "shop",
                     "CRAZY DAVE'S SHOP",
                     "Spend coins and gems on permanent and daily offers."
                 )
@@ -77,15 +77,23 @@ public class ShopView extends View {
             wrappedLabel(
                 "Every purchase asks for confirmation "
                     + "before coins or gems are spent.",
-                720f
+                620f
             );
 
         hint.setAlignment(
             Align.center
         );
 
+        Image dave = MenuVisualAssets.image("dave_waist");
+        if (dave != null) {
+            dave.setScaling(Scaling.fit);
+            hintPanel.add(dave)
+                .size(78f)
+                .padRight(10f);
+        }
+
         hintPanel.add(hint)
-            .width(720f);
+            .width(620f);
 
         table.add(hintPanel)
             .width(780f)
@@ -281,7 +289,9 @@ public class ShopView extends View {
             .pad(10f);
 
         card.add(
-                greenButton(
+                assetTextButton(
+                    "gems_buy",
+                    "gems_buy_down",
                     "BUY",
                     () ->
                         confirmPurchase(
@@ -301,7 +311,7 @@ public class ShopView extends View {
             .pad(10f);
 
         table.add(card)
-            .width(980f)
+            .width(1080f)
             .pad(6f)
             .row();
     }
@@ -321,9 +331,8 @@ public class ShopView extends View {
         Table card =
             pvzPanel();
 
-        Image currencyIcon = MenuVisualAssets.image(
-            priceText.toUpperCase().contains("GEM") ? "gem" : "coin"
-        );
+        String productIconKey = productIconKey(titleText, priceText);
+        Image currencyIcon = MenuVisualAssets.image(productIconKey);
         if (currencyIcon != null) {
             currencyIcon.setScaling(Scaling.fit);
             card.add(currencyIcon)
@@ -371,7 +380,9 @@ public class ShopView extends View {
             .pad(10f);
 
         card.add(
-                greenButton(
+                assetTextButton(
+                    purchaseButtonKey(titleText, priceText),
+                    purchaseButtonDownKey(titleText, priceText),
                     "BUY",
                     buyAction
                 )
@@ -381,9 +392,61 @@ public class ShopView extends View {
             .pad(10f);
 
         table.add(card)
-            .width(980f)
+            .width(1080f)
             .pad(6f)
             .row();
+    }
+
+    private String productIconKey(
+        String titleText,
+        String priceText
+    ) {
+        String title = titleText == null ? "" : titleText.toUpperCase();
+
+        if (title.contains("POT")) {
+            return "pot";
+        }
+        if (title.contains("PLANT FOOD")) {
+            return "plantfood";
+        }
+        if (title.contains("DAILY")) {
+            return "star";
+        }
+        if (title.contains("CURRENCY")) {
+            return "gem";
+        }
+
+        return priceText != null && priceText.toUpperCase().contains("GEM")
+            ? "gem"
+            : "coin";
+    }
+
+    private String purchaseButtonKey(
+        String titleText,
+        String priceText
+    ) {
+        String title = titleText == null ? "" : titleText.toUpperCase();
+        String price = priceText == null ? "" : priceText.toUpperCase();
+
+        if (title.contains("CURRENCY")) {
+            return "generic_currency";
+        }
+        if (price.contains("GEM")) {
+            return "gems_buy";
+        }
+        return "coin_buy";
+    }
+
+    private String purchaseButtonDownKey(
+        String titleText,
+        String priceText
+    ) {
+        String normalKey = purchaseButtonKey(titleText, priceText);
+        return switch (normalKey) {
+            case "generic_currency" -> "generic_currency_down";
+            case "gems_buy" -> "gems_buy_down";
+            default -> "coin_buy_down";
+        };
     }
 
     private void confirmPurchase(

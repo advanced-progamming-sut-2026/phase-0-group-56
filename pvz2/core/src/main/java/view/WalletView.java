@@ -38,7 +38,7 @@ public class WalletView extends View {
 
         table.add(
                 menuSectionHeader(
-                    "hud_zg",
+                    "shop",
                     "WALLET",
                     "Manage your Coins and Gems in one place."
                 )

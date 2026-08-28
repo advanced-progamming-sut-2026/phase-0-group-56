@@ -194,26 +194,10 @@ public class View implements Screen {
         if (backScreen != null) {
 
             TextButton back =
-                new TextButton(
+                brownButton(
                     "BACK",
-                    skin,
-                    "brown"
+                    () -> App.setScreen(getBackScreen())
                 );
-
-            back.addListener(
-                new ClickListener() {
-                    @Override
-                    public void clicked(
-                        InputEvent event,
-                        float x,
-                        float y
-                    ) {
-                        App.setScreen(
-                            getBackScreen()
-                        );
-                    }
-                }
-            );
 
             navigationSlot.add(back)
                 .width(122f)
@@ -291,10 +275,10 @@ public class View implements Screen {
         coinLabel = resourceAmount(user.getCoins());
         diamondLabel = resourceAmount(user.getDiamonds());
 
-        bar.add(resourceChip("coin", "COINS", coinLabel))
+        bar.add(resourceChip("coin_small", "COINS", coinLabel))
             .padRight(8f);
 
-        bar.add(resourceChip("gem", "GEMS", diamondLabel));
+        bar.add(resourceChip("gem_small", "GEMS", diamondLabel));
 
         /*
          * Debug resource buttons.
@@ -395,6 +379,11 @@ public class View implements Screen {
         Label amount
     ) {
         Table chip = new Table();
+        Drawable chipBackground = MenuVisualAssets.drawable("counter_bg");
+        if (chipBackground != null) {
+            chip.setBackground(chipBackground);
+        }
+
         Image icon = MenuVisualAssets.image(iconKey);
         if (icon != null) {
             icon.setScaling(Scaling.fit);
@@ -503,8 +492,8 @@ public class View implements Screen {
     }
 
     /**
-     * Creates a compact visual shortcut using one of the official
-     * pvz-skin ImageButton styles. The action is deliberately attached
+     * Creates a compact visual shortcut using extracted menu artwork when it
+     * exists, then falls back to the bundled skin icon. The action is attached
      * only to the icon so the surrounding menu layout remains unchanged.
      */
     protected Table menuShortcut(
@@ -515,13 +504,7 @@ public class View implements Screen {
         Table shortcut = pvzInnerPanel();
         shortcut.pad(12f, 10f, 12f, 10f);
 
-        ImageButton icon;
-
-        try {
-            icon = new ImageButton(skin, iconStyle);
-        } catch (Exception exception) {
-            icon = new ImageButton(skin);
-        }
+        ImageButton icon = createMenuIcon(iconStyle);
 
         icon.addListener(
             new ClickListener() {
@@ -565,19 +548,17 @@ public class View implements Screen {
     ) {
         Table banner = pvzInnerPanel();
         Drawable bannerBackground =
-            getSkinDrawableSafe("image_ui_mainmenu_mm_settings_tab_10");
+            MenuVisualAssets.drawable("settings_tab");
+        if (bannerBackground == null) {
+            bannerBackground =
+                getSkinDrawableSafe("image_ui_mainmenu_mm_settings_tab_10");
+        }
         if (bannerBackground != null) {
             banner.setBackground(bannerBackground);
         }
         banner.pad(10f, 16f, 10f, 16f);
 
-        ImageButton icon;
-
-        try {
-            icon = new ImageButton(skin, iconStyle);
-        } catch (Exception exception) {
-            icon = new ImageButton(skin);
-        }
+        ImageButton icon = createMenuIcon(iconStyle);
 
         icon.setTouchable(Touchable.disabled);
 
@@ -608,6 +589,137 @@ public class View implements Screen {
             .left();
 
         return banner;
+    }
+
+    /**
+     * Resolves the semantic skin style used by existing screens to the
+     * matching extracted artwork. Keeping the mapping here means screens do
+     * not know whether a visual comes from the skin module or assets/ui/menu.
+     */
+    private ImageButton createMenuIcon(String iconStyle) {
+        String assetKey = menuAssetKey(iconStyle);
+        if (assetKey != null) {
+            ImageButton assetButton = MenuVisualAssets.imageButton(
+                assetKey,
+                pressedAssetKey(assetKey),
+                null
+            );
+            if (assetButton != null) {
+                return assetButton;
+            }
+        }
+
+        try {
+            return new ImageButton(skin, iconStyle);
+        } catch (Exception exception) {
+            return new ImageButton(skin);
+        }
+    }
+
+    private String menuAssetKey(String iconStyle) {
+        if (iconStyle == null) {
+            return null;
+        }
+
+        return switch (iconStyle) {
+            case "hud_quests", "quest" -> "quest";
+            case "hud_zg", "greenhouse" -> "greenhouse";
+            case "hud_minigames", "minigames" -> "minigames";
+            case "hud_task_list", "tasks" -> "tasks";
+            case "settings" -> "settings";
+            case "shop" -> "shop";
+            case "news" -> "news";
+            default -> null;
+        };
+    }
+
+    private String pressedAssetKey(String assetKey) {
+        return switch (assetKey) {
+            case "quest" -> "quest_down";
+            case "event_shop" -> "event_shop_down";
+            case "plant_boost" -> "plant_boost_down";
+            case "premium" -> "premium_down";
+            case "tickets" -> "tickets_down";
+            case "coin_buy" -> "coin_buy_down";
+            case "gems_buy" -> "gems_buy_down";
+            case "generic_currency" -> "generic_currency_down";
+            default -> null;
+        };
+    }
+
+    /**
+     * Builds a text-labelled button on top of one of the extracted PvZ
+     * controls. Returning a Stack lets callers keep their existing Table cell
+     * sizing while the artwork fills the complete hit target.
+     */
+    protected Stack assetTextButton(
+        String normalKey,
+        String pressedKey,
+        String text,
+        Runnable action
+    ) {
+        ImageButton icon = MenuVisualAssets.imageButton(
+            normalKey,
+            pressedKey,
+            null
+        );
+
+        Stack button = new Stack();
+        if (icon == null) {
+            button.add(greenButton(text, action));
+            return button;
+        }
+
+        button.add(icon);
+
+        Label caption = mediumTitle(text);
+        caption.setAlignment(Align.center);
+        caption.setTouchable(Touchable.disabled);
+        button.add(caption);
+
+        button.addListener(
+            new ClickListener() {
+                @Override
+                public boolean touchDown(
+                    InputEvent event,
+                    float x,
+                    float y,
+                    int pointer,
+                    int buttonCode
+                ) {
+                    button.setTransform(true);
+                    button.setOrigin(Align.center);
+                    button.clearActions();
+                    button.addAction(Actions.scaleTo(0.97f, 0.97f, 0.06f));
+                    return true;
+                }
+
+                @Override
+                public void touchUp(
+                    InputEvent event,
+                    float x,
+                    float y,
+                    int pointer,
+                    int buttonCode
+                ) {
+                    button.clearActions();
+                    button.addAction(Actions.scaleTo(1f, 1f, 0.08f));
+                }
+
+                @Override
+                public void clicked(
+                    InputEvent event,
+                    float x,
+                    float y
+                ) {
+                    if (action != null) {
+                        action.run();
+                    }
+                }
+            }
+        );
+
+        return button;
     }
 
     private TextButton styledButton(

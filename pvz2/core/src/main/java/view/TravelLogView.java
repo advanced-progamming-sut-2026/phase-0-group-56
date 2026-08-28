@@ -245,7 +245,7 @@ public class TravelLogView extends View {
                 + "]";
 
         Table questHeader = new Table();
-        Image questIcon = MenuVisualAssets.image("tasks");
+        Image questIcon = MenuVisualAssets.image("quest");
         if (questIcon != null) {
             questIcon.setScaling(Scaling.fit);
             questHeader.add(questIcon)
@@ -341,6 +341,16 @@ public class TravelLogView extends View {
         footer.add()
             .expandX();
 
+        Image rewardIcon = MenuVisualAssets.image(
+            rewardIconKey(quest.getRewardType())
+        );
+        if (rewardIcon != null) {
+            rewardIcon.setScaling(Scaling.fit);
+            footer.add(rewardIcon)
+                .size(28f)
+                .padRight(5f);
+        }
+
         footer.add(rewardLabel)
             .right();
 
@@ -406,6 +416,23 @@ public class TravelLogView extends View {
                 skin
             );
         }
+    }
+
+    private String rewardIconKey(String rewardType) {
+        String reward = rewardType == null
+            ? ""
+            : rewardType.toUpperCase();
+
+        if (reward.contains("GEM") || reward.contains("DIAMOND")) {
+            return "gem_small";
+        }
+        if (reward.contains("FOOD")) {
+            return "plantfood";
+        }
+        if (reward.contains("STAR") || reward.contains("XP")) {
+            return "star";
+        }
+        return "coin_small";
     }
 
     private void claimReward(

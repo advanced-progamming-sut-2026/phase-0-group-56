@@ -45,7 +45,7 @@ public class NewsView extends View {
 
         table.add(
                 menuSectionHeader(
-                    "hud_quests",
+                    "news",
                     "NEWS",
                     "Stay up to date with the latest garden announcements."
                 )
@@ -67,7 +67,7 @@ public class NewsView extends View {
         status.setAlignment(Align.center);
 
         Table statusPanel = pvzInnerPanel();
-        Image statusIcon = MenuVisualAssets.image("tasks");
+        Image statusIcon = MenuVisualAssets.image("news");
         if (statusIcon != null) {
             statusIcon.setScaling(Scaling.fit);
             statusPanel.add(statusIcon)
@@ -129,6 +129,14 @@ public class NewsView extends View {
                 .expandX();
 
             if (item.isUnread()) {
+                Image unreadDot = MenuVisualAssets.image("red_dot");
+                if (unreadDot != null) {
+                    unreadDot.setScaling(Scaling.fit);
+                    meta.add(unreadDot)
+                        .size(18f)
+                        .padRight(5f);
+                }
+
                 Label badge =
                     secondaryLabel("NEW");
 
