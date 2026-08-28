@@ -4,6 +4,7 @@ import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.ProgressBar;
+import com.badlogic.gdx.scenes.scene2d.ui.Stack;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.utils.Align;
@@ -114,21 +115,11 @@ public class TravelLogView extends View {
         Table summaryPanel =
             pvzInnerPanel();
 
-        Label summary =
-            secondaryLabel(
-                "IN PROGRESS: "
-                    + inProgress
-                    + "    |    READY TO CLAIM: "
-                    + claimable
-                    + "    |    CLAIMED: "
-                    + claimed
-            );
-
-        summary.setAlignment(Align.center);
-
-        summaryPanel.add(summary)
-            .width(720f)
-            .center();
+        summaryPanel.pad(8f, 12f, 8f, 12f);
+        summaryPanel.defaults().width(235f).height(48f).pad(4f);
+        summaryPanel.add(summaryCell("quest", "IN PROGRESS", inProgress));
+        summaryPanel.add(summaryCell("claim", "READY TO CLAIM", claimable));
+        summaryPanel.add(summaryCell("check", "CLAIMED", claimed));
 
         table.add(summaryPanel)
             .width(800f)
@@ -149,25 +140,13 @@ public class TravelLogView extends View {
         };
 
         for (String category : categories) {
-            TextButton button;
-
-            if (
-                category.equals(
-                    selectedCategory
-                )
-            ) {
-                button =
-                    purpleButton(
-                        category,
-                        null
-                    );
-            } else {
-                button =
-                    brownButton(
-                        category,
-                        () -> selectCategory(category)
-                    );
-            }
+            boolean selected = category.equals(selectedCategory);
+            Stack button = assetTextButton(
+                selected ? "purple_button" : "brown_button",
+                selected ? "purple_button_down" : "brown_button_down",
+                category,
+                selected ? null : () -> selectCategory(category)
+            );
 
             tabPanel.add(button)
                 .width(170f)
@@ -178,6 +157,20 @@ public class TravelLogView extends View {
         table.add(tabPanel)
             .padBottom(16f)
             .row();
+    }
+
+    private Table summaryCell(String iconKey, String label, int value) {
+        Table cell = new Table();
+        Image icon = MenuVisualAssets.image(iconKey);
+        if (icon != null) {
+            icon.setScaling(Scaling.fit);
+            cell.add(icon).size(28f).padRight(5f);
+        }
+        Table text = new Table();
+        text.add(secondaryLabel(label)).left().row();
+        text.add(mediumTitle(String.valueOf(value))).left();
+        cell.add(text).left();
+        return cell;
     }
 
     private void selectCategory(
@@ -236,7 +229,8 @@ public class TravelLogView extends View {
     private Table buildQuestCard(
         Quest quest
     ) {
-        Table card = pvzPanel();
+        Table card = pvzInnerPanel();
+        card.pad(14f, 18f, 14f, 18f);
 
         String titleText =
             quest.getQuestName()
@@ -245,7 +239,7 @@ public class TravelLogView extends View {
                 + "]";
 
         Table questHeader = new Table();
-        Image questIcon = MenuVisualAssets.image("quest");
+        Image questIcon = MenuVisualAssets.image(questIconKey(quest.getCategory()));
         if (questIcon != null) {
             questIcon.setScaling(Scaling.fit);
             questHeader.add(questIcon)
@@ -276,11 +270,8 @@ public class TravelLogView extends View {
             .padBottom(8f)
             .row();
 
-        Label description =
-            wrappedLabel(
-                quest.getDescription(),
-                820f
-            );
+        Label description = secondaryLabel(quest.getDescription());
+        description.setWrap(true);
 
         card.add(description)
             .width(820f)
@@ -341,18 +332,19 @@ public class TravelLogView extends View {
         footer.add()
             .expandX();
 
-        Image rewardIcon = MenuVisualAssets.image(
-            rewardIconKey(quest.getRewardType())
-        );
+        Table rewardBadge = new Table();
+        com.badlogic.gdx.scenes.scene2d.utils.Drawable rewardBackground =
+            MenuVisualAssets.drawable(rewardFrameKey(quest.getRewardType()));
+        if (rewardBackground != null) {
+            rewardBadge.setBackground(rewardBackground);
+        }
+        Image rewardIcon = MenuVisualAssets.image(rewardIconKey(quest.getRewardType()));
         if (rewardIcon != null) {
             rewardIcon.setScaling(Scaling.fit);
-            footer.add(rewardIcon)
-                .size(28f)
-                .padRight(5f);
+            rewardBadge.add(rewardIcon).size(28f).padRight(5f);
         }
-
-        footer.add(rewardLabel)
-            .right();
+        rewardBadge.add(rewardLabel).right();
+        footer.add(rewardBadge).right().padLeft(8f);
 
         card.add(footer)
             .width(820f)
@@ -360,30 +352,26 @@ public class TravelLogView extends View {
             .row();
 
         if (quest.isClaimable()) {
-            TextButton claimButton =
-                greenButton(
+            card.add(assetTextButton(
+                    "green_button",
+                    "green_button_down",
                     "CLAIM REWARD",
                     () -> claimReward(quest)
-                );
-
-            card.add(claimButton)
+                ))
                 .width(260f)
-                .height(50f)
+                .height(54f)
                 .right();
         } else if (quest.isRewardClaimed()) {
-            Label claimedLabel =
-                secondaryLabel(
-                    "REWARD CLAIMED"
-                );
-
-            claimedLabel.setAlignment(
-                Align.center
-            );
-
-            card.add(claimedLabel)
-                .width(260f)
-                .height(40f)
-                .right();
+            Table claimed = new Table();
+            Image check = MenuVisualAssets.image("check");
+            if (check != null) {
+                check.setScaling(Scaling.fit);
+                claimed.add(check).size(28f).padRight(5f);
+            }
+            Label claimedLabel = secondaryLabel("REWARD CLAIMED");
+            claimedLabel.setAlignment(Align.center);
+            claimed.add(claimedLabel).center();
+            card.add(claimed).width(260f).height(40f).right();
         }
 
         return card;
@@ -393,10 +381,22 @@ public class TravelLogView extends View {
         float target,
         boolean completed
     ) {
-        String style =
-            completed
-                ? "xp_green"
-                : "xp_teal";
+        com.badlogic.gdx.scenes.scene2d.ui.ProgressBar.ProgressBarStyle assetStyle =
+            new com.badlogic.gdx.scenes.scene2d.ui.ProgressBar.ProgressBarStyle();
+        com.badlogic.gdx.scenes.scene2d.utils.Drawable background =
+            MenuVisualAssets.drawable("xp_bar");
+        com.badlogic.gdx.scenes.scene2d.utils.Drawable fill =
+            MenuVisualAssets.drawable(completed ? "xp_fill_green" : "xp_fill_teal");
+        if (background != null && fill != null) {
+            assetStyle.background = background;
+            assetStyle.knobBefore = fill;
+            assetStyle.knob = solidDrawable(
+                new com.badlogic.gdx.graphics.Color(0f, 0f, 0f, 0f)
+            );
+            return new ProgressBar(0f, target, 1f, false, assetStyle);
+        }
+
+        String style = completed ? "xp_green" : "xp_teal";
 
         try {
             return new ProgressBar(
@@ -433,6 +433,34 @@ public class TravelLogView extends View {
             return "star";
         }
         return "coin_small";
+    }
+
+    private String rewardFrameKey(String rewardType) {
+        String reward = rewardType == null ? "" : rewardType.toUpperCase();
+        if (reward.contains("GEM") || reward.contains("DIAMOND")) {
+            return "reward4";
+        }
+        if (reward.contains("FOOD") || reward.contains("STAR") || reward.contains("XP")) {
+            return "reward3";
+        }
+        return "reward1";
+    }
+
+    private String questIconKey(String category) {
+        String value = category == null ? "" : category.toUpperCase();
+        if (value.contains("EPIC")) {
+            return "epic_icon";
+        }
+        if (value.contains("DAILY")) {
+            return "event_lawn";
+        }
+        if (value.contains("MINIGAME")) {
+            return "event_foodfight";
+        }
+        if (value.contains("MAIN")) {
+            return "event_beach";
+        }
+        return "quest";
     }
 
     private void claimReward(

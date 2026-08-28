@@ -164,10 +164,26 @@ public class GreenHouseView extends View {
                         );
                 }
 
-                pots.add(potButton)
+                Table potSlot = new Table();
+                if (pot != null && !pot.isUnlocked()) {
+                    Image lock = MenuVisualAssets.image("lock");
+                    if (lock != null) {
+                        lock.setScaling(Scaling.fit);
+                        potSlot.add(lock)
+                            .size(24f)
+                            .padBottom(1f)
+                            .row();
+                    }
+                }
+
+                pots.add(potSlot)
+                    .top()
                     .width(175f)
                     .height(100f)
                     .pad(5f);
+                potSlot.add(potButton)
+                    .grow()
+                    .row();
             }
 
             pots.row();

@@ -119,9 +119,9 @@ public class View implements Screen {
         root.setFillParent(true);
         root.top();
         root.pad(
-            12f,
+            8f,
             18f,
-            14f,
+            10f,
             18f
         );
 
@@ -132,7 +132,7 @@ public class View implements Screen {
 
         content = new Table();
         content.top();
-        content.pad(18f);
+        content.pad(12f);
 
         ScrollPane scrollPane =
             new ScrollPane(content, skin);
@@ -144,19 +144,15 @@ public class View implements Screen {
         );
 
         Table scrollFrame = new Table();
-        Drawable frameBackground =
-            getSkinDrawableSafe("image_ui_dialog_asset_inner_bkgd_10");
-        if (frameBackground != null) {
-            scrollFrame.setBackground(frameBackground);
-        } else {
-            scrollFrame.setBackground(solidDrawable(
-                new Color(0.02f, 0.055f, 0.045f, 0.82f)
-            ));
-        }
+        // Keep the official main-menu artwork visible between cards. The
+        // former opaque skin panel hid almost the entire background.
+        scrollFrame.setBackground(solidDrawable(
+            new Color(0.04f, 0.10f, 0.08f, 0.20f)
+        ));
 
         scrollFrame.add(scrollPane)
             .grow()
-            .pad(8f);
+            .pad(5f);
 
         root.add(scrollFrame)
             .grow()
@@ -177,7 +173,7 @@ public class View implements Screen {
 
         Table header = new Table();
 
-        header.pad(6f, 10f, 6f, 10f);
+        header.pad(4f, 10f, 4f, 10f);
 
         Drawable headerBackground =
             getSkinDrawableSafe(
@@ -193,11 +189,13 @@ public class View implements Screen {
 
         if (backScreen != null) {
 
-            TextButton back =
-                brownButton(
-                    "BACK",
-                    () -> App.setScreen(getBackScreen())
-                );
+            // Keep Back as a real TextButton.  The extracted art is used by
+            // the other menu controls, but a native Button gives the header
+            // a direct hit target and avoids Stack/ImageButton event routing.
+            TextButton back = brownButton(
+                "BACK",
+                () -> App.setScreen(getBackScreen())
+            );
 
             navigationSlot.add(back)
                 .width(122f)
@@ -206,7 +204,7 @@ public class View implements Screen {
         }
 
         header.add(navigationSlot)
-            .width(235f)
+            .width(220f)
             .left();
 
         Table identity = new Table();
@@ -214,8 +212,8 @@ public class View implements Screen {
         if (logo != null) {
             logo.setScaling(Scaling.fit);
             identity.add(logo)
-                .width(225f)
-                .height(56f)
+                .width(210f)
+                .height(50f)
                 .center()
                 .row();
         }
@@ -236,12 +234,12 @@ public class View implements Screen {
             buildResourceBar();
 
         header.add(resourceBar)
-            .width(235f)
+            .width(220f)
             .right();
 
         root.add(header)
             .growX()
-            .minHeight(92f)
+            .minHeight(80f)
             .row();
     }
 
@@ -670,6 +668,11 @@ public class View implements Screen {
             return button;
         }
 
+        // Keep the Stack as the single hit target.  Without this, the
+        // ImageButton consumes pointer events before the Stack's listener
+        // can run, so clicks on the artwork (Back/tabs/Buy/Claim) appear
+        // intermittent depending on where the user presses.
+        icon.setTouchable(Touchable.disabled);
         button.add(icon);
 
         Label caption = mediumTitle(text);

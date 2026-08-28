@@ -73,30 +73,28 @@ public class ShopView extends View {
         Table hintPanel =
             pvzInnerPanel();
 
-        Label hint =
-            wrappedLabel(
-                "Every purchase asks for confirmation "
-                    + "before coins or gems are spent.",
-                620f
-            );
+        Label hint = secondaryLabel(
+            "Every purchase asks for confirmation before coins or gems are spent."
+        );
 
         hint.setAlignment(
             Align.center
         );
+        hint.setWrap(true);
 
         Image dave = MenuVisualAssets.image("dave_waist");
         if (dave != null) {
             dave.setScaling(Scaling.fit);
             hintPanel.add(dave)
-                .size(78f)
+                .size(96f)
                 .padRight(10f);
         }
 
         hintPanel.add(hint)
-            .width(620f);
+            .width(680f);
 
         table.add(hintPanel)
-            .width(780f)
+            .width(900f)
             .padBottom(14f)
             .row();
 
@@ -233,14 +231,14 @@ public class ShopView extends View {
             )
         );
 
-        Table card =
-            pvzPanel();
+        Table card = pvzInnerPanel();
+        card.pad(13f, 16f, 13f, 16f);
 
         Image currencyIcon = MenuVisualAssets.image("gem");
         if (currencyIcon != null) {
             currencyIcon.setScaling(Scaling.fit);
             card.add(currencyIcon)
-                .size(54f)
+                .size(86f)
                 .center()
                 .padRight(8f);
         }
@@ -267,13 +265,11 @@ public class ShopView extends View {
             .padTop(4f)
             .row();
 
-        text.add(
-                wrappedLabel(
-                    "Choose an unlocked plant "
-                        + "and receive 10 seed packets.",
-                    430f
-                )
-            )
+        Label seedDescription = secondaryLabel(
+            "Choose an unlocked plant and receive 10 seed packets."
+        );
+        seedDescription.setWrap(true);
+        text.add(seedDescription)
             .width(430f)
             .left()
             .padTop(8f);
@@ -306,13 +302,13 @@ public class ShopView extends View {
                         )
                 )
             )
-            .width(150f)
-            .height(50f)
+            .width(175f)
+            .height(58f)
             .pad(10f);
 
         table.add(card)
-            .width(1080f)
-            .pad(6f)
+            .width(1000f)
+            .pad(5f)
             .row();
     }
 
@@ -328,15 +324,15 @@ public class ShopView extends View {
         Runnable buyAction
     ) {
 
-        Table card =
-            pvzPanel();
+        Table card = pvzInnerPanel();
+        card.pad(13f, 16f, 13f, 16f);
 
         String productIconKey = productIconKey(titleText, priceText);
         Image currencyIcon = MenuVisualAssets.image(productIconKey);
         if (currencyIcon != null) {
             currencyIcon.setScaling(Scaling.fit);
             card.add(currencyIcon)
-                .size(54f)
+                .size(86f)
                 .center()
                 .padRight(8f);
         }
@@ -364,13 +360,10 @@ public class ShopView extends View {
             .padTop(4f)
             .row();
 
-        text.add(
-                wrappedLabel(
-                    description,
-                    580f
-                )
-            )
-            .width(580f)
+        Label descriptionLabel = secondaryLabel(description);
+        descriptionLabel.setWrap(true);
+        text.add(descriptionLabel)
+            .width(610f)
             .left()
             .padTop(8f);
 
@@ -387,13 +380,13 @@ public class ShopView extends View {
                     buyAction
                 )
             )
-            .width(160f)
-            .height(52f)
-            .pad(10f);
+            .width(175f)
+            .height(58f)
+            .pad(8f);
 
         table.add(card)
-            .width(1080f)
-            .pad(6f)
+            .width(1000f)
+            .pad(5f)
             .row();
     }
 

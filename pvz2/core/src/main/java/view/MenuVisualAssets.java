@@ -90,6 +90,68 @@ final class MenuVisualAssets {
         register(files, "dave_waist", "dave_waist.png");
         register(files, "settings_tab", "settings_tab.png");
 
+        // Shared PvZ chrome. Every menu uses the same normal/pressed/disabled
+        // language instead of falling back to a generic skin button.
+        register(files, "blue_button", "BlueButton.png");
+        register(files, "blue_button_down", "BlueButton_Down.png");
+        register(files, "brown_button", "BrownButton.png");
+        register(files, "brown_button_down", "BrownButton_Down.png");
+        register(files, "green_button", "GreenButton.png");
+        register(files, "green_button_down", "GreenButton_Down.png");
+        register(files, "purple_button", "PurpleButton.png");
+        register(files, "purple_button_down", "PurpleButton_Down.png");
+        register(files, "disabled_button", "DisabledButton.png");
+        register(files, "disabled_button_down", "DisabledButton_Down.png");
+        register(files, "green_buy_button", "GreenBuyButton.png");
+        register(files, "green_buy_button_down", "GreenBuyButton_Down.png");
+        register(files, "close", "close_btn.png");
+        register(files, "close_down", "close_down.png");
+        register(files, "close_circle", "close_circle.png");
+        register(files, "close_circle_down", "close_circle_down.png");
+        register(files, "info", "info_button_up.png");
+        register(files, "info_down", "info_button_down.png");
+        register(files, "arrow_left", "Arrow_Left_Green.png");
+        register(files, "arrow_right_green", "Arrow_Right_Green.png");
+        register(files, "arrow_up", "Arrow_Up_Green.png");
+        register(files, "arrow_down", "Arrow_Down_Orange.png");
+        register(files, "leaf_backdrop", "leaf_backdrop.png");
+        register(files, "popup_9slice", "popup_9slice.png");
+
+        // Quest, progression, notification and reward artwork.
+        register(files, "notification", "Notification_Icon.png");
+        register(files, "claim", "claim_small.png");
+        register(files, "check", "check_mark_sm.png");
+        register(files, "challenge_background", "challenge_background.png");
+        register(files, "challenge_progress", "challenge_general_progress.png");
+        register(files, "xp_bar", "xp_progress_bar.png");
+        register(files, "xp_fill_green", "xp_progress_bar_fill_green.png");
+        register(files, "xp_fill_teal", "xp_progress_bar_fill_teal.png");
+        register(files, "xp_fill_yellow", "xp_progress_bar_fill_yellow.png");
+        register(files, "xp_fill_fuschia", "xp_progress_bar_fill_fuschia.png");
+        register(files, "value_badge_1", "value_badge_1.png");
+        register(files, "value_badge_2", "value_badge_2.png");
+        register(files, "value_badge_3", "value_badge_3.png");
+        register(files, "epic_pinata", "epic_reward_pinata.png");
+        register(files, "epic_icon", "icon_epic.png");
+        register(files, "navdot", "navdot.png");
+        register(files, "navdot_fill", "navdot_fill.png");
+
+        // Event currency used by official quest/event screens.
+        register(files, "mint", "mint.png");
+        register(files, "mint_small", "mint_icon_small.png");
+        register(files, "mint_counter", "mint_currency_counter.png");
+        register(files, "mint_counter_down", "mint_currency_counter_down.png");
+
+        // A small, curated set of official event tiles for menu cards.
+        register(files, "event_beach", "event_icon_beach_up.png");
+        register(files, "event_beach_down", "event_icon_beach_down.png");
+        register(files, "event_lawn", "event_icon_lawnofdoom_up.png");
+        register(files, "event_lawn_down", "event_icon_lawnofdoom_down.png");
+        register(files, "event_foodfight", "event_icon_foodfight_up.png");
+        register(files, "event_foodfight_down", "event_icon_foodfight_down.png");
+        register(files, "event_zcorp", "event_icon_zcorp_up.png");
+        register(files, "event_zcorp_down", "event_icon_zcorp_down.png");
+
         FILES = Collections.unmodifiableMap(files);
     }
 

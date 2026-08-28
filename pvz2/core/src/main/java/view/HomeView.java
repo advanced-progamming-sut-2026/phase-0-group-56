@@ -1,10 +1,14 @@
 package view;
 
-import com.badlogic.gdx.scenes.scene2d.ui.Label;
+import com.badlogic.gdx.scenes.scene2d.InputEvent;
+import com.badlogic.gdx.scenes.scene2d.Touchable;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
+import com.badlogic.gdx.scenes.scene2d.ui.ImageButton;
+import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
-import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
+import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.utils.Align;
+import com.badlogic.gdx.utils.Scaling;
 
 import controllers.datacontroller.Data;
 import controllers.menus.Home;
@@ -33,286 +37,178 @@ public class HomeView extends View {
         }
 
         String nickname = user.getNickname();
-
         if (nickname == null || nickname.isBlank()) {
             nickname = user.getName();
         }
-
         if (nickname == null || nickname.isBlank()) {
             nickname = "PLAYER";
         }
 
         Table hero = pvzPanel();
+        hero.pad(18f, 24f, 16f, 24f);
+
         Image pot = MenuVisualAssets.image("pot");
         if (pot != null) {
-            pot.setScaling(com.badlogic.gdx.utils.Scaling.fit);
-            hero.add(pot)
-                .size(84f)
-                .padRight(14f)
-                .center();
+            pot.setScaling(Scaling.fit);
+            hero.add(pot).size(90f).padRight(16f).center();
         }
 
         Table heroCopy = new Table();
-        Label welcome = mediumTitle(
-            "WELCOME, " + nickname.toUpperCase() + "!"
-        );
+        Label welcome = mediumTitle("WELCOME, " + nickname.toUpperCase() + "!");
         welcome.setAlignment(Align.left);
-        heroCopy.add(welcome)
-            .left()
-            .growX()
-            .row();
+        heroCopy.add(welcome).left().growX().row();
+
         Label subtitle = secondaryLabel(
             "Your garden is ready. Choose a destination and keep the lawn growing."
         );
         subtitle.setWrap(true);
         subtitle.setAlignment(Align.left);
-        heroCopy.add(subtitle)
-            .width(560f)
-            .left();
-        hero.add(heroCopy)
-            .growX()
-            .left();
+        heroCopy.add(subtitle).width(620f).left().padTop(4f).row();
 
-        table.add(hero)
-            .width(820f)
-            .center()
-            .padTop(4f)
-            .padBottom(14f)
-            .row();
+        Table progressLine = new Table();
+        Image star = MenuVisualAssets.image("star");
+        if (star != null) {
+            star.setScaling(Scaling.fit);
+            progressLine.add(star).size(25f).padRight(5f);
+        }
+        progressLine.add(secondaryLabel(
+            "LEVELS " + user.getLevelsPassed()
+                + "   •   " + user.getLastProgressText()
+                + "   •   DIFFICULTY " + user.getDifficultyLevel()
+        )).left();
+        heroCopy.add(progressLine).left().padTop(8f);
+        hero.add(heroCopy).growX().left();
 
-        Table shortcutPanel = pvzInnerPanel();
+        table.add(hero).width(900f).center().padTop(4f).padBottom(14f).row();
 
-        shortcutPanel.defaults()
-            .width(132f)
-            .height(112f)
-            .pad(4f);
+        Table stats = pvzInnerPanel();
+        stats.pad(9f, 14f, 9f, 14f);
+        stats.defaults().width(210f).height(58f).pad(4f);
+        stats.add(statCard("coin_small", "COINS", String.valueOf(user.getCoins())));
+        stats.add(statCard("gem_small", "GEMS", String.valueOf(user.getDiamonds())));
+        stats.add(statCard("star", "LEVELS CLEARED", String.valueOf(user.getLevelsPassed())));
+        stats.add(statCard("quest", "ACTIVE QUESTS", String.valueOf(user.getActiveQuests().size())));
+        table.add(stats).width(920f).center().padBottom(14f).row();
 
-        shortcutPanel.add(
-            menuShortcut(
-                "almanac",
-                "ADVENTURE",
-                () -> openMenu("Adventure menu")
-            )
+        Table navigation = pvzPanel();
+        navigation.pad(14f, 18f, 16f, 18f);
+        Label navigationTitle = mediumTitle("GARDEN DESTINATIONS");
+        navigationTitle.setAlignment(Align.center);
+        navigation.add(navigationTitle).colspan(4).growX().padBottom(8f).row();
+
+        navigation.defaults().width(210f).height(136f).pad(5f);
+        navigation.add(homeTile("event_beach", "event_beach_down", "almanac",
+            "ADVENTURE", "Continue your journey", () -> openMenu("Adventure menu")));
+        navigation.add(homeTile("event_lawn", "event_lawn_down", "almanac",
+            "COLLECTION", "Plants and unlocks", () -> openMenu("Collection menu")));
+        navigation.add(homeTile("quest", "quest_down", "hud_quests",
+            "TRAVEL LOG", "Quests and rewards", () -> openMenu("Travel Log menu")));
+        navigation.add(homeTile("greenhouse", null, "hud_zg",
+            "GREENHOUSE", "Grow your plants", () -> openMenu("Greenhouse menu")));
+        navigation.row();
+        navigation.add(homeTile("shop", null, "shop",
+            "SHOP", "Daily offers", () -> openMenu("Shop menu")));
+        navigation.add(homeTile("event_zcorp", "event_zcorp_down", "news",
+            "EVENTS", "Seasonal content", () -> openMenu("News menu")));
+        navigation.add(homeTile("news", null, "news",
+            "NEWS", "Latest updates", () -> openMenu("News menu")));
+        navigation.add(homeTile("star", null, "almanac",
+            "LEADERBOARD", "Top players", () -> openMenu("Leaderboard menu")));
+        navigation.row();
+        navigation.add(homeTile("pot", null, "almanac",
+            "PROFILE", "Your garden", () -> openMenu("Profile menu")));
+        navigation.add(homeTile("coin", null, "shop",
+            "WALLET", "Currencies", () -> openMenu("Wallet menu")));
+        navigation.add(homeTile("settings", null, "settings",
+            "SETTINGS", "Game options", () -> openMenu("Settings menu")));
+        navigation.add(homeTile("plant_boost", "plant_boost_down", "hud_quests",
+            "BOOSTS", "Plant Food bank", () -> openMenu("Greenhouse menu")));
+
+        table.add(navigation).width(940f).center().padBottom(14f).row();
+
+        Table status = pvzInnerPanel();
+        status.pad(9f, 18f, 9f, 18f);
+        Label statusLabel = secondaryLabel(
+            "ACCOUNT STATUS  •  "
+                + (user.isDebugMode() ? "DEBUG MODE ON" : "STANDARD MODE")
+                + "  •  " + user.getLastProgressText()
         );
-
-        shortcutPanel.add(
-            menuShortcut(
-                "almanac",
-                "COLLECTION",
-                () -> openMenu("Collection menu")
-            )
-        );
-
-        shortcutPanel.add(
-            menuShortcut(
-                "hud_quests",
-                "TRAVEL LOG",
-                () -> openMenu("Travel Log menu")
-            )
-        );
-
-        shortcutPanel.add(
-            menuShortcut(
-                "settings",
-                "SETTINGS",
-                () -> openMenu("Settings menu")
-            )
-        );
-
-        shortcutPanel.add(
-            menuShortcut(
-                "hud_zg",
-                "GREENHOUSE",
-                () -> openMenu("Greenhouse menu")
-            )
-        );
-
-        table.add(shortcutPanel)
-            .width(760f)
-            .center()
-            .padBottom(12f)
-            .row();
-
-        Table mainPanel = pvzPanel();
-
-        TextButton adventure =
-            greenButton(
-                "ADVENTURE",
-                () -> openMenu("Adventure menu")
-            );
-
-        TextButton collection =
-            greenButton(
-                "COLLECTION",
-                () -> openMenu("Collection menu")
-            );
-
-        int unreadNews = user.getUnreadNews().size();
-
-        String newsText =
-            unreadNews > 0
-                ? "NEWS  (" + unreadNews + " NEW)"
-                : "NEWS";
-
-        TextButton news =
-            greenButton(
-                newsText,
-                () -> openMenu("News menu")
-            );
-
-        TextButton profile =
-            greenButton(
-                "PROFILE",
-                () -> openMenu("Profile menu")
-            );
-
-        TextButton settings =
-            brownButton(
-                "SETTINGS",
-                () -> openMenu("Settings menu")
-            );
-
-        TextButton leaderboard =
-            purpleButton(
-                "LEADERBOARD",
-                () -> openMenu("Leaderboard menu")
-            );
-
-        TextButton quests =
-            purpleButton(
-                "TRAVEL LOG / QUESTS",
-                () -> openMenu("Travel Log menu")
-            );
-
-        TextButton greenhouse =
-            greenButton(
-                "GREENHOUSE",
-                () -> openMenu("Greenhouse menu")
-            );
-
-        TextButton shop =
-            greenButton(
-                "SHOP",
-                () -> openMenu("Shop menu")
-            );
-
-        TextButton wallet =
-            purpleButton(
-                "WALLET",
-                () -> openMenu("Wallet menu")
-            );
-
-        mainPanel.defaults()
-            .width(310f)
-            .height(56f)
-            .pad(7f, 12f, 7f, 12f);
-
-        mainPanel.add(
-                mediumTitle("GARDEN COMMAND CENTER")
-            )
-            .colspan(2)
-            .center()
-            .padBottom(7f)
-            .row();
-
-        mainPanel.add(adventure);
-        mainPanel.add(collection);
-        mainPanel.row();
-
-        mainPanel.add(news);
-        mainPanel.add(profile);
-        mainPanel.row();
-
-        mainPanel.add(settings);
-        mainPanel.add(leaderboard);
-        mainPanel.row();
-
-        mainPanel.add(quests);
-        mainPanel.add(greenhouse);
-        mainPanel.row();
-
-        mainPanel.add(shop);
-        mainPanel.add(wallet);
-        mainPanel.row();
-
-        table.add(mainPanel)
-            .width(760f)
-            .center()
-            .padBottom(12f)
-            .row();
-
-        Table infoPanel = pvzInnerPanel();
-
-        Label progress =
-            secondaryLabel(
-                "CURRENT PROGRESS: "
-                    + user.getLastProgressText()
-                    + "  |  COMPLETED LEVELS: "
-                    + user.getLevelsPassed()
-                    + "  |  DIFFICULTY: "
-                    + user.getDifficultyLevel()
-            );
-
-        progress.setAlignment(Align.center);
-
-        infoPanel.add(progress)
-            .width(700f)
-            .center()
-            .padBottom(5f)
-            .row();
-
-        Label debugStatus =
-            secondaryLabel(
-                "DEBUG MODE: "
-                    + (user.isDebugMode() ? "ON" : "OFF")
-                    + "  |  RESOURCE CHEATS: "
-                    + (user.isDebugMode() ? "AVAILABLE" : "HIDDEN")
-            );
-
-        debugStatus.setAlignment(Align.center);
-
-        infoPanel.add(debugStatus)
-            .width(700f)
-            .center();
-
-        table.add(infoPanel)
-            .width(760f)
-            .center()
-            .padBottom(12f)
-            .row();
+        statusLabel.setAlignment(Align.center);
+        status.add(statusLabel).width(820f).center();
+        table.add(status).width(900f).center().padBottom(12f).row();
 
         Table accountActions = new Table();
+        accountActions.add(assetTextButton("brown_button", "brown_button_down",
+            "LOG OUT", this::confirmLogout)).width(225f).height(52f).padRight(10f);
+        accountActions.add(assetTextButton("brown_button", "brown_button_down",
+            "EXIT GAME", this::confirmExit)).width(225f).height(52f).padLeft(10f);
+        table.add(accountActions).center().padBottom(8f);
+    }
 
-        TextButton logout =
-            brownButton(
-                "LOG OUT",
-                this::confirmLogout
-            );
+    private Table statCard(String iconKey, String caption, String value) {
+        Table card = pvzInnerPanel();
+        card.pad(6f, 10f, 6f, 10f);
+        Image icon = MenuVisualAssets.image(iconKey);
+        if (icon != null) {
+            icon.setScaling(Scaling.fit);
+            card.add(icon).size(28f).padRight(5f);
+        }
+        Table labels = new Table();
+        labels.add(secondaryLabel(caption)).left().row();
+        labels.add(mediumTitle(value)).left();
+        card.add(labels).left();
+        return card;
+    }
 
-        TextButton exitGame =
-            brownButton(
-                "EXIT GAME",
-                this::confirmExit
-            );
+    private Table homeTile(
+        String iconKey,
+        String pressedKey,
+        String fallbackStyle,
+        String title,
+        String caption,
+        Runnable action
+    ) {
+        Table tile = pvzInnerPanel();
+        tile.pad(8f, 7f, 8f, 7f);
 
-        accountActions.add(logout)
-            .width(230f)
-            .height(52f)
-            .padRight(12f);
+        ImageButton icon = MenuVisualAssets.imageButton(iconKey, pressedKey, null);
+        if (icon == null) {
+            try {
+                icon = new ImageButton(skin, fallbackStyle);
+            } catch (Exception ignored) {
+                icon = new ImageButton(skin);
+            }
+        }
+        // The card is the hit target, not only the artwork.  Disabling
+        // touch on the child lets Scene2D bubble clicks from the icon and
+        // the labels to the card listener below.
+        icon.setTouchable(Touchable.disabled);
+        tile.add(icon).size(68f).center().padBottom(3f).row();
 
-        accountActions.add(exitGame)
-            .width(230f)
-            .height(52f)
-            .padLeft(12f);
+        Label titleLabel = mediumTitle(title);
+        titleLabel.setAlignment(Align.center);
+        titleLabel.setTouchable(Touchable.disabled);
+        tile.add(titleLabel).width(190f).center().row();
 
-        table.add(accountActions)
-            .center()
-            .padBottom(8f);
+        Label captionLabel = secondaryLabel(caption);
+        captionLabel.setAlignment(Align.center);
+        captionLabel.setTouchable(Touchable.disabled);
+        tile.add(captionLabel).width(190f).center();
+
+        tile.setTouchable(Touchable.enabled);
+        tile.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                if (action != null) {
+                    action.run();
+                }
+            }
+        });
+        return tile;
     }
 
     private void openMenu(String menuName) {
         String result = menu.ChangeMenu(menuName);
-
         if (result != null && result.startsWith("Error")) {
             showMessage(result);
         }
@@ -336,47 +232,24 @@ public class HomeView extends View {
 
     private void buildNoUserScreen(Table table) {
         Table panel = pvzPanel();
-
-        Label warning =
-            mediumTitle(
-                "NO USER IS LOGGED IN"
-            );
-
+        Image logo = MenuVisualAssets.image("logo");
+        if (logo != null) {
+            logo.setScaling(Scaling.fit);
+            panel.add(logo).size(270f, 80f).center().padBottom(16f).row();
+        }
+        Label warning = mediumTitle("NO USER IS LOGGED IN");
         warning.setAlignment(Align.center);
+        panel.add(warning).width(550f).center().padBottom(14f).row();
 
-        panel.add(warning)
-            .width(500f)
-            .center()
-            .padBottom(20f)
-            .row();
-
-        Label description =
-            wrappedLabel(
-                "You need to log in before opening the main menu.",
-                500f
-            );
-
+        Label description = wrappedLabel(
+            "You need to log in before opening the main menu.",
+            520f
+        );
         description.setAlignment(Align.center);
-
-        panel.add(description)
-            .width(500f)
-            .center()
-            .padBottom(22f)
-            .row();
-
-        panel.add(
-                greenButton(
-                    "GO TO LOGIN",
-                    () -> App.setScreen(new LogInView())
-                )
-            )
-            .width(230f)
-            .height(54f)
-            .center();
-
-        table.add(panel)
-            .width(650f)
-            .center()
-            .padTop(80f);
+        panel.add(description).width(520f).center().padBottom(20f).row();
+        panel.add(assetTextButton("green_button", "green_button_down",
+                "GO TO LOGIN", () -> App.setScreen(new LogInView())))
+            .width(240f).height(56f).center();
+        table.add(panel).width(680f).center().padTop(70f);
     }
 }
