@@ -668,10 +668,8 @@ public class View implements Screen {
             return button;
         }
 
-        // Keep the Stack as the single hit target.  Without this, the
-        // ImageButton consumes pointer events before the Stack's listener
-        // can run, so clicks on the artwork (Back/tabs/Buy/Claim) appear
-        // intermittent depending on where the user presses.
+        // The artwork is visual-only; the transparent TextButton added below
+        // is the reliable interactive layer.
         icon.setTouchable(Touchable.disabled);
         button.add(icon);
 
@@ -680,48 +678,14 @@ public class View implements Screen {
         caption.setTouchable(Touchable.disabled);
         button.add(caption);
 
-        button.addListener(
-            new ClickListener() {
-                @Override
-                public boolean touchDown(
-                    InputEvent event,
-                    float x,
-                    float y,
-                    int pointer,
-                    int buttonCode
-                ) {
-                    button.setTransform(true);
-                    button.setOrigin(Align.center);
-                    button.clearActions();
-                    button.addAction(Actions.scaleTo(0.97f, 0.97f, 0.06f));
-                    return true;
-                }
-
-                @Override
-                public void touchUp(
-                    InputEvent event,
-                    float x,
-                    float y,
-                    int pointer,
-                    int buttonCode
-                ) {
-                    button.clearActions();
-                    button.addAction(Actions.scaleTo(1f, 1f, 0.08f));
-                }
-
-                @Override
-                public void clicked(
-                    InputEvent event,
-                    float x,
-                    float y
-                ) {
-                    if (action != null) {
-                        action.run();
-                    }
-                }
-            }
-        );
-
+        // Use a real TextButton as an invisible full-size hit target.  A
+        // Stack/ImageButton can render the artwork correctly, but its event
+        // bubbling is not reliable for purchase controls inside a Table.
+        // The transparent button keeps the artwork while guaranteeing that
+        // BUY, tabs and CLAIM invoke their action.
+        TextButton hitTarget = greenButton("", action);
+        hitTarget.setColor(1f, 1f, 1f, 0f);
+        button.add(hitTarget);
         return button;
     }
 
