@@ -5,7 +5,7 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import pvz.libpvz.pam.PamPlayer;
 import java.util.*;
 
-public class Zomboss extends Entity {
+public abstract class Zomboss extends Entity {
 
     private String pamPath;
     private float stateTime = 0f;
@@ -47,13 +47,16 @@ public class Zomboss extends Entity {
     private float attackCooldown = 5f;
     private Random random = new Random();
 
+    // ====== VISIBILITY ======
+    private final Map<String, Boolean> visibilityMap = new HashMap<>();
+
     // ====== CONSTRUCTOR ======
     public Zomboss(float x, float y, int line, String pamPath) {
         super();
         this.x = x;
         this.y = y;
-        this.line = line;  // lowest line
-        this.tileIndex = 6; // lowest col
+        this.line = line;
+        this.tileIndex = 6;
         this.hp = 3000;
         this.pamPath = pamPath;
         this.maxHp = hp;
@@ -74,7 +77,7 @@ public class Zomboss extends Entity {
 
     private void startStateTimer(PamPlayer player, String clipName) {
         if (clipName == null || pamPath == null) {
-            startStateTimer(2.0f); // fallback
+            startStateTimer(2.0f);
             return;
         }
         float duration = player.clipDurationSeconds(pamPath, clipName);
@@ -216,7 +219,7 @@ public class Zomboss extends Entity {
     }
 
     private void goToStun() {
-        setState(BossState.STUNNED, stunClip, 1.5f); // مدت زمان Stun
+        setState(BossState.STUNNED, stunClip, 1.5f);
     }
 
     // ====== ATTACK ======
@@ -235,9 +238,7 @@ public class Zomboss extends Entity {
         executeAttack(chosen, game);
     }
 
-    protected void executeAttack(String clipName, BaseGame game) {
-        // در کلاس‌های فرزند پیاده‌سازی می‌شود
-    }
+    protected abstract void executeAttack(String clipName, BaseGame game);
 
     // ====== DEATH SEQUENCE ======
     private void goToDie(PamPlayer player) {
@@ -262,13 +263,10 @@ public class Zomboss extends Entity {
     public void takeDamage(float damage) {
         if (state == BossState.DEAD || !isAlive) return;
 
-        float newHp = Math.max(0, this.hp - damage);
-        this.hp = newHp;
+        this.hp = Math.max(0, this.hp - damage);
 
         if (this.hp <= 0 && !deathSequenceStarted) {
             deathSequenceStarted = true;
-            // نیاز به PamPlayer داریم، ولی اینجا نداریم
-            // باید از caller دریافت کنیم
         }
     }
 
