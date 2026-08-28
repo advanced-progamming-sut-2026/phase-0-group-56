@@ -1,10 +1,12 @@
 package view;
 
 import com.badlogic.gdx.Screen;
+import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextField;
 import com.badlogic.gdx.utils.Align;
+import com.badlogic.gdx.utils.Scaling;
 
 import controllers.datacontroller.Data;
 import controllers.menus.secondarymenus.Profile;
@@ -65,6 +67,28 @@ public class ProfileView extends View {
 
         Table info =
             pvzPanel();
+
+        Table identity = new Table();
+        Image gardenBadge = MenuVisualAssets.image("pot");
+        if (gardenBadge != null) {
+            gardenBadge.setScaling(Scaling.fit);
+            identity.add(gardenBadge)
+                .size(68f)
+                .padRight(12f);
+        }
+        Label identityLabel = mediumTitle(
+            nickname.toUpperCase() + "'S GARDEN"
+        );
+        identityLabel.setAlignment(Align.left);
+        identity.add(identityLabel)
+            .left()
+            .growX();
+
+        info.add(identity)
+            .colspan(2)
+            .left()
+            .padBottom(12f)
+            .row();
 
         addInfo(
             info,

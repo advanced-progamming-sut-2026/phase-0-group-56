@@ -2,10 +2,12 @@ package view;
 
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.scenes.scene2d.ui.CheckBox;
+import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextField;
 import com.badlogic.gdx.utils.Align;
+import com.badlogic.gdx.utils.Scaling;
 
 import controllers.menus.LogIn;
 import models.App;
@@ -46,6 +48,16 @@ public class LogInView extends View {
 
         Table panel =
             pvzPanel();
+
+        Image gardenBadge = MenuVisualAssets.image("pot");
+        if (gardenBadge != null) {
+            gardenBadge.setScaling(Scaling.fit);
+            panel.add(gardenBadge)
+                .size(64f)
+                .center()
+                .padBottom(4f)
+                .row();
+        }
 
         TextField username =
             field("Username");
