@@ -14,7 +14,6 @@ import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.ui.Widget;
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
-import com.badlogic.gdx.scenes.scene2d.utils.ColorDrawable;
 import com.badlogic.gdx.scenes.scene2d.utils.Drawable;
 import com.badlogic.gdx.utils.Align;
 import controllers.datacontroller.SeedPackage;
@@ -59,6 +58,7 @@ public final class ToolsStack extends Table {
     private final ProgressBar waveProgress;
     private final WaveMarkerLayer waveMarkers;
     private final TextureBank textureBank;
+
 
     private final Table seedRow;
     private final ImageButton shovelButton;
@@ -431,13 +431,20 @@ public final class ToolsStack extends Table {
 
     /** Creates a high-contrast yellow card for a one-shot greenhouse boost. */
     private TextButton.TextButtonStyle boostedSeedStyle() {
-        TextButton.TextButtonStyle base = skin.get(TextButton.TextButtonStyle.class, "brown");
+        TextButton.TextButtonStyle base = skin.get("brown" ,TextButton.TextButtonStyle.class);
         TextButton.TextButtonStyle boosted = new TextButton.TextButtonStyle(base);
-        boosted.up = new ColorDrawable(new Color(1f, 0.78f, 0.08f, 1f));
-        boosted.down = new ColorDrawable(new Color(0.86f, 0.61f, 0.03f, 1f));
-        boosted.over = new ColorDrawable(new Color(1f, 0.88f, 0.28f, 1f));
-        boosted.checked = boosted.down;
-        boosted.disabled = new ColorDrawable(new Color(0.55f, 0.47f, 0.20f, 1f));
+        Drawable background = base.up;
+                if (background != null) {
+                        boosted.up = skin.newDrawable(background, new Color(1f, 0.78f, 0.08f, 1f));
+                        boosted.down = skin.newDrawable(background, new Color(0.86f, 0.61f, 0.03f, 1f));
+                        boosted.over = skin.newDrawable(background, new Color(1f, 0.88f, 0.28f, 1f));
+                        boosted.checked = boosted.down;
+                        boosted.disabled = skin.newDrawable(
+                              background,
+                                new Color(0.55f, 0.47f, 0.20f, 1f)
+                                );
+                }
+
         boosted.fontColor = Color.BLACK;
         boosted.downFontColor = Color.BLACK;
         boosted.overFontColor = Color.BLACK;
