@@ -32,7 +32,7 @@ public class NightsOps extends NormalGame implements SpecialGame {
 
     @Override
     public ArrayList<PlantType> filterPlants() {
-        return null;
+        return new ArrayList<>(selection.getPlantsToChoose());
     }
 
     @Override

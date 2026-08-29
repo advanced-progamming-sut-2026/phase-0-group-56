@@ -451,6 +451,14 @@ public class User implements Serializable, QuestObserver {
         }
     }
 
+    /** Consumes the one-shot greenhouse boost for this plant, if present. */
+    public boolean consumeBoost(PlantType seedling) {
+        if (seedling == null || boostList == null) {
+            return false;
+        }
+        return boostList.remove(seedling);
+    }
+
     public ArrayList<String> getUnlockedPlantsNames() {
         if (unlockedPlantsNames == null) {
             unlockedPlantsNames = new ArrayList<>();

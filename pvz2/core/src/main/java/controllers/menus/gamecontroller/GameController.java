@@ -5,6 +5,7 @@ import controllers.datacontroller.LevelProgressService;
 import controllers.datacontroller.SeedPackage;
 import controllers.menus.Menu;
 import models.App;
+import models.Constants;
 import models.QuestGameSession;
 import models.User;
 import models.entity.*;
@@ -24,7 +25,6 @@ import models.games.specialgames.PlantWhatYouGet;
 import models.games.specialgames.SaveOurSeeds;
 import models.games.specialgames.TimedWar;
 import models.utils.Result;
-import view.PlayView;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -38,12 +38,15 @@ import java.util.List;
  */
 public class GameController implements Controller, Menu {
 
-    private static final int REQUIRED_STARTING_PLANTS = 5;
+    private static final int REQUIRED_STARTING_PLANTS = Constants.PLANTS_COUNT_IN_A_GAME;
 
     private final BaseGame game;
     private final Level level;
     private final Chapters chapter;
     private final QuestGameSession questSession;
+    private boolean resultHandled;
+    private boolean resultWon;
+    private String resultMessage = "";
 
     public GameController(Chapters chapter, Level level) {
         if (chapter == null) {
@@ -59,7 +62,8 @@ public class GameController implements Controller, Menu {
         game = switch (level.getLevelType().toLowerCase()) {
             case "night ops" -> new NightsOps(chapter,level);
             case "plant what you get" -> new PlantWhatYouGet(chapter,level);
-            case "locked plants by category" -> new LockedPlants(LockedPlants.LockType.ByCategory);
+            case "locked plants by category" ->
+                new LockedPlants(chapter, level, LockedPlants.LockType.ByCategory);
             case "conveyor belt" -> new ConveyorBelt(chapter,level);
             case "deadline" -> new Deadline(chapter,level);
             case "save our seeds" -> new SaveOurSeeds(chapter,level);
@@ -298,6 +302,11 @@ public class GameController implements Controller, Menu {
             return "Plant not found.";
         }
 
+        User user = App.getCurrentuser();
+        if (user != null && user.getBoostList().contains(type)) {
+            seedPackage.setBoost(true);
+        }
+
         game.getAvailable_plants().put(type, seedPackage);
         return type.name() + " selected.";
     }
@@ -338,6 +347,27 @@ public class GameController implements Controller, Menu {
         return GameStart("");
     }
 
+    /** Starts the zombie phase of the Plant What You Get challenge. */
+    public String startZombieWaves() {
+        if (!(game instanceof PlantWhatYouGet plantWhatYouGet)) {
+            return "Zombie waves already start automatically.";
+        }
+        if (game.getState() != BaseGame.GameState.PLAYING) {
+            return "The game is not running.";
+        }
+        if (plantWhatYouGet.isWavesStarted()) {
+            return "Zombie waves have already started.";
+        }
+        plantWhatYouGet.startWaves();
+        return "Zombie waves started.";
+    }
+
+    public boolean isWaitingForZombieWaves() {
+        return game instanceof PlantWhatYouGet plantWhatYouGet
+            && game.getState() == BaseGame.GameState.PLAYING
+            && !plantWhatYouGet.isWavesStarted();
+    }
+
     @Override
     public String GameStart(String input) {
         if (game.getState() != BaseGame.GameState.STARTING) {
@@ -369,25 +399,30 @@ public class GameController implements Controller, Menu {
         questSession.afterUpdate(delta);
         Result endResult = game.check_endGame();
 
-        if (endResult.success() && "Loss".equals(endResult.message())) {
-            questSession.onGameLost();
-            App.setScreen(new PlayView());
-            return "You lost the level.";
-        }
-
-        if (game.isWon()) {
-            questSession.onGameWon();
-            end();
-            return "Level completed.";
+        if (endResult.success() || game.isWon()) {
+            if (!resultHandled) {
+                resultHandled = true;
+                boolean won = game.isWon() || "Won".equals(endResult.message());
+                resultWon = won;
+                game.endGame();
+                if (won) {
+                    questSession.onGameWon();
+                    saveCompletedLevel();
+                    resultMessage = "Level completed.";
+                } else {
+                    questSession.onGameLost();
+                    resultMessage = "You lost the level.";
+                }
+            }
+            return resultMessage;
         }
 
         return log;
     }
 
-    private void end() {
+    private void saveCompletedLevel() {
         User user = Data.getCurrentUser();
         if (user == null) {
-            App.setScreen(new PlayView());
             return;
         }
 
@@ -399,7 +434,26 @@ public class GameController implements Controller, Menu {
         LevelProgressService.completeLevel(user, chapter, level);
 
         Data.saveUser();
-        App.setScreen(new PlayView());
+    }
+
+    public boolean isResultHandled() {
+        return resultHandled;
+    }
+
+    public boolean isWon() {
+        return resultHandled ? resultWon : game.isWon();
+    }
+
+    public String getResultMessage() {
+        return resultMessage;
+    }
+
+    public String getLastWaveAnnouncement() {
+        return game.getLastWaveAnnouncement();
+    }
+
+    public String getLastEventAnnouncement() {
+        return game.getLastEventAnnouncement();
     }
 
     private PlantType parsePlantType(String name) {
@@ -424,7 +478,11 @@ public class GameController implements Controller, Menu {
 
     public String gameEndCheat() {
         questSession.markCheatUsed();
-        end();
+        game.endGame();
+        resultHandled = true;
+        resultWon = true;
+        resultMessage = "Level completed.";
+        saveCompletedLevel();
         return "game ended. you won!";
     }
 

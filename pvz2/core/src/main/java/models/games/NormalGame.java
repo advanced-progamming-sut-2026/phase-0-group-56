@@ -2,6 +2,7 @@ package models.games;
 
 import controllers.datacontroller.SeedPackage;
 import models.App;
+import models.User;
 import models.gameadventure.Chapters;
 import models.gameadventure.levels.Level;
 import models.entity.*;
@@ -96,6 +97,9 @@ public NormalGame(Chapters chapters, Level level){
 
     @Override
     public boolean plant(String plantName, int x, int y) {
+        if (field == null || plantName == null || !validCoordinates(x, y)) {
+            return false;
+        }
         String name = plantName.replaceAll(" " , "_").toUpperCase();
         Result findPlant = plantAvailable(name);
         if(!findPlant.success()){
@@ -109,21 +113,30 @@ public NormalGame(Chapters chapters, Level level){
             return false;
         }
 
-            Plant newPlant = plantFactory.createPlant(findPlant.plantType());
+        Plant newPlant = plantFactory.createPlant(findPlant.plantType());
+        if (newPlant == null) {
+            return false;
+        }
         if(!isEmpty(newPlant ,x, y)) {
             return false;
         }
-        plantsInField.add(newPlant);
         Tile tile = field.getTiles().get(y).get(x);
-        if(plantName.equals("LILY_PAD")){
+        Plant existing = findByCoordinates(x, y);
+        if (existing != null && existing.getType() == PlantType.LILY_PAD) {
+            newPlant.onLilyPad = true;
+        }
+        plantsInField.add(newPlant);
+        if(findPlant.plantType() == PlantType.LILY_PAD){
             tile.setPlantable(true);
+            tile.setEmpty(false);
         } else {
             tile.setEmpty(false);
         }
         newPlant.setLine(y);
         newPlant.setTileIndex(x);
         SeedPackage seedPackage = availablePlants.get(findPlant.plantType());
-        if(App.getCurrentuser().getBoostList().contains(seedPackage.getPlant())){
+        User user = App.getCurrentuser();
+        if (user != null && user.consumeBoost(seedPackage.getPlant())) {
             seedPackage.setBoost(true);
         }
         if(seedPackage.getBoost()){
@@ -149,7 +162,11 @@ public NormalGame(Chapters chapters, Level level){
     }
 
     protected boolean isEmpty(Plant type, int x, int y) {
-        boolean waterPlant = type.getTags().contains(PlantTags.WATER);
+        if (field == null || type == null || !validCoordinates(x, y)) {
+            return false;
+        }
+        boolean waterPlant = type.getTags() != null
+            && type.getTags().contains(PlantTags.WATER);
         Tile tile = field.getTileByCoordinats(x, y);
         Plant existingPlant = findByCoordinates(x, y);
 
@@ -157,13 +174,17 @@ public NormalGame(Chapters chapters, Level level){
         if (existingPlant != null && existingPlant.getType() == PlantType.PEA_POD && type.getType() == PlantType.PEA_POD) {
             return true;
         }
+        if (existingPlant != null && existingPlant.getType() == PlantType.LILY_PAD
+            && type.getType() != PlantType.LILY_PAD) {
+            return tile.isWater();
+        }
         else if (type.getType() == PlantType.GRAVE_BUSTER) {
             return tile.getTileType() == TileType.EGYPTIAN_GRAVE || tile.getTileType() == TileType.DARK_AGE_GRAVE;
         }
 
         // FIXED: get(y).get(x) because y = row, x = col
         Tile toPlantOn = field.getTiles().get(y).get(x);
-        boolean water = toPlantOn.isWater() || !waterPlant;
+        boolean water = !toPlantOn.isWater() || waterPlant;
 
         return toPlantOn.isEmpty() &&
                 (toPlantOn.isPlantable() || (type.getArmor().isEmpty() && type.getType() == PlantType.PUMPKIN)) &&
@@ -173,6 +194,9 @@ public NormalGame(Chapters chapters, Level level){
 
     @Override
     public String pluck(int x, int y) {
+        if (field == null || !validCoordinates(x, y)) {
+            return "Outside the lawn.";
+        }
         // FIXED: y is row (line), x is column (tileIndex)
         Tile toPluckOn = field.getTiles().get(y).get(x);
         Iterator<Plant> iterator = plantsInField.iterator();
@@ -235,7 +259,14 @@ public NormalGame(Chapters chapters, Level level){
 
     public String boost(PlantType type){
         SeedPackage seedPackage = availablePlants.get(type);
+        if (seedPackage == null) {
+            return type + " is not selected.";
+        }
         seedPackage.setBoost(true);
-        return type + " boosetd.";
+        return type + " boosted.";
+    }
+
+    private static boolean validCoordinates(int x, int y) {
+        return x >= 0 && x < 9 && y >= 0 && y < 5;
     }
 }

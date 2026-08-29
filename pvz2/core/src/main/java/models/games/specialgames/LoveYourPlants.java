@@ -17,7 +17,7 @@ public class LoveYourPlants extends NormalGame implements SpecialGame {
 
     @Override
     public ArrayList<PlantType> filterPlants() {
-        return null;
+        return new ArrayList<>(selection.getPlantsToChoose());
     }
 
     @Override
@@ -26,10 +26,19 @@ public class LoveYourPlants extends NormalGame implements SpecialGame {
     }
 
     @Override
+    public void updatePlants(float delta) {
+        int before = plantsInField.size();
+        super.updatePlants(delta);
+        deadPlants += Math.max(0, before - plantsInField.size());
+    }
+
+    @Override
     public Result check_endGame() {
         if(deadPlants >= 5){
+            won = false;
+            state = GameState.END;
             return new Result(true , "Loss" , null);
         }
-        return  new Result(false, null , null);
+        return super.check_endGame();
     }
 }

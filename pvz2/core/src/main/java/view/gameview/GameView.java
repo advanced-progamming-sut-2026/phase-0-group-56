@@ -40,6 +40,7 @@ import controllers.datacontroller.Data;
 import controllers.datacontroller.SeedPackage;
 import controllers.menus.gamecontroller.GameController;
 import models.App;
+import models.Constants;
 import models.factory.builder.PlantType;
 import models.gameadventure.Chapters;
 import models.gameadventure.levels.Level;
@@ -51,6 +52,7 @@ import view.View;
 import view.components.PlantTable;
 
 import java.io.File;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -73,7 +75,7 @@ public final class GameView extends View {
     private static final float VIRTUAL_HEIGHT = 720f;
     private static final float MAX_DELTA = 1f / 15f;
     private static final float CAMERA_SLIDE_DURATION = 0.75f;
-    private static final int REQUIRED_SELECTION_COUNT = 5;
+    private static final int REQUIRED_SELECTION_COUNT = Constants.PLANTS_COUNT_IN_A_GAME;
     private static final String PVZ_ASSET_RESOLUTION = "768";
     private static final String SHOVEL_CURSOR_ID = "IMAGE_UI_HUD_INGAME_SHOVEL_ICON";
 
@@ -122,6 +124,14 @@ public final class GameView extends View {
 
     private ToolsStack toolsStack;
     private Table pauseOverlay;
+    private Table announcementOverlay;
+    private Label announcementLabel;
+    private Table outcomeOverlay;
+    private Label outcomeLabel;
+    private final ArrayDeque<String> announcementQueue = new ArrayDeque<>();
+    private String activeAnnouncement = "";
+    private float announcementRemaining;
+    private static final float ANNOUNCEMENT_DURATION = 1.8f;
 
     private FileHandle pvzAssetsRoot;
     private TextureBank textureBank;
@@ -181,6 +191,8 @@ public final class GameView extends View {
         toolsStack.setVisible(false);
         stage.addActor(toolsStack);
         buildPauseOverlay();
+        buildAnnouncementOverlay();
+        buildOutcomeOverlay();
 
         if (controller.getGame().getState() == BaseGame.GameState.STARTING) {
             buildPreparationUI();
@@ -220,6 +232,7 @@ public final class GameView extends View {
 
         BaseGame.GameState state = controller.getGame().getState();
         syncPauseOverlay(state);
+        syncOutcomeOverlay(state);
         updatePointerFromScreen(Gdx.input.getX(), Gdx.input.getY());
         updateCursorPlant(safeDelta, state);
         syncSystemCursor(state);
@@ -233,17 +246,17 @@ public final class GameView extends View {
             if (toolsStack != null) {
                 toolsStack.refresh();
                 if (log != null && !log.isBlank()) {
-                    toolsStack.setStatus(log);
+                    toolsStack.setStatus(lastMeaningfulLine(log));
                 }
             }
-
-            // GameController can change screens after win/loss.
-            if (App.getScreen() != this) {
-                return;
-            }
+            queueGameAnnouncements();
+            syncOutcomeOverlay(controller.getGame().getState());
         } else if (toolsStack != null && state == BaseGame.GameState.PAUSE) {
             toolsStack.refresh();
         }
+
+        updateAnnouncementOverlay(safeDelta);
+        syncOutcomeOverlay(controller.getGame().getState());
 
         ScreenUtils.clear(0.04f, 0.08f, 0.06f, 1f);
 
@@ -484,6 +497,114 @@ public final class GameView extends View {
 
         pauseOverlay.add(panel).center();
         stage.addActor(pauseOverlay);
+    }
+
+    private void buildAnnouncementOverlay() {
+        announcementOverlay = new Table();
+        announcementOverlay.setFillParent(true);
+        announcementOverlay.center();
+        announcementOverlay.setTouchable(Touchable.disabled);
+        announcementOverlay.setVisible(false);
+
+        announcementLabel = new Label("", skin, "big_outline");
+        announcementLabel.setAlignment(Align.center);
+        announcementLabel.setWrap(true);
+        announcementLabel.setColor(new Color(0.95f, 0.04f, 0.04f, 1f));
+        announcementOverlay.add(announcementLabel).width(980f).pad(20f);
+        stage.addActor(announcementOverlay);
+    }
+
+    private void buildOutcomeOverlay() {
+        outcomeOverlay = new Table();
+        outcomeOverlay.setFillParent(true);
+        outcomeOverlay.center();
+        outcomeOverlay.setTouchable(Touchable.disabled);
+        outcomeOverlay.setVisible(false);
+
+        Table card = new Table();
+        card.pad(28f);
+        Drawable background = safeDrawable("image_ui_quests_panel_edge_to_edge_ten");
+        if (background != null) {
+            card.setBackground(background);
+        }
+
+        outcomeLabel = new Label("", skin, "big_outline");
+        outcomeLabel.setAlignment(Align.center);
+        outcomeLabel.setWrap(true);
+        card.add(outcomeLabel).colspan(2).width(460f).padBottom(18f).row();
+
+        TextButton retry = new TextButton("RETRY", skin, "green");
+        retry.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                App.setScreen(new GameView(chapter, level));
+            }
+        });
+        TextButton exit = new TextButton("EXIT TO ADVENTURE", skin, "brown");
+        exit.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                Data.saveUser();
+                App.setScreen(new PlayView());
+            }
+        });
+        card.add(retry).width(190f).height(58f).pad(5f);
+        card.add(exit).width(230f).height(58f).pad(5f);
+        outcomeOverlay.add(card).center();
+        stage.addActor(outcomeOverlay);
+    }
+
+    private void queueGameAnnouncements() {
+        enqueueAnnouncement(controller.getLastWaveAnnouncement());
+        enqueueAnnouncement(controller.getLastEventAnnouncement());
+    }
+
+    private void enqueueAnnouncement(String announcement) {
+        if (announcement == null || announcement.isBlank()) {
+            return;
+        }
+        String text = announcement.trim();
+        if (text.equals(activeAnnouncement) || announcementQueue.contains(text)) {
+            return;
+        }
+        announcementQueue.addLast(text);
+    }
+
+    private void updateAnnouncementOverlay(float delta) {
+        if (announcementOverlay == null || announcementLabel == null) {
+            return;
+        }
+        if (announcementRemaining > 0f) {
+            announcementRemaining -= delta;
+        }
+        if (announcementRemaining <= 0f && !announcementQueue.isEmpty()) {
+            activeAnnouncement = announcementQueue.removeFirst();
+            announcementLabel.setText(activeAnnouncement);
+            announcementOverlay.setVisible(true);
+            announcementRemaining = ANNOUNCEMENT_DURATION;
+        } else if (announcementRemaining <= 0f) {
+            activeAnnouncement = "";
+            announcementLabel.setText("");
+            announcementOverlay.setVisible(false);
+        }
+    }
+
+    private void syncOutcomeOverlay(BaseGame.GameState state) {
+        if (outcomeOverlay == null || outcomeLabel == null) {
+            return;
+        }
+        boolean ended = state == BaseGame.GameState.END && controller.isResultHandled();
+        outcomeOverlay.setVisible(ended);
+        outcomeOverlay.setTouchable(ended ? Touchable.enabled : Touchable.disabled);
+        if (ended) {
+            boolean won = controller.isWon();
+            outcomeLabel.setText(won ? "YOU WIN!" : "YOU LOSE!");
+            outcomeLabel.setColor(
+                won
+                    ? new Color(0.20f, 0.95f, 0.22f, 1f)
+                    : new Color(0.95f, 0.04f, 0.04f, 1f)
+            );
+        }
     }
 
     private void syncPauseOverlay(BaseGame.GameState state) {
@@ -798,6 +919,9 @@ public final class GameView extends View {
                 TextButton empty = new TextButton("EMPTY", skin, "brown");
                 empty.setDisabled(true);
                 selectedSlotsTable.add(empty).size(102f, 58f).padRight(5f);
+            }
+            if ((i + 1) % 4 == 0) {
+                selectedSlotsTable.row();
             }
         }
 

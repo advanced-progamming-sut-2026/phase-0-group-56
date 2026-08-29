@@ -89,7 +89,9 @@ public class Field {
                             for (Plant x : game.getPlantsInField()){
                                 int dx = Math.abs(x.getTileIndex() - tile.getCol());
                                 int dy = Math.abs(x.getLine() - tile.getLine());
-                                if(dx <= 1 && dy <= 1 && x.getTags().contains(PlantTags.Fire)){
+                                if(dx <= 1 && dy <= 1
+                                    && x.getTags() != null
+                                    && x.getTags().contains(PlantTags.Fire)){
                                     tile.setHp(tile.getHp() - delta * 60);
                                 }
                             }

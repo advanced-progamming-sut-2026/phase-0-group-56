@@ -6,7 +6,7 @@ import models.gamepanes.TileType;
 import models.games.BaseGame;
 
 import java.util.ArrayList;
-import java.util.Iterator;
+import java.util.List;
 
 public class GraveSpawner implements  ChapterSpecialEvent {
 
@@ -17,23 +17,32 @@ public class GraveSpawner implements  ChapterSpecialEvent {
     }
     @Override
     public void run(BaseGame game, float delta) {
-        Iterator<Zombie> iterator = game.getCurrentWave().getZombies().iterator();
+        if (game == null || game.getCurrentWave() == null || game.getField() == null) {
+            return;
+        }
 
-        int count = 0;
-        for (ArrayList< Tile> row : game.getField().getTiles()){
-            for (Tile tile : row){
-                if(tile.getTileType() == TileType.NECROMANCY) count += 1;
-                Zombie zombie = game.getCurrentWave().getZombies().get(count);
-                if(zombie != null){
-                    zombie.setLine(tile.getLine());
-                    zombie.setTileIndex(tile.getCol());
-                    zombie.setX(tile.getX() + Tile.getWidth() / 2);
-                    zombie.setY(tile.getY() + Tile.getHeight() / 2);
+        List<Tile> graveTiles = new ArrayList<>();
+        for (ArrayList<Tile> row : game.getField().getTiles()) {
+            for (Tile tile : row) {
+                if (tile != null && tile.getTileType() == TileType.NECROMANCY) {
+                    graveTiles.add(tile);
                 }
             }
         }
 
-        /// TODO: implement spawning random graves
+        List<Zombie> waveZombies = game.getCurrentWave().getZombies();
+        int count = Math.min(graveTiles.size(), waveZombies == null ? 0 : waveZombies.size());
+        for (int index = 0; index < count; index++) {
+            Zombie zombie = waveZombies.get(index);
+            Tile tile = graveTiles.get(index);
+            if (zombie != null) {
+                zombie.setLine(tile.getLine());
+                zombie.setTileIndex(tile.getCol());
+                zombie.setX(tile.getX() + Tile.getWidth() / 2f);
+                zombie.setY(tile.getY() + Tile.getHeight() / 2f);
+            }
+        }
+
         dispose(game);
     }
 

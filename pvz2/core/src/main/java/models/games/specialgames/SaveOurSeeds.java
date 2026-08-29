@@ -140,7 +140,7 @@ public class SaveOurSeeds extends NormalGame implements SpecialGame {
 
     @Override
     public ArrayList<PlantType> filterPlants() {
-        return null;
+        return new ArrayList<>(selection.getPlantsToChoose());
     }
 
     @Override
@@ -154,10 +154,12 @@ public class SaveOurSeeds extends NormalGame implements SpecialGame {
                 || !plant.isAlive()
                 || plant.getHp() <= 0f
                 || !plantsInField.contains(plant)) {
+                won = false;
+                state = GameState.END;
                 return new Result(true, "Loss", null);
             }
         }
-        return new Result(false, null, null);
+        return super.check_endGame();
     }
 
     private record Cell(int col, int row) {

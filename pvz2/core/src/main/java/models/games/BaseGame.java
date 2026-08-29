@@ -5,6 +5,7 @@ import controllers.Start.PlantSelection;
 import controllers.datacontroller.SeedPackage;
 import controllers.observer.WizardObserver;
 import models.gameadventure.*;
+import models.Constants;
 //import models.collection.ZombieRegistry;
 import models.gameadventure.levels.Level;
 import models.entity.*;
@@ -56,6 +57,10 @@ public class BaseGame implements Game {
     protected ChapterSpecialEvent event;
     protected PlantFactory plantFactory = new PlantFactory();
 
+    /** Short, structured HUD messages emitted only when a wave starts. */
+    private String lastWaveAnnouncement = "";
+    private String lastEventAnnouncement = "";
+
 
 
     // ====== WIZARD OBSERVER ======
@@ -86,6 +91,8 @@ public class BaseGame implements Game {
     public PlantSelection getSelection() { return selection; }
     public LinkedHashMap<PlantType, SeedPackage> getAvailable_plants() { return availablePlants; }
     public void setEvent(ChapterSpecialEvent event) { this.event = event; }
+    public String getLastWaveAnnouncement() { return lastWaveAnnouncement; }
+    public String getLastEventAnnouncement() { return lastEventAnnouncement; }
 
     @Override
     public void initGame(Chapters chapter , Level level) {
@@ -94,7 +101,7 @@ public class BaseGame implements Game {
 
     @Override
     public boolean startGame(String plantName) {
-        return availablePlants.size() == 5;
+        return availablePlants.size() == Constants.PLANTS_COUNT_IN_A_GAME;
     }
 
     protected boolean plantSelection = false;
@@ -106,6 +113,8 @@ public class BaseGame implements Game {
     @Override
     public String playGame(float delta) {
         output = new StringBuilder();
+        lastWaveAnnouncement = "";
+        lastEventAnnouncement = "";
 
 
         for (SeedPackage x : availablePlants.values()){
@@ -254,13 +263,19 @@ public class BaseGame implements Game {
     @Override
     public Result check_endGame() {
         for (Zombie z : zombies) {
-            if(z.getX() <= -50) return new Result(true , "Loss" , null);
+            if(z.getX() <= -50) {
+                won = false;
+                state = GameState.END;
+                return new Result(true , "Loss" , null);
+            }
         }
         return new  Result(false, null,null);
     }
 
     @Override
-    public void endGame() {}
+    public void endGame() {
+        state = GameState.END;
+    }
 
     protected int waveID = 0;
     /** Zombies which belong to the active wave but have not entered the lawn yet. */
@@ -284,10 +299,12 @@ public class BaseGame implements Game {
             if (currentWave != null && waves != null && !waves.isEmpty()
                 && currentWave == waves.getLast()) {
                 won = true;
+                state = GameState.END;
                 return new Result(true , "Won" , null);
             }
             if (waves == null || waveID >= waves.size()) {
                 won = true;
+                state = GameState.END;
                 return new Result(true, "Won", null);
             }
             previousWave = currentWave;
@@ -301,15 +318,14 @@ public class BaseGame implements Game {
                 case BigWaveBeach -> new Water(this);
                 default -> new GraveSpawner(this);
             };
-            StringBuilder announcement = new StringBuilder(
-                setTheWaveZombies(lastWave)
-            );
+            lastWaveAnnouncement = setTheWaveZombies(lastWave);
+            lastEventAnnouncement = eventMessage(chapter);
+            StringBuilder announcement = new StringBuilder(lastWaveAnnouncement);
             if (spawnLog.length() > 0) {
                 announcement.append('\n').append(spawnLog);
             }
-            String eventMessage = eventMessage(chapter);
-            if (!eventMessage.isBlank()) {
-                announcement.append('\n').append(eventMessage);
+            if (!lastEventAnnouncement.isBlank()) {
+                announcement.append('\n').append(lastEventAnnouncement);
             }
             return new Result(true , announcement.toString() , null);
         }
@@ -474,8 +490,9 @@ public class BaseGame implements Game {
         return switch (currentChapter) {
             case AncientEgypt -> "Tornado is coming!";
             case FrozenCaves -> "Wind is blowing! ready to be frozen!";
-            case BigWaveBeach -> "Water surface is changing!";
-            default -> "Zombies are coming from the graves!";
+            case BigWaveBeach -> "Low tide alert: the water surface is changing!";
+            case DarkAge -> "Necromancy alert: zombies may rise from the graves!";
+            default -> "Zombies are approaching!";
         };
     }
 

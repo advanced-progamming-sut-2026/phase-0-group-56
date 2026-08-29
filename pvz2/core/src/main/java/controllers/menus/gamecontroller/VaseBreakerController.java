@@ -9,7 +9,6 @@ import models.games.minigames.VaseBreakResult;
 import models.games.minigames.VaseBraker;
 import models.games.minigames.VaseSeedDrop;
 import models.utils.Result;
-import view.MiniGamesView;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,7 +16,9 @@ import java.util.List;
 /** Controller for the graphical Vase Breaker screen. */
 public class VaseBreakerController implements Controller {
     private final VaseBraker game;
+    private final int levelNumber;
     private boolean ended;
+    private String resultMessage = "";
 
     public VaseBreakerController() {
         this(buildCurrentLevel());
@@ -30,10 +31,19 @@ public class VaseBreakerController implements Controller {
 
     public VaseBreakerController(MinigameLevel level) {
         game = new VaseBraker(level);
+        levelNumber = Math.max(1, Math.min(3, level == null ? 1 : level.getId()));
     }
 
     public VaseBraker getGame() {
         return game;
+    }
+
+    public int getLevelNumber() {
+        return levelNumber;
+    }
+
+    public String getResultMessage() {
+        return resultMessage;
     }
 
     @Override
@@ -92,6 +102,7 @@ public class VaseBreakerController implements Controller {
     }
 
     private void finish(String result) {
+        resultMessage = result == null ? "" : result;
         User user = App.getCurrentuser();
 
         if (user != null && "Won".equals(result)) {
@@ -101,7 +112,6 @@ public class VaseBreakerController implements Controller {
             Data.saveUser();
         }
 
-        App.setScreen(new MiniGamesView());
     }
 
     private static MinigameLevel buildCurrentLevel() {
