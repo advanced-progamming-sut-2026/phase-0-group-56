@@ -3,11 +3,12 @@ package view;
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
+import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
-import com.badlogic.gdx.scenes.scene2d.utils.Drawable;
 import com.badlogic.gdx.utils.Align;
+import com.badlogic.gdx.utils.Scaling;
 import models.App;
 import models.User;
 import view.gameview.BeghouledView;
@@ -91,17 +92,22 @@ public final class MiniGamesView extends View {
     }
 
     private Table createCard(String titleText, String description) {
-        Table card = new Table();
+        Table card = pvzPanel();
         card.top().pad(20f);
-        Drawable background =
-            getSkinDrawableSafe("image_ui_quests_panel_edge_to_edge_ten");
-        if (background != null) {
-            card.setBackground(background);
+
+        Image icon = MenuVisualAssets.image("minigames");
+        if (icon != null) {
+            icon.setScaling(Scaling.fit);
+            card.add(icon)
+                .size(70f)
+                .center()
+                .padBottom(5f)
+                .row();
         }
 
         Label title = new Label(titleText, skin, "big_outline");
         title.setAlignment(Align.center);
-        Label body = new Label(description, skin);
+        Label body = secondaryLabel(description);
         body.setWrap(true);
         body.setAlignment(Align.center);
 

@@ -2,10 +2,12 @@ package view;
 
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
+import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.SelectBox;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.Array;
+import com.badlogic.gdx.utils.Scaling;
 
 import controllers.datacontroller.Data;
 import controllers.menus.secondarymenus.Shop;
@@ -58,7 +60,7 @@ public class ShopView extends View {
 
         table.add(
                 menuSectionHeader(
-                    "hud_zg",
+                    "shop",
                     "CRAZY DAVE'S SHOP",
                     "Spend coins and gems on permanent and daily offers."
                 )
@@ -71,22 +73,28 @@ public class ShopView extends View {
         Table hintPanel =
             pvzInnerPanel();
 
-        Label hint =
-            wrappedLabel(
-                "Every purchase asks for confirmation "
-                    + "before coins or gems are spent.",
-                720f
-            );
+        Label hint = secondaryLabel(
+            "Every purchase asks for confirmation before coins or gems are spent."
+        );
 
         hint.setAlignment(
             Align.center
         );
+        hint.setWrap(true);
+
+        Image dave = MenuVisualAssets.image("dave_waist");
+        if (dave != null) {
+            dave.setScaling(Scaling.fit);
+            hintPanel.add(dave)
+                .size(96f)
+                .padRight(10f);
+        }
 
         hintPanel.add(hint)
-            .width(720f);
+            .width(680f);
 
         table.add(hintPanel)
-            .width(780f)
+            .width(900f)
             .padBottom(14f)
             .row();
 
@@ -223,8 +231,17 @@ public class ShopView extends View {
             )
         );
 
-        Table card =
-            pvzPanel();
+        Table card = pvzInnerPanel();
+        card.pad(13f, 16f, 13f, 16f);
+
+        Image currencyIcon = MenuVisualAssets.image("gem");
+        if (currencyIcon != null) {
+            currencyIcon.setScaling(Scaling.fit);
+            card.add(currencyIcon)
+                .size(86f)
+                .center()
+                .padRight(8f);
+        }
 
         Table text =
             new Table();
@@ -248,13 +265,11 @@ public class ShopView extends View {
             .padTop(4f)
             .row();
 
-        text.add(
-                wrappedLabel(
-                    "Choose an unlocked plant "
-                        + "and receive 10 seed packets.",
-                    430f
-                )
-            )
+        Label seedDescription = secondaryLabel(
+            "Choose an unlocked plant and receive 10 seed packets."
+        );
+        seedDescription.setWrap(true);
+        text.add(seedDescription)
             .width(430f)
             .left()
             .padTop(8f);
@@ -270,7 +285,9 @@ public class ShopView extends View {
             .pad(10f);
 
         card.add(
-                greenButton(
+                assetTextButton(
+                    "gems_buy",
+                    "gems_buy_down",
                     "BUY",
                     () ->
                         confirmPurchase(
@@ -285,13 +302,13 @@ public class ShopView extends View {
                         )
                 )
             )
-            .width(150f)
-            .height(50f)
+            .width(175f)
+            .height(58f)
             .pad(10f);
 
         table.add(card)
-            .width(980f)
-            .pad(6f)
+            .width(1000f)
+            .pad(5f)
             .row();
     }
 
@@ -307,8 +324,18 @@ public class ShopView extends View {
         Runnable buyAction
     ) {
 
-        Table card =
-            pvzPanel();
+        Table card = pvzInnerPanel();
+        card.pad(13f, 16f, 13f, 16f);
+
+        String productIconKey = productIconKey(titleText, priceText);
+        Image currencyIcon = MenuVisualAssets.image(productIconKey);
+        if (currencyIcon != null) {
+            currencyIcon.setScaling(Scaling.fit);
+            card.add(currencyIcon)
+                .size(86f)
+                .center()
+                .padRight(8f);
+        }
 
         Table text =
             new Table();
@@ -333,13 +360,10 @@ public class ShopView extends View {
             .padTop(4f)
             .row();
 
-        text.add(
-                wrappedLabel(
-                    description,
-                    580f
-                )
-            )
-            .width(580f)
+        Label descriptionLabel = secondaryLabel(description);
+        descriptionLabel.setWrap(true);
+        text.add(descriptionLabel)
+            .width(610f)
             .left()
             .padTop(8f);
 
@@ -349,19 +373,73 @@ public class ShopView extends View {
             .pad(10f);
 
         card.add(
-                greenButton(
+                assetTextButton(
+                    purchaseButtonKey(titleText, priceText),
+                    purchaseButtonDownKey(titleText, priceText),
                     "BUY",
                     buyAction
                 )
             )
-            .width(160f)
-            .height(52f)
-            .pad(10f);
+            .width(175f)
+            .height(58f)
+            .pad(8f);
 
         table.add(card)
-            .width(980f)
-            .pad(6f)
+            .width(1000f)
+            .pad(5f)
             .row();
+    }
+
+    private String productIconKey(
+        String titleText,
+        String priceText
+    ) {
+        String title = titleText == null ? "" : titleText.toUpperCase();
+
+        if (title.contains("POT")) {
+            return "pot";
+        }
+        if (title.contains("PLANT FOOD")) {
+            return "plantfood";
+        }
+        if (title.contains("DAILY")) {
+            return "star";
+        }
+        if (title.contains("CURRENCY")) {
+            return "gem";
+        }
+
+        return priceText != null && priceText.toUpperCase().contains("GEM")
+            ? "gem"
+            : "coin";
+    }
+
+    private String purchaseButtonKey(
+        String titleText,
+        String priceText
+    ) {
+        String title = titleText == null ? "" : titleText.toUpperCase();
+        String price = priceText == null ? "" : priceText.toUpperCase();
+
+        if (title.contains("CURRENCY")) {
+            return "generic_currency";
+        }
+        if (price.contains("GEM")) {
+            return "gems_buy";
+        }
+        return "coin_buy";
+    }
+
+    private String purchaseButtonDownKey(
+        String titleText,
+        String priceText
+    ) {
+        String normalKey = purchaseButtonKey(titleText, priceText);
+        return switch (normalKey) {
+            case "generic_currency" -> "generic_currency_down";
+            case "gems_buy" -> "gems_buy_down";
+            default -> "coin_buy_down";
+        };
     }
 
     private void confirmPurchase(

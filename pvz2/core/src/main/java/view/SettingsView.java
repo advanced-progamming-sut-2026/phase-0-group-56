@@ -2,11 +2,13 @@ package view;
 
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.scenes.scene2d.ui.CheckBox;
+import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.SelectBox;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.Array;
+import com.badlogic.gdx.utils.Scaling;
 
 import controllers.datacontroller.Data;
 import controllers.menus.secondarymenus.Settings;
@@ -174,8 +176,18 @@ public class SettingsView extends View {
             Align.center
         );
 
+        Image helpIcon = MenuVisualAssets.image("sun");
+        if (helpIcon != null) {
+            helpIcon.setScaling(Scaling.fit);
+            helpPanel.add(helpIcon)
+                .size(42f)
+                .padRight(8f)
+                .left();
+        }
+
         helpPanel.add(description)
-            .width(600f);
+            .width(530f)
+            .padLeft(8f);
 
         table.add(helpPanel)
             .width(660f)

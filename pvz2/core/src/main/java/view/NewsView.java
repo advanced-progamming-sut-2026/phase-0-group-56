@@ -2,8 +2,10 @@ package view;
 
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
+import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.utils.Align;
+import com.badlogic.gdx.utils.Scaling;
 
 import controllers.datacontroller.Data;
 import controllers.menus.secondarymenus.News;
@@ -43,7 +45,7 @@ public class NewsView extends View {
 
         table.add(
                 menuSectionHeader(
-                    "hud_quests",
+                    "news",
                     "NEWS",
                     "Stay up to date with the latest garden announcements."
                 )
@@ -64,7 +66,19 @@ public class NewsView extends View {
 
         status.setAlignment(Align.center);
 
-        table.add(status)
+        Table statusPanel = pvzInnerPanel();
+        Image statusIcon = MenuVisualAssets.image("news");
+        if (statusIcon != null) {
+            statusIcon.setScaling(Scaling.fit);
+            statusPanel.add(statusIcon)
+                .size(42f)
+                .padRight(8f);
+        }
+        statusPanel.add(status).center();
+
+        table.add(statusPanel)
+            .width(420f)
+            .center()
             .padTop(8f)
             .padBottom(16f)
             .row();
@@ -115,6 +129,14 @@ public class NewsView extends View {
                 .expandX();
 
             if (item.isUnread()) {
+                Image unreadDot = MenuVisualAssets.image("red_dot");
+                if (unreadDot != null) {
+                    unreadDot.setScaling(Scaling.fit);
+                    meta.add(unreadDot)
+                        .size(18f)
+                        .padRight(5f);
+                }
+
                 Label badge =
                     secondaryLabel("NEW");
 
