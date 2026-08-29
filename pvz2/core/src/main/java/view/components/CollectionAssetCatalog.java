@@ -9,10 +9,7 @@ import pvz.libpvz.textures.ResourceIndex;
 import pvz.libpvz.textures.TextureBank;
 import view.gameview.PvzAssetLocator;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -25,22 +22,16 @@ import java.util.Map;
  */
 public final class CollectionAssetCatalog implements AutoCloseable {
 
-    private static final String PLANT_PACKET_PREFIX =
-        "IMAGE_UI_PACKETS_";
-
-    private static final String ZOMBIE_PACKET_PREFIX =
-        "IMAGE_UI_ALMANAC_PACKETS_ZOMBIES_";
+    private static final Map<String, String> PLANT_ALIASES = plantAliases();
+    private static final Map<String, String> ZOMBIE_ALIASES = zombieAliases();
 
     private final TextureBank textureBank;
     private final ResourceIndex resourceIndex;
-    private final List<String> imageIds;
     private final Map<String, String> idCache = new HashMap<>();
 
     private CollectionAssetCatalog(TextureBank textureBank) {
         this.textureBank = textureBank;
         this.resourceIndex = textureBank.resourceIndex();
-        this.imageIds = new ArrayList<>(resourceIndex.imageIds());
-        Collections.sort(this.imageIds);
     }
 
     public static CollectionAssetCatalog create() {
@@ -62,18 +53,26 @@ public final class CollectionAssetCatalog implements AutoCloseable {
         textureBank.update();
     }
 
+    /** Returns an exact official UI region from the extracted asset bundle. */
+    public TextureRegion uiRegion(String resourceId) {
+        if (resourceId == null || resourceId.isBlank()) {
+            return null;
+        }
+        try {
+            return textureBank.region(resourceId);
+        } catch (RuntimeException exception) {
+            return null;
+        }
+    }
+
     public TextureRegion plantPortrait(PlantType type) {
         if (type == null) {
             return null;
         }
-        String packetKey = plantPacketKey(type);
         return regionFor(
-            "P:" + type.name(),
-            packetKey.isEmpty()
-                ? null
-                : PLANT_PACKET_PREFIX + packetKey,
-            plantSpriteKey(type),
-            false
+            "PLANT_" + type.name(),
+            "IMAGE_UI_PACKETS_",
+            PLANT_ALIASES
         );
     }
 
@@ -84,31 +83,34 @@ public final class CollectionAssetCatalog implements AutoCloseable {
             return null;
         }
         return regionFor(
-            "Z:" + type.name(),
-            ZOMBIE_PACKET_PREFIX + zombiePacketKey(type),
-            zombieSpriteKey(type),
-            true
+            "ZOMBIE_" + type.name(),
+            "IMAGE_UI_ALMANAC_PACKETS_ZOMBIES_",
+            ZOMBIE_ALIASES
         );
     }
 
     private TextureRegion regionFor(
-        String cacheKey,
-        String preferredId,
-        String fallbackToken,
-        boolean zombie
+        String token,
+        String resourcePrefix,
+        Map<String, String> aliases
     ) {
-        String cachedId = idCache.get(cacheKey);
-        if (cachedId == null && idCache.containsKey(cacheKey)) {
+        String normalizedToken = normalize(token);
+        if (normalizedToken.isEmpty()) {
+            return null;
+        }
+
+        String cachedId = idCache.get(normalizedToken);
+        if (cachedId == null && idCache.containsKey(normalizedToken)) {
             return null;
         }
 
         if (cachedId == null) {
-            if (preferredId != null && resourceIndex.image(preferredId) != null) {
-                cachedId = preferredId;
-            } else {
-                cachedId = findBestSpriteId(fallbackToken, zombie);
-            }
-            idCache.put(cacheKey, cachedId);
+            cachedId = findExactId(
+                normalizedToken,
+                resourcePrefix,
+                aliases
+            );
+            idCache.put(normalizedToken, cachedId);
         }
 
         if (cachedId == null || cachedId.isBlank()) {
@@ -122,174 +124,46 @@ public final class CollectionAssetCatalog implements AutoCloseable {
         }
     }
 
-    private String findBestSpriteId(String token, boolean zombie) {
-        String normalizedToken = normalize(token);
-        if (normalizedToken.isEmpty()) {
-            return null;
+    /**
+     * Only resolve an explicit official almanac packet. The old implementation
+     * used a loose substring search, which could silently select another plant
+     * (for example a mint or a projectile) when a name was missing.
+     */
+    private String findExactId(
+        String token,
+        String resourcePrefix,
+        Map<String, String> aliases
+    ) {
+        String alias = aliases.get(token);
+        if (alias != null && resourceIndex.image(alias) != null) {
+            return alias;
         }
 
-        String bestId = null;
-        int bestScore = Integer.MIN_VALUE;
+        String normalizedPrefix = normalize(resourcePrefix);
+        String normalizedSuffix = token;
+        if (token.startsWith("PLANT")) {
+            normalizedSuffix = token.substring("PLANT".length());
+        } else if (token.startsWith("ZOMBIE")) {
+            normalizedSuffix = token.substring("ZOMBIE".length());
+        }
 
-        for (String id : imageIds) {
+        for (String id : resourceIndex.imageIds()) {
             if (id == null || id.isBlank()) {
                 continue;
             }
 
-            ResourceIndex.ImageEntry entry =
-                resourceIndex.image(id);
-
-            if (entry == null) {
+            String normalizedId = normalize(id);
+            if (!normalizedId.startsWith(normalizedPrefix)) {
                 continue;
             }
 
-            String path = entry.path == null
-                ? ""
-                : entry.path.replace('\\', '/')
-                .toUpperCase(Locale.ROOT);
-
-            String folder = pathFolder(path, zombie ? "/ZOMBIE/" : "/PLANT/");
-            if (!normalizedToken.equals(normalize(folder))) {
-                continue;
-            }
-
-            if (entry.aw <= 0 || entry.ah <= 0) {
-                continue;
-            }
-
-            int minDimension = Math.min(entry.aw, entry.ah);
-            int maxDimension = Math.max(entry.aw, entry.ah);
-            int score = 1000;
-
-            // Prefer a stable, compact character frame over tiny fragments.
-            if (path.contains("/INITIAL/")) {
-                score += 140;
-            }
-            if (path.contains("/FULL/")) {
-                score += 100;
-            }
-            if (minDimension >= 40 && maxDimension <= 220) {
-                score += 130;
-            }
-            score += Math.max(0, 100 - Math.abs(maxDimension - 96));
-            score -= Math.abs(entry.aw - entry.ah) * 2;
-
-            if (score > bestScore
-                || (score == bestScore && (bestId == null
-                || id.compareTo(bestId) < 0))) {
-                bestScore = score;
-                bestId = id;
+            String suffix = normalizedId.substring(normalizedPrefix.length());
+            if (suffix.equals(normalizedSuffix)) {
+                return id;
             }
         }
 
-        return bestId;
-    }
-
-    private static String pathFolder(String path, String marker) {
-        int markerStart = path.indexOf(marker);
-        if (markerStart < 0) {
-            return "";
-        }
-
-        int folderStart = markerStart + marker.length();
-        int folderEnd = path.indexOf('/', folderStart);
-        return folderEnd < 0
-            ? path.substring(folderStart)
-            : path.substring(folderStart, folderEnd);
-    }
-
-    private static String plantPacketKey(PlantType type) {
-        return switch (type) {
-            case CHERRY_BOMB -> "CHERRY_BOMB";
-            case GOO_PEASHOOTER -> "POISONPEASHOOTER";
-            case MEGA_GATLING_PEA -> "MEGAGATLING";
-            case ICEBERG_LETTUCE -> "ICEBURG";
-            case FUM_SHROOM -> "FUMESHROOM";
-            case PIERCE_MINT -> "SPEARMINT";
-            case ROTOBAGA, CAT_TAIL, CATTAIL_MINT -> "";
-            default -> normalize(type.name());
-        };
-    }
-
-    private static String plantSpriteKey(PlantType type) {
-        return switch (type) {
-            case ROTOBAGA -> "ROTORUTABAGA";
-            case GOO_PEASHOOTER -> "GOOPEASHOOTER";
-            case MEGA_GATLING_PEA -> "MEGAGATLING";
-            case ICEBERG_LETTUCE -> "ICEBURG";
-            case FUM_SHROOM -> "FUMESHROOM";
-            case KERNEL_PULT -> "KERNALPULT";
-            case PHAT_BEET -> "PHATBEETS";
-            case CAT_TAIL -> "CATTAIL";
-            default -> normalize(type.name());
-        };
-    }
-
-    private static String zombiePacketKey(
-        ZombieRegistry.ZombieType type
-    ) {
-        return switch (type) {
-            case NORMAL -> "TUTORIAL";
-            case CONEHEAD -> "TUTORIAL_ARMOR1";
-            case BUCKETHEAD -> "TUTORIAL_ARMOR2";
-            case BRICKHEAD -> "TUTORIAL_ARMOR4";
-            case KNIGHT -> "DARK_ARMOR4";
-            case IMP -> "TUTORIAL_IMP";
-            case GARGANTUAR -> "TUTORIAL_GARGANTUAR";
-            case ALLSTAR -> "MODERN_ALLSTAR";
-            case ARCADe -> "EIGHTIES_ARCADE";
-            case PARASOL -> "LOSTCITY_JANE";
-            case TURQUOISE -> "LOSTCITY_CRYSTALSKULL";
-            case PROSPECTOR -> "PROSPECTOR";
-            case PIANIST -> "PIANO";
-            case NEWSPAPER -> "MODERN_NEWSPAPER";
-            case BARREL_ROLLER -> "BARRELROLLER";
-            case RA -> "RA";
-            case EXPLORER -> "EXPLORER";
-            case TOMB_RAISER -> "TOMB_RAISER";
-            case DODO_RIDER -> "ICEAGE_DODO";
-            case HUNTER -> "ICEAGE_HUNTER";
-            case TROGLOBITE -> "ICEAGE_TROGLOBITE";
-            case FISHERMAN -> "BEACH_FISHERMAN";
-            case SNORKEL -> "BEACH_SNORKEL";
-            case OCTOPUS -> "BEACH_OCTOPUS";
-            case JUGGLER -> "DARK_JUGGLER";
-            case WIZARD -> "DARK_WIZARD";
-            case KING -> "DARK_KING";
-            case IMP_DRAGON -> "DARK_IMP_DRAGON";
-        };
-    }
-
-    private static String zombieSpriteKey(
-        ZombieRegistry.ZombieType type
-    ) {
-        return switch (type) {
-            case NORMAL, CONEHEAD, BUCKETHEAD, BRICKHEAD -> "ZOMBIETUTORIAL";
-            case KNIGHT -> "ZOMBIEDARKBASIC";
-            case IMP -> "ZOMBIETUTORIALIMP";
-            case GARGANTUAR -> "ZOMBIETUTORIALGARGANTUAR";
-            case ALLSTAR -> "ZOMBIEMODERNALLSTAR";
-            case ARCADe -> "ZOMBIE80SARCADE";
-            case PARASOL -> "ZOMBIELOSTCITYJANE";
-            case TURQUOISE -> "ZOMBIELOSTCITYCRYSTALSKULL";
-            case PROSPECTOR -> "ZOMBIEPROSPECTOR";
-            case PIANIST -> "ZOMBIEPIANO";
-            case NEWSPAPER -> "ZOMBIEMODERNNEWSPAPER";
-            case BARREL_ROLLER -> "ZOMBIEPIRATEBARRELPUSHERBARREL";
-            case RA -> "ZOMBIEEGYPTRA";
-            case EXPLORER -> "ZOMBIEEXPLORER";
-            case TOMB_RAISER -> "ZOMBIEEGYPTTOMBRAISER";
-            case DODO_RIDER -> "ZOMBIEICEAGEDODORIDER";
-            case HUNTER -> "ZOMBIEICEAGEHUNTER";
-            case TROGLOBITE -> "ZOMBIEICEAGETROGLOBITE";
-            case FISHERMAN -> "ZOMBIEBEACHFISHERMAN";
-            case SNORKEL -> "ZOMBIEBEACHSNORKELER";
-            case OCTOPUS -> "ZOMBIEBEACHOCTOPUS";
-            case JUGGLER -> "ZOMBIEDARKJESTER";
-            case WIZARD -> "ZOMBIEDARKWIZARD";
-            case KING -> "ZOMBIEDARKKING";
-            case IMP_DRAGON -> "ZOMBIEDARKIMPDRAGON";
-        };
+        return null;
     }
 
     private static String normalize(String value) {
@@ -300,6 +174,36 @@ public final class CollectionAssetCatalog implements AutoCloseable {
         return value
             .toUpperCase(Locale.ROOT)
             .replaceAll("[^A-Z0-9]", "");
+    }
+
+    private static Map<String, String> plantAliases() {
+        Map<String, String> aliases = new HashMap<>();
+        aliases.put("PLANTGOOPEASHOOTER", "IMAGE_UI_PACKETS_POISONPEASHOOTER");
+        aliases.put("PLANTMEGAGATLINGPEA", "IMAGE_UI_PACKETS_MEGAGATLING");
+        aliases.put("PLANTICEBERGLETTUCE", "IMAGE_UI_PACKETS_ICEBURG");
+        aliases.put("PLANTFUMSHROOM", "IMAGE_UI_PACKETS_FUMESHROOM");
+        aliases.put("PLANTPIERCEMINT", "IMAGE_UI_PACKETS_SPEARMINT");
+        return aliases;
+    }
+
+    private static Map<String, String> zombieAliases() {
+        Map<String, String> aliases = new HashMap<>();
+        aliases.put("ZOMBIEARCADE", "IMAGE_UI_ALMANAC_PACKETS_ZOMBIES_EIGHTIES_ARCADE");
+        aliases.put("ZOMBIEALLSTAR", "IMAGE_UI_ALMANAC_PACKETS_ZOMBIES_MODERN_ALLSTAR");
+        aliases.put("ZOMBIEPIANIST", "IMAGE_UI_ALMANAC_PACKETS_ZOMBIES_PIANO");
+        aliases.put("ZOMBIENEWSPAPER", "IMAGE_UI_ALMANAC_PACKETS_ZOMBIES_MODERN_NEWSPAPER");
+        aliases.put("ZOMBIEBARRELROLLER", "IMAGE_UI_ALMANAC_PACKETS_ZOMBIES_BARRELROLLER");
+        aliases.put("ZOMBIEDODORIDER", "IMAGE_UI_ALMANAC_PACKETS_ZOMBIES_ICEAGE_DODO");
+        aliases.put("ZOMBIEHUNTER", "IMAGE_UI_ALMANAC_PACKETS_ZOMBIES_ICEAGE_HUNTER");
+        aliases.put("ZOMBIETROGLOBITE", "IMAGE_UI_ALMANAC_PACKETS_ZOMBIES_ICEAGE_TROGLOBITE");
+        aliases.put("ZOMBIEFISHERMAN", "IMAGE_UI_ALMANAC_PACKETS_ZOMBIES_BEACH_FISHERMAN");
+        aliases.put("ZOMBIESNORKEL", "IMAGE_UI_ALMANAC_PACKETS_ZOMBIES_BEACH_SNORKEL");
+        aliases.put("ZOMBIEOCTOPUS", "IMAGE_UI_ALMANAC_PACKETS_ZOMBIES_BEACH_OCTOPUS");
+        aliases.put("ZOMBIEJUGGLER", "IMAGE_UI_ALMANAC_PACKETS_ZOMBIES_DARK_JUGGLER");
+        aliases.put("ZOMBIEWIZARD", "IMAGE_UI_ALMANAC_PACKETS_ZOMBIES_DARK_WIZARD");
+        aliases.put("ZOMBIEKING", "IMAGE_UI_ALMANAC_PACKETS_ZOMBIES_DARK_KING");
+        aliases.put("ZOMBIEIMPDRAGON", "IMAGE_UI_ALMANAC_PACKETS_ZOMBIES_DARK_IMP_DRAGON");
+        return aliases;
     }
 
     @Override
