@@ -108,21 +108,21 @@ public class HomeView extends View {
         navigation.row();
         navigation.add(homeTile("shop", null, "shop",
             "SHOP", "Daily offers", () -> openMenu("Shop menu")));
-        navigation.add(homeTile("event_zcorp", "event_zcorp_down", "news",
-            "EVENTS", "Seasonal content", () -> openMenu("News menu")));
         navigation.add(homeTile("news", null, "news",
             "NEWS", "Latest updates", () -> openMenu("News menu")));
         navigation.add(homeTile("star", null, "almanac",
             "LEADERBOARD", "Top players", () -> openMenu("Leaderboard menu")));
-        navigation.row();
         navigation.add(homeTile("pot", null, "almanac",
             "PROFILE", "Your garden", () -> openMenu("Profile menu")));
+        navigation.row();
+        // Keep the final two destinations centered after removing the
+        // obsolete Events and Boosts tiles from the Home navigation.
+        navigation.add().width(210f).height(136f).pad(5f);
         navigation.add(homeTile("coin", null, "shop",
             "WALLET", "Currencies", () -> openMenu("Wallet menu")));
         navigation.add(homeTile("settings", null, "settings",
             "SETTINGS", "Game options", () -> openMenu("Settings menu")));
-        navigation.add(homeTile("plant_boost", "plant_boost_down", "hud_quests",
-            "BOOSTS", "Plant Food bank", () -> openMenu("Greenhouse menu")));
+        navigation.add().width(210f).height(136f).pad(5f);
 
         table.add(navigation).width(940f).center().padBottom(14f).row();
 
