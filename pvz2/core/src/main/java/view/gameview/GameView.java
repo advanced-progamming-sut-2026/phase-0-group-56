@@ -882,7 +882,9 @@ public final class GameView extends View {
         panel.add(selectionCountLabel).left();
         panel.add(backButton).right().width(110f).height(48f).row();
         panel.add(selectedSlotsTable).colspan(2).left().padTop(8f).padBottom(10f).row();
-        panel.add(scrollPane).colspan(2).width(565f).height(430f).left().row();
+        // Keep the action button visible after expanding the selection to
+        // eight plants (the selected slots occupy two rows).
+        panel.add(scrollPane).colspan(2).width(565f).height(315f).left().row();
         panel.add(preparationStatusLabel).colspan(2).expandX().fillX().padTop(8f).row();
         panel.add(letsRockButton).colspan(2).width(230f).height(64f).center().padTop(8f);
 
