@@ -57,6 +57,24 @@ public final class NetworkClient implements Closeable {
         return running && socket != null && socket.isConnected() && !socket.isClosed();
     }
 
+    /** Returns true when this live client already targets the requested endpoint. */
+    public boolean isConnectedTo(String candidateHost, int candidatePort) {
+        if (!isConnected() || port != candidatePort) {
+            return false;
+        }
+        String normalizedHost = candidateHost == null || candidateHost.isBlank()
+            ? "127.0.0.1"
+            : candidateHost.trim();
+        return host.equalsIgnoreCase(normalizedHost)
+            || (isLoopbackHost(host) && isLoopbackHost(normalizedHost));
+    }
+
+    private static boolean isLoopbackHost(String value) {
+        return "127.0.0.1".equalsIgnoreCase(value)
+            || "localhost".equalsIgnoreCase(value)
+            || "::1".equalsIgnoreCase(value);
+    }
+
     public NetworkResponse register(String username, String password, String nickname,
                                     String email, String gender, int question, String answer) {
         return request("REGISTER", username, password, nickname, email, gender,

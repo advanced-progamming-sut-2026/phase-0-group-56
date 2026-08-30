@@ -50,6 +50,12 @@ public final class NetworkService {
     }
 
     public static synchronized NetworkResponse connect(String host, int port) {
+        // Reconnecting to the endpoint we already use would discard the
+        // server-side authenticated session. Keep the existing socket alive.
+        if (client != null && client.isConnectedTo(host, port)) {
+            return new NetworkResponse(true, "ALREADY_CONNECTED",
+                "Already connected.", new String[0]);
+        }
         disconnectClient();
         client = new NetworkClient(host, port);
         attachListeners(client);

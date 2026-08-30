@@ -61,10 +61,10 @@ public class NetworkView extends View {
         connection.add(address).width(265f).height(44f).padRight(6f);
         connection.add(port).width(135f).height(44f).padRight(6f);
         connection.add(greenSmallButton("CONNECT", () -> setStatus(
-            controller.connectToServer(address.getText().trim(), parsePort(port.getText(), 47856))))
+                controller.connectToServer(address.getText().trim(), parsePort(port.getText(), 47856)))))
             .width(140f).height(44f).padRight(6f);
         connection.add(brownButton("HOST", () -> setStatus(
-            controller.hostServer(parsePort(port.getText(), 47856))))
+                controller.hostServer(parsePort(port.getText(), 47856)))))
             .width(120f).height(44f);
         table.add(connection).padBottom(14f).row();
 
