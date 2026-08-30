@@ -40,6 +40,7 @@ import controllers.datacontroller.Data;
 import controllers.datacontroller.SeedPackage;
 import controllers.menus.gamecontroller.GameController;
 import models.App;
+import models.Constants;
 import models.factory.builder.PlantType;
 import models.gameadventure.Chapters;
 import models.gameadventure.levels.Level;
@@ -51,6 +52,7 @@ import view.View;
 import view.components.PlantTable;
 
 import java.io.File;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -73,7 +75,7 @@ public final class GameView extends View {
     private static final float VIRTUAL_HEIGHT = 720f;
     private static final float MAX_DELTA = 1f / 15f;
     private static final float CAMERA_SLIDE_DURATION = 0.75f;
-    private static final int REQUIRED_SELECTION_COUNT = 5;
+    private static final int REQUIRED_SELECTION_COUNT = Constants.PLANTS_COUNT_IN_A_GAME;
     private static final String PVZ_ASSET_RESOLUTION = "768";
     private static final String SHOVEL_CURSOR_ID = "IMAGE_UI_HUD_INGAME_SHOVEL_ICON";
 
@@ -117,9 +119,19 @@ public final class GameView extends View {
     private Label preparationStatusLabel;
     private TextButton letsRockButton;
     private PlantTable plantTable;
+    private CrazyDaveIntro crazyDaveIntro;
+    private boolean crazyDaveIntroActive;
 
     private ToolsStack toolsStack;
     private Table pauseOverlay;
+    private Table announcementOverlay;
+    private Label announcementLabel;
+    private Table outcomeOverlay;
+    private Label outcomeLabel;
+    private final ArrayDeque<String> announcementQueue = new ArrayDeque<>();
+    private String activeAnnouncement = "";
+    private float announcementRemaining;
+    private static final float ANNOUNCEMENT_DURATION = 1.8f;
 
     private FileHandle pvzAssetsRoot;
     private TextureBank textureBank;
@@ -175,10 +187,12 @@ public final class GameView extends View {
         }
         initialiseWorldEntities();
 
-        toolsStack = new ToolsStack(controller);
+        toolsStack = new ToolsStack(controller, textureBank);
         toolsStack.setVisible(false);
         stage.addActor(toolsStack);
         buildPauseOverlay();
+        buildAnnouncementOverlay();
+        buildOutcomeOverlay();
 
         if (controller.getGame().getState() == BaseGame.GameState.STARTING) {
             buildPreparationUI();
@@ -190,6 +204,9 @@ public final class GameView extends View {
 
             if (worldEntities != null) {
                 worldEntities.preloadPlants(controller.getSelectedPlants());
+            }
+            if (shouldShowCrazyDaveIntro()) {
+                beginCrazyDaveIntro();
             }
         }
 
@@ -215,13 +232,14 @@ public final class GameView extends View {
 
         BaseGame.GameState state = controller.getGame().getState();
         syncPauseOverlay(state);
+        syncOutcomeOverlay(state);
         updatePointerFromScreen(Gdx.input.getX(), Gdx.input.getY());
         updateCursorPlant(safeDelta, state);
         syncSystemCursor(state);
 
         if (cameraSliding) {
             updateCameraSlide(safeDelta);
-        } else if (state == BaseGame.GameState.PLAYING) {
+        } else if (state == BaseGame.GameState.PLAYING && !crazyDaveIntroActive) {
             float scaledDelta = safeDelta * (toolsStack == null ? 1f : toolsStack.getTimeScale());
             String log = controller.playGame(scaledDelta);
 
@@ -231,20 +249,20 @@ public final class GameView extends View {
                     toolsStack.setStatus(lastMeaningfulLine(log));
                 }
             }
-
-            // GameController can change screens after win/loss.
-            if (App.getScreen() != this) {
-                return;
-            }
+            queueGameAnnouncements();
+            syncOutcomeOverlay(controller.getGame().getState());
         } else if (toolsStack != null && state == BaseGame.GameState.PAUSE) {
             toolsStack.refresh();
         }
+
+        updateAnnouncementOverlay(safeDelta);
+        syncOutcomeOverlay(controller.getGame().getState());
 
         ScreenUtils.clear(0.04f, 0.08f, 0.06f, 1f);
 
         renderMap();
 
-        if (state == BaseGame.GameState.PLAYING) {
+        if (state == BaseGame.GameState.PLAYING && !crazyDaveIntroActive) {
             renderPlacementHighlight();
         }
 
@@ -481,6 +499,114 @@ public final class GameView extends View {
         stage.addActor(pauseOverlay);
     }
 
+    private void buildAnnouncementOverlay() {
+        announcementOverlay = new Table();
+        announcementOverlay.setFillParent(true);
+        announcementOverlay.center();
+        announcementOverlay.setTouchable(Touchable.disabled);
+        announcementOverlay.setVisible(false);
+
+        announcementLabel = new Label("", skin, "big_outline");
+        announcementLabel.setAlignment(Align.center);
+        announcementLabel.setWrap(true);
+        announcementLabel.setColor(new Color(0.95f, 0.04f, 0.04f, 1f));
+        announcementOverlay.add(announcementLabel).width(980f).pad(20f);
+        stage.addActor(announcementOverlay);
+    }
+
+    private void buildOutcomeOverlay() {
+        outcomeOverlay = new Table();
+        outcomeOverlay.setFillParent(true);
+        outcomeOverlay.center();
+        outcomeOverlay.setTouchable(Touchable.disabled);
+        outcomeOverlay.setVisible(false);
+
+        Table card = new Table();
+        card.pad(28f);
+        Drawable background = safeDrawable("image_ui_quests_panel_edge_to_edge_ten");
+        if (background != null) {
+            card.setBackground(background);
+        }
+
+        outcomeLabel = new Label("", skin, "big_outline");
+        outcomeLabel.setAlignment(Align.center);
+        outcomeLabel.setWrap(true);
+        card.add(outcomeLabel).colspan(2).width(460f).padBottom(18f).row();
+
+        TextButton retry = new TextButton("RETRY", skin, "green");
+        retry.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                App.setScreen(new GameView(chapter, level));
+            }
+        });
+        TextButton exit = new TextButton("EXIT TO ADVENTURE", skin, "brown");
+        exit.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                Data.saveUser();
+                App.setScreen(new PlayView());
+            }
+        });
+        card.add(retry).width(190f).height(58f).pad(5f);
+        card.add(exit).width(230f).height(58f).pad(5f);
+        outcomeOverlay.add(card).center();
+        stage.addActor(outcomeOverlay);
+    }
+
+    private void queueGameAnnouncements() {
+        enqueueAnnouncement(controller.getLastWaveAnnouncement());
+        enqueueAnnouncement(controller.getLastEventAnnouncement());
+    }
+
+    private void enqueueAnnouncement(String announcement) {
+        if (announcement == null || announcement.isBlank()) {
+            return;
+        }
+        String text = announcement.trim();
+        if (text.equals(activeAnnouncement) || announcementQueue.contains(text)) {
+            return;
+        }
+        announcementQueue.addLast(text);
+    }
+
+    private void updateAnnouncementOverlay(float delta) {
+        if (announcementOverlay == null || announcementLabel == null) {
+            return;
+        }
+        if (announcementRemaining > 0f) {
+            announcementRemaining -= delta;
+        }
+        if (announcementRemaining <= 0f && !announcementQueue.isEmpty()) {
+            activeAnnouncement = announcementQueue.removeFirst();
+            announcementLabel.setText(activeAnnouncement);
+            announcementOverlay.setVisible(true);
+            announcementRemaining = ANNOUNCEMENT_DURATION;
+        } else if (announcementRemaining <= 0f) {
+            activeAnnouncement = "";
+            announcementLabel.setText("");
+            announcementOverlay.setVisible(false);
+        }
+    }
+
+    private void syncOutcomeOverlay(BaseGame.GameState state) {
+        if (outcomeOverlay == null || outcomeLabel == null) {
+            return;
+        }
+        boolean ended = state == BaseGame.GameState.END && controller.isResultHandled();
+        outcomeOverlay.setVisible(ended);
+        outcomeOverlay.setTouchable(ended ? Touchable.enabled : Touchable.disabled);
+        if (ended) {
+            boolean won = controller.isWon();
+            outcomeLabel.setText(won ? "YOU WIN!" : "YOU LOSE!");
+            outcomeLabel.setColor(
+                won
+                    ? new Color(0.20f, 0.95f, 0.22f, 1f)
+                    : new Color(0.95f, 0.04f, 0.04f, 1f)
+            );
+        }
+    }
+
     private void syncPauseOverlay(BaseGame.GameState state) {
         if (pauseOverlay == null) {
             return;
@@ -532,6 +658,7 @@ public final class GameView extends View {
 
     private void updateCursorPlant(float delta, BaseGame.GameState state) {
         if (toolsStack == null
+            || crazyDaveIntroActive
             || cameraSliding
             || state != BaseGame.GameState.PLAYING
             || toolsStack.getInteractionMode() != ToolsStack.InteractionMode.PLANT) {
@@ -600,6 +727,7 @@ public final class GameView extends View {
         boolean customVisualAvailable = false;
 
         if (state == BaseGame.GameState.PLAYING
+            && !crazyDaveIntroActive
             && !cameraSliding
             && toolsStack != null) {
 
@@ -733,8 +861,11 @@ public final class GameView extends View {
                     if (worldEntities != null) {
                         worldEntities.preloadPlants(controller.getSelectedPlants());
                     }
-
-                    beginBattleCameraSlide();
+                    if (shouldShowCrazyDaveIntro()) {
+                        beginCrazyDaveIntro();
+                    } else {
+                        beginBattleCameraSlide();
+                    }
                 }
             }
         });
@@ -751,7 +882,9 @@ public final class GameView extends View {
         panel.add(selectionCountLabel).left();
         panel.add(backButton).right().width(110f).height(48f).row();
         panel.add(selectedSlotsTable).colspan(2).left().padTop(8f).padBottom(10f).row();
-        panel.add(scrollPane).colspan(2).width(565f).height(430f).left().row();
+        // Keep the action button visible after expanding the selection to
+        // eight plants (the selected slots occupy two rows).
+        panel.add(scrollPane).colspan(2).width(565f).height(315f).left().row();
         panel.add(preparationStatusLabel).colspan(2).expandX().fillX().padTop(8f).row();
         panel.add(letsRockButton).colspan(2).width(230f).height(64f).center().padTop(8f);
 
@@ -789,6 +922,9 @@ public final class GameView extends View {
                 empty.setDisabled(true);
                 selectedSlotsTable.add(empty).size(102f, 58f).padRight(5f);
             }
+            if ((i + 1) % 4 == 0) {
+                selectedSlotsTable.row();
+            }
         }
 
         selectionCountLabel.setText(
@@ -811,6 +947,50 @@ public final class GameView extends View {
         cameraSlideElapsed = 0f;
         cameraSlideFromX = worldCamera.position.x;
         cameraSlideFromY = worldCamera.position.y;
+    }
+
+    private boolean shouldShowCrazyDaveIntro() {
+        String type = level.getLevelType();
+        return type != null && !type.trim().equalsIgnoreCase("normal");
+    }
+
+    private void beginCrazyDaveIntro() {
+        if (crazyDaveIntroActive || stage == null) {
+            return;
+        }
+
+        if (preparationRoot != null) {
+            preparationRoot.setTouchable(Touchable.disabled);
+            preparationRoot.setVisible(false);
+        }
+        toolsStack.setVisible(false);
+        crazyDaveIntroActive = true;
+
+        Drawable bubble = safeDrawable("image_ui_quests_panel_edge_to_edge_ten");
+        crazyDaveIntro = new CrazyDaveIntro(
+            pvzAssetsRoot,
+            textureBank,
+            skin,
+            chapter,
+            level,
+            bubble,
+            this::finishCrazyDaveIntro
+        );
+        crazyDaveIntro.setBounds(0f, 0f, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+        stage.addActor(crazyDaveIntro);
+    }
+
+    private void finishCrazyDaveIntro() {
+        if (!crazyDaveIntroActive) {
+            return;
+        }
+        crazyDaveIntroActive = false;
+        if (crazyDaveIntro != null) {
+            crazyDaveIntro.remove();
+            crazyDaveIntro.dispose();
+            crazyDaveIntro = null;
+        }
+        beginBattleCameraSlide();
     }
 
     private void updateCameraSlide(float delta) {
@@ -845,6 +1025,12 @@ public final class GameView extends View {
 
             @Override
             public boolean keyDown(int keycode) {
+                if (crazyDaveIntroActive) {
+                    if (keycode == Input.Keys.ENTER) {
+                        crazyDaveIntro.advance();
+                    }
+                    return true;
+                }
                 if (keycode == Input.Keys.ESCAPE) {
                     BaseGame.GameState state = controller.getGame().getState();
                     if (state == BaseGame.GameState.PLAYING || state == BaseGame.GameState.PAUSE) {
@@ -858,6 +1044,9 @@ public final class GameView extends View {
 
             @Override
             public boolean touchDown(int screenX, int screenY, int pointer, int button) {
+                if (crazyDaveIntroActive) {
+                    return true;
+                }
                 if (button != Input.Buttons.LEFT
                     || cameraSliding
                     || controller.getGame().getState() != BaseGame.GameState.PLAYING) {
@@ -1297,6 +1486,12 @@ public final class GameView extends View {
         disposed = true;
 
         restoreSystemCursor();
+
+        crazyDaveIntroActive = false;
+        if (crazyDaveIntro != null) {
+            crazyDaveIntro.dispose();
+            crazyDaveIntro = null;
+        }
 
         if (stage != null) {
             stage.dispose();

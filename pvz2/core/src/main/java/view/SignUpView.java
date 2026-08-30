@@ -2,11 +2,13 @@ package view;
 
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.scenes.scene2d.Actor;
+import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.SelectBox;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextField;
 import com.badlogic.gdx.utils.Array;
+import com.badlogic.gdx.utils.Scaling;
 
 import controllers.menus.SignUp;
 import models.App;
@@ -45,6 +47,16 @@ public class SignUpView extends View {
             .row();
 
         Table panel = pvzPanel();
+
+        Image gardenBadge = MenuVisualAssets.image("pot");
+        if (gardenBadge != null) {
+            gardenBadge.setScaling(Scaling.fit);
+            panel.add(gardenBadge)
+                .size(64f)
+                .center()
+                .padBottom(4f)
+                .row();
+        }
 
         TextField username = field("Username");
         TextField password = passwordField("Password");

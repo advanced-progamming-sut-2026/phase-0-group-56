@@ -1,0 +1,846 @@
+diff --git a/pvz2/core/src/main/java/controllers/menus/gamecontroller/GameController.java b/pvz2/core/src/main/java/controllers/menus/gamecontroller/GameController.java
+index 5bea551..a61926d 100644
+--- a/pvz2/core/src/main/java/controllers/menus/gamecontroller/GameController.java
++++ b/pvz2/core/src/main/java/controllers/menus/gamecontroller/GameController.java
+@@ -438,6 +438,22 @@ public class GameController implements Controller, Menu {
+         return "==== >> Suns added by Cheat code : " + amount + "\n now " + showSunAmount();
+     }
+ 
++    /** Applies the in-game debug resource controls without exposing the model to the view. */
++    public String debugAddResources(int suns, int plantFood) {
++        if (suns <= 0 && plantFood <= 0) {
++            return "Debug values must be positive.";
++        }
++        questSession.markCheatUsed();
++        if (suns > 0) {
++            game.addSun(suns);
++        }
++        if (plantFood > 0) {
++            game.setPlantFoodsCount(game.getPlantFoodsCount() + plantFood);
++        }
++        return "DEBUG: +" + Math.max(0, suns) + " sun, +"
++            + Math.max(0, plantFood) + " plant food";
++    }
++
+     public String cheatZombieKiller() {
+         questSession.markCheatUsed();
+         for (Zombie zombie : game.getZombies()) {
+diff --git a/pvz2/core/src/main/java/controllers/menus/gamecontroller/WallnutController.java b/pvz2/core/src/main/java/controllers/menus/gamecontroller/WallnutController.java
+index 66e1499..67593dd 100644
+--- a/pvz2/core/src/main/java/controllers/menus/gamecontroller/WallnutController.java
++++ b/pvz2/core/src/main/java/controllers/menus/gamecontroller/WallnutController.java
+@@ -85,9 +85,8 @@ public class WallnutController implements Controller{
+         fallback.setId(200 + progress);
+         ArrayList<PlantType> plants = new ArrayList<>();
+         plants.add(PlantType.BOWLING_BULB);
+-        if (progress >= 2) {
+-            plants.add(PlantType.EXPLODE_O_NUT);
+-        }
++        plants.add(PlantType.EXPLODE_O_NUT);
++        plants.add(PlantType.GIANT_WALLNUT);
+         fallback.setPlants(plants);
+         fallback.setZombiesNames(new ArrayList<>(List.of(
+             "normal", "cone", "bucket", "imp"
+diff --git a/pvz2/core/src/main/java/models/entity/LawnMower.java b/pvz2/core/src/main/java/models/entity/LawnMower.java
+index 608f622..b4e7a3b 100644
+--- a/pvz2/core/src/main/java/models/entity/LawnMower.java
++++ b/pvz2/core/src/main/java/models/entity/LawnMower.java
+@@ -54,14 +54,19 @@ public class LawnMower extends Entity {
+         String message = null;
+ 
+         if (state == State.IDLE) {
++            boolean activated = false;
+             for (Zombie zombie : game.getZombies()) {
+                 if (canHit(zombie) && Constants.overlap(zombie, this)) {
+-                    activate();
++                    if (!activated) {
++                        activate();
++                        activated = true;
++                    }
+                     kill(zombie);
+-                    message = "Lawn Mawner turned on at line " + line;
+-                    break;
+                 }
+             }
++            if (activated) {
++                message = "Lawn Mawner turned on at line " + line;
++            }
+         }
+ 
+         if (state == State.RUNNING) {
+diff --git a/pvz2/core/src/main/java/models/entity/Plant.java b/pvz2/core/src/main/java/models/entity/Plant.java
+index 060e8ae..0991d6e 100644
+--- a/pvz2/core/src/main/java/models/entity/Plant.java
++++ b/pvz2/core/src/main/java/models/entity/Plant.java
+@@ -144,6 +144,9 @@ public class Plant extends Entity {
+ 
+     public void update(float delta , BaseGame game){
+         stateTime += delta;
++        if (tags != null && tags.contains(PlantTags.Fire)) {
++            game.meltFrozenZombiesNear(this, 1.5f);
++        }
+         if(tags.contains(PlantTags.Day) && !game.isDay()){
+             System.out.println("This plant is for the day.");
+             return;
+diff --git a/pvz2/core/src/main/java/models/entity/Projectile.java b/pvz2/core/src/main/java/models/entity/Projectile.java
+index ebb061f..16d2a77 100644
+--- a/pvz2/core/src/main/java/models/entity/Projectile.java
++++ b/pvz2/core/src/main/java/models/entity/Projectile.java
+@@ -40,6 +40,8 @@ public class Projectile implements Cloneable {
+     private boolean proved = false;
+     /// for homing plantsInField of course!
+     private Zombie toLockIn;
++    /** Optional lobber target: collision is resolved only after the arc lands. */
++    private Zombie impactTarget;
+     public void setTags(ArrayList<PlantTags> tags) {
+         this.tags.clear();
+         if (tags == null) {
+@@ -114,6 +116,22 @@ public class Projectile implements Cloneable {
+         float previousY = y;
+         updateLocation(delta, game);
+ 
++        if (impactTarget != null) {
++            if (impactTarget.isDead()) {
++                dispose(game);
++                return;
++            }
++            if (!grounded) {
++                return;
++            }
++            // Lobbers land on the target's head, so a moving zombie cannot make
++            // the projectile pass through its old predicted position.
++            x = impactTarget.getX() + impactTarget.getWidth() * 0.5f - width * 0.5f;
++            y = impactTarget.getY() + impactTarget.getHeight() * 0.20f;
++            hitZombie(impactTarget);
++            return;
++        }
++
+         // Airborne lobber shots travel over tiles/plants; their obstacle-ignore
+         // flag remains set after landing so the impact is not consumed by the
+         // landing tile before collision resolution.
+@@ -187,6 +205,9 @@ public class Projectile implements Cloneable {
+ 
+     private void hitZombie(Zombie z){
+         this.pierce -= 1;
++        if (z.isEncasedInIce()) {
++            z.breakIce();
++        }
+         z.notifyBulletObservers(this);
+ 
+         z.takeDamage((int) this.damage);
+@@ -387,6 +408,14 @@ public class Projectile implements Cloneable {
+         this.toLockIn = toLockIn;
+     }
+ 
++    public Zombie getImpactTarget() {
++        return impactTarget;
++    }
++
++    public void setImpactTarget(Zombie impactTarget) {
++        this.impactTarget = impactTarget;
++    }
++
+     public ProjectileType getType() {
+         return type;
+     }
+@@ -433,6 +462,7 @@ public class Projectile implements Cloneable {
+         clone.active = this.active;
+         clone.poisonDamage = this.poisonDamage;
+         clone.toLockIn = this.toLockIn;
++        clone.impactTarget = this.impactTarget;
+ 
+         return clone;
+     }
+diff --git a/pvz2/core/src/main/java/models/entity/Zombie.java b/pvz2/core/src/main/java/models/entity/Zombie.java
+index 12bd69f..dfc970f 100644
+--- a/pvz2/core/src/main/java/models/entity/Zombie.java
++++ b/pvz2/core/src/main/java/models/entity/Zombie.java
+@@ -49,6 +49,8 @@ public class Zombie extends Entity{
+     // ====== STATE FLAGS ======
+     private boolean isTorchOn = false;
+     private boolean isDynamiteFrozen = false;
++    private boolean encasedInIce;
++    private float slipperyCooldown;
+ 
+     // ====== ANIMATION HANDLING FIELDS ======
+     private ZombieState currentState = ZombieState.IDLE;
+@@ -139,6 +141,11 @@ public class Zombie extends Entity{
+         this.currentTile = game.getField().getTileByCoordinats(this.tileIndex , this.line);
+         this.inWater = currentTile.isWater();
+ 
++        slipperyCooldown = Math.max(0f, slipperyCooldown - Math.max(0f, deltaTime));
++        if (encasedInIce) {
++            return;
++        }
++
+         this.velocityX = this.speed;
+         updateEffects(deltaTime);
+ 
+@@ -202,6 +209,28 @@ public class Zombie extends Entity{
+         removeEffect(EffectType.FROZEN);
+     }
+ 
++    public boolean isEncasedInIce() {
++        return encasedInIce;
++    }
++
++    public void setEncasedInIce(boolean encasedInIce) {
++        this.encasedInIce = encasedInIce;
++    }
++
++    public void breakIce() {
++        encasedInIce = false;
++        frozen = false;
++        removeEffect(EffectType.FROZEN);
++    }
++
++    public boolean canSlide() {
++        return slipperyCooldown <= 0f;
++    }
++
++    public void startSlideCooldown(float seconds) {
++        slipperyCooldown = Math.max(0f, seconds);
++    }
++
+     public float getActualSpeed() {
+         if (hasEffect(EffectType.FROZEN)) {
+             return speed * 0.3f;
+@@ -240,7 +269,7 @@ public class Zombie extends Entity{
+             return;
+ 
+         x += getActualSpeed() * movingDirection() * deltaTime /15;
+-        int newTile = (int) (x/ 100);
++        int newTile = (int) (x / Tile.getWidth());
+         if (newTile < 0) newTile = 0;
+         if (newTile > 8) newTile = 8;
+ 
+diff --git a/pvz2/core/src/main/java/models/factory/plantSkills/Shoot.java b/pvz2/core/src/main/java/models/factory/plantSkills/Shoot.java
+index 049d823..43002ef 100644
+--- a/pvz2/core/src/main/java/models/factory/plantSkills/Shoot.java
++++ b/pvz2/core/src/main/java/models/factory/plantSkills/Shoot.java
+@@ -248,13 +248,16 @@ public class Shoot implements Skill {
+     private void lobber(Plant shooter , BaseGame game){
+         Zombie target = null;
+         for (Zombie z : game.getZombies()) {
+-            if(z.getLine() == shooter.getLine()){
+-                if(target == null){
+-                    target = z;
+-                }
+-                else if(target.getTileIndex() > z.getTileIndex()){
+-                    target = z;
+-                }
++            if (z == null || z.isDead() || z.getLine() != shooter.getLine()) {
++                continue;
++            }
++            // Zombies walk right-to-left. A lobber must choose the closest
++            // zombie still in front of the plant, not one already behind it.
++            if (z.getX() + z.getWidth() < shooter.getX()) {
++                continue;
++            }
++            if (target == null || z.getX() < target.getX()) {
++                target = z;
+             }
+         }
+ 
+@@ -292,11 +295,12 @@ public class Shoot implements Skill {
+         float relativeSpeed = projectile.getVelocityX() - targetVelocityX;
+         float t = horizontalDistance / Math.max(1f, relativeSpeed);
+         t = Math.max(0.25f, t);
+-        float dy = target.getY() - startY;
++        float dy = target.getY() + target.getHeight() * 0.20f - startY;
+         float vy = dy / t + Constants.GRAVITY * t / 2f;
+         projectile.setVelocityY(vy);
+         projectile.setGrounded(false);
+         projectile.setIgnoresObstacles(true);
++        projectile.setImpactTarget(target);
+         return projectile;
+     }
+ 
+diff --git a/pvz2/core/src/main/java/models/gameadventure/IcyWind.java b/pvz2/core/src/main/java/models/gameadventure/IcyWind.java
+index c68d04f..75eb9a4 100644
+--- a/pvz2/core/src/main/java/models/gameadventure/IcyWind.java
++++ b/pvz2/core/src/main/java/models/gameadventure/IcyWind.java
+@@ -1,6 +1,7 @@
+ package models.gameadventure;
+ 
+ import models.entity.Plant;
++import models.entity.Zombie;
+ import models.games.BaseGame;
+ 
+ import java.util.Random;
+@@ -11,6 +12,7 @@ public class IcyWind implements ChapterSpecialEvent{
+     private float remaining = BLOW_DURATION_SECONDS;
+     private boolean freezeApplied;
+     private int affectedRow = -1;
++    private boolean zombiesFrozen;
+ 
+     public IcyWind(BaseGame game) {
+ 
+@@ -29,6 +31,20 @@ public class IcyWind implements ChapterSpecialEvent{
+             freezeApplied = true;
+         }
+ 
++        if (!zombiesFrozen) {
++            Random random = new Random();
++            int count = Math.min(game.getZombies().size(), 2 + random.nextInt(3));
++            java.util.Collections.shuffle(game.getZombies(), random);
++            for (int i = 0; i < count; i++) {
++                Zombie zombie = game.getZombies().get(i);
++                if (zombie != null && !zombie.isDead()) {
++                    zombie.setEncasedInIce(true);
++                    zombie.setFrozen(true);
++                }
++            }
++            zombiesFrozen = true;
++        }
++
+         remaining -= Math.max(0f, delta);
+         if (remaining <= 0f) {
+             dispose(game);
+diff --git a/pvz2/core/src/main/java/models/gameadventure/Water.java b/pvz2/core/src/main/java/models/gameadventure/Water.java
+index 773ffe8..058d0b2 100644
+--- a/pvz2/core/src/main/java/models/gameadventure/Water.java
++++ b/pvz2/core/src/main/java/models/gameadventure/Water.java
+@@ -10,6 +10,8 @@ import java.util.Random;
+ 
+ public class Water implements  ChapterSpecialEvent
+ {
++    private static final int MIN_SURFACE_COLUMN = 4;
++    private static final int MAX_SURFACE_COLUMN = 7;
+     public Water(BaseGame game) {
+ 
+     }
+@@ -18,12 +20,11 @@ public class Water implements  ChapterSpecialEvent
+     @Override
+     public void run(BaseGame game, float delta) {
+         if(waterSurfaceChange <= 0){
+-            int newSurface = rand.nextInt(8 -
+-                    game.getField().getWaveLimitColumn()) +
+-                    game.getField().getWaveLimitColumn();
+-            int difference = newSurface - game.getField().getWaveLimitColumn();
++            int oldSurface = game.getField().getWaterCurrentSurface();
++            int newSurface = MIN_SURFACE_COLUMN
++                + rand.nextInt(MAX_SURFACE_COLUMN - MIN_SURFACE_COLUMN + 1);
+             game.getField().setWaterCurrentSurface(newSurface);
+-            fixTiles(game.getField() , difference);
++            fixTiles(game.getField(), oldSurface, newSurface);
+             WaterEffect(game);
+             waterSurfaceChange = rand.nextFloat(Constants.WATER_SURFACE_CHANGE_TIME);
+         }else{
+@@ -33,20 +34,17 @@ public class Water implements  ChapterSpecialEvent
+ 
+     }
+ 
+-    private void fixTiles(Field field , int difference) {
+-        if(difference > 0){
+-            for (int i = field.getWaterCurrentSurface()
+-                 ; i < field.getWaterCurrentSurface() - difference ; i--) {
++    private void fixTiles(Field field, int oldSurface, int newSurface) {
++        if (newSurface < oldSurface) {
++            for (int i = newSurface; i < oldSurface; i++) {
+                 for (int j = 0; j < 5; j++) {
+-                    field.getTiles().get(j).get(i).setWater(false);
++                    field.getTiles().get(j).get(i).setWater(true);
+                 }
+             }
+-        }
+-        else{
+-            for (int i = field.getWaterCurrentSurface()
+-                 ; i < field.getWaterCurrentSurface() + difference ; i++) {
++        } else if (newSurface > oldSurface) {
++            for (int i = oldSurface; i < newSurface; i++) {
+                 for (int j = 0; j < 5; j++) {
+-                    field.getTiles().get(j).get(i).setWater(true);
++                    field.getTiles().get(j).get(i).setWater(false);
+                 }
+             }
+         }
+diff --git a/pvz2/core/src/main/java/models/gamepanes/Field.java b/pvz2/core/src/main/java/models/gamepanes/Field.java
+index 8c0e5cb..1a79d97 100644
+--- a/pvz2/core/src/main/java/models/gamepanes/Field.java
++++ b/pvz2/core/src/main/java/models/gamepanes/Field.java
+@@ -1,10 +1,10 @@
+ package models.gamepanes;
+ 
+-import models.entity.LawnMower;
+ import models.gameadventure.Chapters;
+ import models.entity.LawnMower;
+ import models.entity.Plant;
+ import models.entity.PlantTags;
++import models.entity.Zombie;
+ import models.games.BaseGame;
+ 
+ import java.util.ArrayList;
+@@ -73,6 +73,8 @@ public class Field {
+ 
+ 
+             private void initWater(){
++                WaveLimitColumn = 7;
++                waterCurrentSurface = WaveLimitColumn;
+                 for (int i = 8; i > 6 ; i--) {
+                     for (int j = 0; j < 5; j++) {
+                         tiles.get(j).get(i).setWater(true);
+@@ -94,6 +96,24 @@ public class Field {
+                         }
+                     }
+                 }
++
++                // Slider tiles move a zombie once per tile contact. The cooldown
++                // prevents a zombie from bouncing between rows every frame.
++                for (Zombie zombie : game.getZombies()) {
++                    if (zombie == null || zombie.isDead() || !zombie.canSlide()) {
++                        continue;
++                    }
++                    int row = zombie.getLine();
++                    int col = Math.max(0, Math.min(8, zombie.getTileIndex()));
++                    Tile tile = tiles.get(row).get(col);
++                    if (tile.getTileType() == TileType.SLIPPERY_UP && row < 4) {
++                        zombie.setLine(row + 1);
++                        zombie.startSlideCooldown(0.45f);
++                    } else if (tile.getTileType() == TileType.SLIPPERY_DOWN && row > 0) {
++                        zombie.setLine(row - 1);
++                        zombie.startSlideCooldown(0.45f);
++                    }
++                }
+             }
+ 
+ 
+diff --git a/pvz2/core/src/main/java/models/games/BaseGame.java b/pvz2/core/src/main/java/models/games/BaseGame.java
+index 7d798b3..05444ac 100644
+--- a/pvz2/core/src/main/java/models/games/BaseGame.java
++++ b/pvz2/core/src/main/java/models/games/BaseGame.java
+@@ -502,6 +502,23 @@ public class BaseGame implements Game {
+         sunCount += amount;
+     }
+ 
++    /** Breaks ice encasing zombies near a fire plant. */
++    public void meltFrozenZombiesNear(Plant source, float radius) {
++        if (source == null) {
++            return;
++        }
++        float maxDistance = Math.max(0f, radius) * Tile.getWidth();
++        for (Zombie zombie : zombies) {
++            if (zombie == null || !zombie.isEncasedInIce()
++                || zombie.getLine() != source.getLine()) {
++                continue;
++            }
++            if (Math.abs(zombie.getX() - source.getX()) <= maxDistance) {
++                zombie.breakIce();
++            }
++        }
++    }
++
+     public boolean isDay() {
+         return day;
+     }
+diff --git a/pvz2/core/src/main/java/models/games/minigames/WallnutBowling.java b/pvz2/core/src/main/java/models/games/minigames/WallnutBowling.java
+index a8aa80e..96a1190 100644
+--- a/pvz2/core/src/main/java/models/games/minigames/WallnutBowling.java
++++ b/pvz2/core/src/main/java/models/games/minigames/WallnutBowling.java
+@@ -47,21 +47,13 @@ public class WallnutBowling extends NormalGame {
+     }
+ 
+     private void initialiseBelt(MinigameLevel level) {
+-        // Minigame JSON uses BOWLING_WALLNUT and GIANT_WALLNUT, which are
+-        // minigame names rather than regular PlantType values. Use the level
+-        // id for progression and accept EXPLODE_O_NUT from hand-built levels.
+-        int progress = level == null ? 1 : Math.max(1, Math.min(3, level.getId() % 100));
++        // Minigame JSON uses names that differ from regular PlantType values.
++        // Keep all three nut variants on one shared conveyor.
+         availableNutTypes.add(BOWLING_NUT);
+-        if (progress >= 2 || containsExplosive(level)) {
+-            availableNutTypes.add(EXPLOSIVE_BOWLING_NUT);
+-        }
+-        if (progress >= 3 || containsBig(level)) {
+-            availableNutTypes.add(BIG_NUT);
+-        }
++        availableNutTypes.add(EXPLOSIVE_BOWLING_NUT);
++        availableNutTypes.add(BIG_NUT);
+ 
+-        // Guarantee one card for every unlocked nut type. This keeps an
+-        // explosive/big nut plantable immediately while the remaining slots
+-        // still follow the weighted random distribution.
++        // Guarantee one card for every nut type; remaining slots are weighted.
+         belt.addAll(availableNutTypes);
+         while (belt.size() < CONVEYOR_CAPACITY) {
+             belt.add(randomNutType());
+@@ -69,22 +61,6 @@ public class WallnutBowling extends NormalGame {
+         Collections.shuffle(belt, random);
+     }
+ 
+-    private boolean containsExplosive(MinigameLevel level) {
+-        if (level == null || level.getPlants() == null) {
+-            return false;
+-        }
+-        return level.getPlants().stream().anyMatch(type ->
+-            type != null && type.name().equalsIgnoreCase("EXPLODE_O_NUT"));
+-    }
+-
+-    private boolean containsBig(MinigameLevel level) {
+-        if (level == null || level.getPlants() == null) {
+-            return false;
+-        }
+-        return level.getPlants().stream().anyMatch(type ->
+-            type != null && type.name().equalsIgnoreCase("GIANT_WALLNUT"));
+-    }
+-
+     private String randomNutType() {
+         if (availableNutTypes.size() == 1) {
+             return availableNutTypes.get(0);
+diff --git a/pvz2/core/src/main/java/view/gameview/ChapterElementRenderer.java b/pvz2/core/src/main/java/view/gameview/ChapterElementRenderer.java
+index 2d1a975..380352e 100644
+--- a/pvz2/core/src/main/java/view/gameview/ChapterElementRenderer.java
++++ b/pvz2/core/src/main/java/view/gameview/ChapterElementRenderer.java
+@@ -57,6 +57,8 @@ public final class ChapterElementRenderer implements Disposable {
+         "768/FULL/EFFECTS/TILESLIDER_ICEAGE_DOWN/TILESLIDER_ICEAGE_DOWN.PAM";
+     private static final String FROSTBITE_CHILL_WIND =
+         "768/FULL/EFFECTS/FROSTBITE_CHILL_WIND/FROSTBITE_CHILL_WIND.PAM";
++    private static final String ICE_BLOCK_ZOMBIE =
++        "768/INITIAL/EFFECTS/ICEBLOOM_ICE_BLOCK_ZOMBIE/ICEBLOOM_ICE_BLOCK_ZOMBIE.PAM";
+ 
+     // Big Wave Beach
+     private static final String WATER_SQUARE =
+@@ -65,6 +67,10 @@ public final class ChapterElementRenderer implements Disposable {
+         "768/FULL/EFFECTS/WATER_FOAM/WATER_FOAM.PAM";
+     private static final String WATER_UNDERLAYER =
+         "768/FULL/BACKGROUNDS/WATER_UNDERLAYER/WATER_UNDERLAYER.PAM";
++    private static final String WATER_UPPERLAYER =
++        "768/FULL/BACKGROUNDS/WAVE_UPPERLAYER/WAVE_UPPERLAYER.PAM";
++    private static final String WATER_TIDE_LINE =
++        "768/FULL/BACKGROUNDS/WATER_TIDE_LINE/WATER_TIDE_LINE.PAM";
+ 
+     // Dark Age
+     private static final String DARK_GRAVE =
+@@ -124,11 +130,14 @@ public final class ChapterElementRenderer implements Disposable {
+                 request(SLIPPERY_UP);
+                 request(SLIPPERY_DOWN);
+                 request(FROSTBITE_CHILL_WIND);
++                request(ICE_BLOCK_ZOMBIE);
+             }
+             case BigWaveBeach -> {
+                 request(WATER_SQUARE);
+                 request(WATER_FOAM);
+                 request(WATER_UNDERLAYER);
++                request(WATER_UPPERLAYER);
++                request(WATER_TIDE_LINE);
+             }
+             case DarkAge -> {
+                 request(DARK_GRAVE);
+@@ -358,6 +367,7 @@ public final class ChapterElementRenderer implements Disposable {
+         float cellWidth,
+         float cellHeight
+     ) {
++        renderFrozenZombieBlocks(batch, game, lawnX, lawnY, cellWidth, cellHeight);
+         if (!(game.getEvent() instanceof IcyWind wind) || !wind.isBlowing()) {
+             return;
+         }
+@@ -378,6 +388,36 @@ public final class ChapterElementRenderer implements Disposable {
+         );
+     }
+ 
++    private void renderFrozenZombieBlocks(
++        Batch batch,
++        BaseGame game,
++        float lawnX,
++        float lawnY,
++        float cellWidth,
++        float cellHeight
++    ) {
++        float logicalBoardWidth = COLUMN_COUNT * Math.max(1f, Tile.getWidth());
++        for (Zombie zombie : game.getZombies()) {
++            if (zombie == null || zombie.isDead() || !zombie.isEncasedInIce()) {
++                continue;
++            }
++            float centerX = lawnX + (zombie.getX() + zombie.getWidth() * 0.5f)
++                / logicalBoardWidth * cellWidth * COLUMN_COUNT;
++            float centerY = lawnY + (zombie.getLine() + 0.5f) * cellHeight;
++            drawPamFit(
++                batch,
++                ICE_BLOCK_ZOMBIE,
++                animationTime,
++                centerX,
++                centerY,
++                cellWidth * 1.12f,
++                cellHeight * 1.20f,
++                true,
++                false
++            );
++        }
++    }
++
+     private void renderBigWaveBeachBackground(
+         Batch batch,
+         BaseGame game,
+@@ -414,6 +454,18 @@ public final class ChapterElementRenderer implements Disposable {
+                 true
+             );
+ 
++            drawPamFit(
++                batch,
++                WATER_UPPERLAYER,
++                animationTime,
++                runCenterX,
++                centerY - cellHeight * 0.10f,
++                runWidth * 1.04f,
++                cellHeight * 1.10f,
++                false,
++                true
++            );
++
+             for (int col = 0; col < Math.min(COLUMN_COUNT, row.size()); col++) {
+                 Tile tile = row.get(col);
+                 if (tile == null || !tile.isWater()) {
+@@ -470,6 +522,21 @@ public final class ChapterElementRenderer implements Disposable {
+                 true
+             );
+         }
++
++        int maxColumn = Math.max(0, Math.min(COLUMN_COUNT - 1,
++            game.getField().getWaveLimitColumn()));
++        float boundaryX = lawnX + maxColumn * cellWidth;
++        drawPamFit(
++            batch,
++            WATER_TIDE_LINE,
++            animationTime,
++            boundaryX,
++            lawnY + cellHeight * ROW_COUNT * 0.5f,
++            cellWidth * 1.05f,
++            cellHeight * ROW_COUNT * 1.02f,
++            false,
++            true
++        );
+     }
+ 
+     private void renderDarkAgeForeground(
+diff --git a/pvz2/core/src/main/java/view/gameview/ToolsStack.java b/pvz2/core/src/main/java/view/gameview/ToolsStack.java
+index 84a31db..ad1feeb 100644
+--- a/pvz2/core/src/main/java/view/gameview/ToolsStack.java
++++ b/pvz2/core/src/main/java/view/gameview/ToolsStack.java
+@@ -56,6 +56,8 @@ public final class ToolsStack extends Table {
+     private final ImageButton plantFoodButton;
+     private final ImageButton pauseButton;
+     private final ImageButton speedButton;
++    private final TextButton debugButton;
++    private final Table debugControls;
+ 
+     private final Map<PlantType, TextButton> seedButtons = new EnumMap<>(PlantType.class);
+ 
+@@ -100,6 +102,9 @@ public final class ToolsStack extends Table {
+         plantFoodButton = new ImageButton(skin, "plantfood");
+         pauseButton = new ImageButton(skin, "ingame_pause");
+         speedButton = new ImageButton(skin, "ingame_2x");
++        debugButton = new TextButton("DEBUG", skin, "brown");
++        debugControls = new Table();
++        debugControls.setVisible(false);
+ 
+         waveProgress = new ProgressBar(
+             0f,
+@@ -112,6 +117,7 @@ public final class ToolsStack extends Table {
+         waveProgress.setAnimateDuration(0.15f);
+ 
+         hookToolButtons();
++        hookDebugControls();
+ 
+         Table plantFoodHolder = new Table();
+         plantFoodHolder.add(plantFoodButton).size(55f);
+@@ -127,6 +133,7 @@ public final class ToolsStack extends Table {
+         hud.add(plantFoodHolder).padLeft(6f);
+         hud.add(pauseButton).size(58f).padLeft(6f);
+         hud.add(speedHolder).padLeft(6f);
++        hud.add(debugButton).width(88f).height(52f).padLeft(6f);
+ 
+         add(hud).expandX().fillX().top().row();
+ 
+@@ -139,6 +146,7 @@ public final class ToolsStack extends Table {
+             .expandX()
+             .fillX()
+             .padTop(4f);
++        add(debugControls).right().padTop(4f).row();
+ 
+         refresh();
+     }
+@@ -198,6 +206,32 @@ public final class ToolsStack extends Table {
+         });
+     }
+ 
++    private void hookDebugControls() {
++        TextButton addSunButton = new TextButton("+50 SUN", skin, "green_small");
++        TextButton addFoodButton = new TextButton("+1 FOOD", skin, "green_small");
++        addSunButton.addListener(new ClickListener() {
++            @Override public void clicked(InputEvent event, float x, float y) {
++                setStatus(controller.debugAddResources(50, 0));
++                refresh();
++            }
++        });
++        addFoodButton.addListener(new ClickListener() {
++            @Override public void clicked(InputEvent event, float x, float y) {
++                setStatus(controller.debugAddResources(0, 1));
++                refresh();
++            }
++        });
++        debugControls.add(addSunButton).size(92f, 42f).padRight(4f);
++        debugControls.add(addFoodButton).size(92f, 42f);
++        debugButton.addListener(new ClickListener() {
++            @Override public void clicked(InputEvent event, float x, float y) {
++                boolean visible = !debugControls.isVisible();
++                debugControls.setVisible(visible);
++                setStatus(visible ? "Debug controls opened" : "Debug controls closed");
++            }
++        });
++    }
++
+     public void refresh() {
+         BaseGame game = controller.getGame();
+ 
+@@ -207,6 +241,10 @@ public final class ToolsStack extends Table {
+         boolean playing = game.getState() == BaseGame.GameState.PLAYING;
+         shovelButton.setDisabled(!playing);
+         plantFoodButton.setDisabled(!playing || game.getPlantFoodsCount() <= 0);
++        debugButton.setDisabled(!playing);
++        if (!playing) {
++            debugControls.setVisible(false);
++        }
+ 
+         refreshSeedRow();
+         refreshSeedButtons();
+diff --git a/pvz2/core/src/main/java/view/gameview/WallnutBowlingView.java b/pvz2/core/src/main/java/view/gameview/WallnutBowlingView.java
+index 8e64382..7a05d12 100644
+--- a/pvz2/core/src/main/java/view/gameview/WallnutBowlingView.java
++++ b/pvz2/core/src/main/java/view/gameview/WallnutBowlingView.java
+@@ -7,6 +7,7 @@ import com.badlogic.gdx.graphics.Color;
+ import com.badlogic.gdx.graphics.GL20;
+ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
+ import com.badlogic.gdx.scenes.scene2d.InputEvent;
++import com.badlogic.gdx.scenes.scene2d.Actor;
+ import com.badlogic.gdx.scenes.scene2d.ui.Label;
+ import com.badlogic.gdx.scenes.scene2d.ui.Table;
+ import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
+@@ -16,6 +17,7 @@ import com.badlogic.gdx.utils.Align;
+ import com.badlogic.gdx.utils.ScreenUtils;
+ import controllers.menus.gamecontroller.WallnutController;
+ import models.App;
++import models.Constants;
+ import models.entity.Zombie;
+ import models.gamepanes.Tile;
+ import models.games.minigames.BowlingNut;
+@@ -35,9 +37,8 @@ public final class WallnutBowlingView extends MinigameBoardView {
+     private final WallnutController controller;
+     private MinigamePamVisual wallnutVisual;
+     private MinigamePamVisual explodeNutVisual;
+-    private TextButton wallnutButton;
+-    private TextButton explodeNutButton;
+-    private TextButton bigNutButton;
++    private Table conveyorRow;
++    private String beltSignature = "";
+     private Label statusLabel;
+     private Label progressLabel;
+     private Table resultPanel;
+@@ -82,6 +83,7 @@ public final class WallnutBowlingView extends MinigameBoardView {
+ 
+         ScreenUtils.clear(0.04f, 0.08f, 0.06f, 1f);
+         renderMap();
++        renderBoundaryLine();
+         renderNutFallbacks();
+         renderWorld(safeDelta);
+ 
+@@ -149,6 +151,20 @@ public final class WallnutBowlingView extends MinigameBoardView {
+         Gdx.gl.glDisable(GL20.GL_BLEND);
+     }
+ 
++    private void renderBoundaryLine() {
++        if (shapes == null || lawnBounds.width <= 0f || lawnBounds.height <= 0f) {
++            return;
++        }
++        worldViewport.apply();
++        worldCamera.update();
++        shapes.setProjectionMatrix(worldCamera.combined);
++        shapes.begin(ShapeRenderer.ShapeType.Filled);
++        shapes.setColor(new Color(0.95f, 0.18f, 0.12f, 0.95f));
++        float x = lawnBounds.x + Constants.WALLNUT_LIMIT_LINE * lawnBounds.width / 9f;
++        shapes.rect(x - 2f, lawnBounds.y, 4f, lawnBounds.height);
++        shapes.end();
++    }
++
+     private float nutCenterX(BowlingNut nut) {
+         return lawnBounds.x
+             + (nut.getX() + nut.getWidth() * 0.5f)
+@@ -182,12 +198,8 @@ public final class WallnutBowlingView extends MinigameBoardView {
+         hud.add(progressLabel).width(210f).right().row();
+ 
+         Table controls = new Table();
+-        wallnutButton = button("WALL-NUT", "green", () -> selectNut("Wallnut"));
+-        explodeNutButton = button("EXPLODE-O-NUT", "brown", () -> selectNut("Explod'O nut"));
+-        bigNutButton = button("BIG NUT", "brown", () -> selectNut("Big Nut"));
+-        controls.add(wallnutButton).size(170f, 58f).padRight(8f);
+-        controls.add(explodeNutButton).size(190f, 58f).padRight(8f);
+-        controls.add(bigNutButton).size(150f, 58f);
++        conveyorRow = new Table();
++        controls.add(conveyorRow).center();
+         hud.add(controls).colspan(3).center().padTop(4f).row();
+         hud.add(statusLabel).colspan(3).expandX().fillX().padTop(4f);
+         stage.addActor(hud);
+@@ -223,15 +235,7 @@ public final class WallnutBowlingView extends MinigameBoardView {
+         progressLabel.setText("NUTS: " + game.getNuts().size()
+             + "   ZOMBIES: " + game.getZombies().size());
+         boolean playing = game.getState() == models.games.BaseGame.GameState.PLAYING;
+-        wallnutButton.setDisabled(!controller.hasNutType("Wallnut") || !playing);
+-        explodeNutButton.setDisabled(!controller.hasNutType("Explod'O nut") || !playing);
+-        bigNutButton.setDisabled(!controller.hasNutType("Big Nut") || !playing);
+-        wallnutButton.setColor("Wallnut".equals(selectedNut)
+-            ? new Color(0.72f, 1f, 0.72f, 1f) : Color.WHITE);
+-        explodeNutButton.setColor("Explod'O nut".equals(selectedNut)
+-            ? new Color(1f, 0.75f, 0.60f, 1f) : Color.WHITE);
+-        bigNutButton.setColor("Big Nut".equals(selectedNut)
+-            ? new Color(1f, 0.88f, 0.52f, 1f) : Color.WHITE);
++        refreshConveyor(game, playing);
+ 
+         boolean ended = game.getState() == models.games.BaseGame.GameState.END;
+         resultPanel.setVisible(ended);
+@@ -242,6 +246,38 @@ public final class WallnutBowlingView extends MinigameBoardView {
+         }
+     }
+ 
++    private void refreshConveyor(WallnutBowling game, boolean playing) {
++        StringBuilder signature = new StringBuilder();
++        for (String type : game.getBelt()) {
++            signature.append(type).append('|');
++        }
++        signature.append("SELECTED=").append(selectedNut);
++        String nextSignature = signature.toString();
++        if (conveyorRow == null) {
++            return;
++        }
++        if (nextSignature.equals(beltSignature)) {
++            for (Actor actor : conveyorRow.getChildren()) {
++                if (actor instanceof TextButton button) {
++                    button.setDisabled(!playing);
++                }
++            }
++            return;
++        }
++        beltSignature = nextSignature;
++        conveyorRow.clearChildren();
++        for (String type : game.getBelt()) {
++            TextButton card = button(type.toUpperCase(Locale.ROOT),
++                "brown", () -> selectNut(type));
++            card.getLabel().setWrap(true);
++            card.getLabel().setAlignment(Align.center);
++            card.setDisabled(!playing);
++            card.setColor(type.equals(selectedNut)
++                ? new Color(0.72f, 1f, 0.72f, 1f) : Color.WHITE);
++            conveyorRow.add(card).size(166f, 58f).padRight(6f);
++        }
++    }
++
+     private void selectNut(String type) {
+         selectedNut = type.equals(selectedNut) ? null : type;
+         statusLabel.setText(selectedNut == null
+@@ -270,7 +306,7 @@ public final class WallnutBowlingView extends MinigameBoardView {
+                 boolean placed = controller.plant(selectedNut, pointerColumn(), pointerRow());
+                 statusLabel.setText(placed
+                     ? pretty(selectedNut) + " launched."
+-                    : "Place the nut in one of the first three columns.");
++                    : "Select a nut on the conveyor and place it before the red line.");
+                 return true;
+             }
+         };

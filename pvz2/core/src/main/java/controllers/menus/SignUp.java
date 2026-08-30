@@ -5,9 +5,16 @@ import models.App;
 import models.User;
 import models.utils.AccountValidator;
 import models.utils.CredentialHasher;
+import network.NetworkClient;
+import network.NetworkResponse;
+import network.NetworkService;
 import view.LogInView;
 
 public class SignUp implements Menu {
+    private String pendingPassword;
+    private String pendingNickname;
+    private String pendingEmail;
+    private String pendingGender;
     public static final String[] SECURITY_QUESTIONS = {
         "What was the name of your first pet?",
         "What city were you born in?",
@@ -20,6 +27,7 @@ public class SignUp implements Menu {
     public String ChangeMenu(String menuName) {
         if (menuName != null && menuName.equalsIgnoreCase("Login menu")) {
             Data.setTempUser(null);
+            clearPendingRegistration();
             App.setScreen(new LogInView());
             return "Changed menu successfully to Login menu";
         }
@@ -29,6 +37,7 @@ public class SignUp implements Menu {
     @Override
     public String exitMenu() {
         Data.setTempUser(null);
+        clearPendingRegistration();
         return "Exit requested.";
     }
 
@@ -60,6 +69,15 @@ public class SignUp implements Menu {
             return validationError;
         }
 
+        if (NetworkService.isConnected()) {
+            pendingUsername = username;
+            pendingPassword = password;
+            pendingNickname = nickname;
+            pendingEmail = email;
+            pendingGender = gender;
+            return "Data valid. Please choose a security question.";
+        }
+
         User newUser = new User(
             username,
             CredentialHasher.hash(password),
@@ -79,7 +97,9 @@ public class SignUp implements Menu {
         User tempUser = Data.getTempUser();
 
         if (tempUser == null) {
-            return "Error: enter valid registration data first.";
+            if (!NetworkService.isConnected() || pendingPassword == null) {
+                return "Error: enter valid registration data first.";
+            }
         }
         if (questionNumber < 1 || questionNumber > SECURITY_QUESTIONS.length) {
             return "Error: invalid security question.";
@@ -94,9 +114,27 @@ public class SignUp implements Menu {
         if (!normalizedAnswer.equals(normalizedConfirm)) {
             return "Error: security answers do not match.";
         }
-        if (Data.isUsernameExists(tempUser.getName())) {
+        if (tempUser != null && Data.isUsernameExists(tempUser.getName())) {
             Data.setTempUser(null);
             return "Error: username is already taken.";
+        }
+
+        if (NetworkService.isConnected() && pendingPassword != null) {
+            NetworkClient client = NetworkService.getClient();
+            NetworkResponse response = client.register(
+                pendingUsername,
+                pendingPassword,
+                pendingNickname,
+                pendingEmail,
+                pendingGender,
+                questionNumber,
+                normalizedAnswer
+            );
+            clearPendingRegistration();
+            if (!response.success()) {
+                return "Error: " + response.message();
+            }
+            return "User created successfully.";
         }
 
         tempUser.setSecurityQuestion(questionNumber, normalizedAnswer);
@@ -148,5 +186,15 @@ public class SignUp implements Menu {
             return "Error: gender must be Male or Female.";
         }
         return null;
+    }
+
+    private String pendingUsername;
+
+    private void clearPendingRegistration() {
+        pendingUsername = null;
+        pendingPassword = null;
+        pendingNickname = null;
+        pendingEmail = null;
+        pendingGender = null;
     }
 }

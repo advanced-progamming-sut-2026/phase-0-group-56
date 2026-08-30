@@ -10,8 +10,31 @@ public class WrampUpPlant extends Plant{
         this.y = plant.getY();
         this.width = plant.getWidth();
         this.height = plant.getHeight();
+        this.velocityX = plant.getVelocityX();
+        this.velocityY = plant.getVelocityY();
+        this.line = plant.getLine();
+        this.tileIndex = plant.getTileIndex();
+        this.hp = plant.getHp();
+        this.stateTime = plant.getStateTime();
+        this.isAlive = plant.isAlive();
+        this.ground = plant.isGround();
+        this.hurt = plant.isHurt();
+        this.damage = plant.getDamage();
+        this.cost = plant.getCost();
+        this.ActionInterval = plant.getActionInterval();
+        this.t = plant.getT();
+        this.category = plant.getCategory();
         this.tags = plant.getTags();
         this.type =  plant.getType();
+        this.baseSkill = plant.getBaseSkill();
+        this.plantfoodSkill = plant.getPlantfoodSkill();
+        this.frozen = plant.isFrozen();
+        this.cat = plant.isCat();
+        this.onLilyPad = plant.onLilyPad;
+        this.lifeTime = plant.getLifeTime();
+        this.freezeLevel = plant.getFreezeLevel();
+        this.armor = plant.getArmor();
+        this.skillObserver = plant.skillObserver;
 
 
 

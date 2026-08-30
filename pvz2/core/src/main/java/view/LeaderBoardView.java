@@ -1,13 +1,16 @@
 package view;
 
 import com.badlogic.gdx.Screen;
+import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.utils.Align;
+import com.badlogic.gdx.utils.Scaling;
 
 import controllers.menus.secondarymenus.LeaderBoard;
 import models.User;
+import network.LeaderboardEntry;
 
 import java.util.List;
 
@@ -63,8 +66,16 @@ public class LeaderBoardView extends View {
             Align.center
         );
 
+        Image hintIcon = MenuVisualAssets.image("star");
+        if (hintIcon != null) {
+            hintIcon.setScaling(Scaling.fit);
+            hintPanel.add(hintIcon)
+                .size(34f)
+                .padRight(8f);
+        }
+
         hintPanel.add(hint)
-            .width(760f);
+            .width(710f);
 
         table.add(hintPanel)
             .width(820f)
@@ -79,6 +90,7 @@ public class LeaderBoardView extends View {
                 sortColumn,
                 descending
             );
+        List<LeaderboardEntry> networkUsers = controller.getNetworkLeaderboard();
 
         Table outerPanel =
             pvzPanel();
@@ -130,7 +142,19 @@ public class LeaderBoardView extends View {
 
         board.row();
 
-        if (users.isEmpty()) {
+        if (!networkUsers.isEmpty()) {
+            int rank = 1;
+            for (LeaderboardEntry entry : networkUsers) {
+                addCell(board, rank + ". " + entry.username(), 145f);
+                addCell(board, "SERVER SCORE", 185f);
+                addCell(board, "-", 120f);
+                addCell(board, "-", 105f);
+                addCell(board, "-", 105f);
+                addCell(board, String.valueOf(entry.score()), 125f);
+                board.row();
+                rank++;
+            }
+        } else if (users.isEmpty()) {
 
             Label empty =
                 mediumTitle(

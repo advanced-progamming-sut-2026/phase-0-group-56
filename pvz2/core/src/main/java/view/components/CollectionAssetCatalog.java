@@ -9,7 +9,10 @@ import pvz.libpvz.textures.ResourceIndex;
 import pvz.libpvz.textures.TextureBank;
 import view.gameview.PvzAssetLocator;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -22,13 +25,22 @@ import java.util.Map;
  */
 public final class CollectionAssetCatalog implements AutoCloseable {
 
+    private static final String PLANT_PACKET_PREFIX =
+        "IMAGE_UI_PACKETS_";
+
+    private static final String ZOMBIE_PACKET_PREFIX =
+        "IMAGE_UI_ALMANAC_PACKETS_ZOMBIES_";
+
     private final TextureBank textureBank;
     private final ResourceIndex resourceIndex;
+    private final List<String> imageIds;
     private final Map<String, String> idCache = new HashMap<>();
 
     private CollectionAssetCatalog(TextureBank textureBank) {
         this.textureBank = textureBank;
         this.resourceIndex = textureBank.resourceIndex();
+        this.imageIds = new ArrayList<>(resourceIndex.imageIds());
+        Collections.sort(this.imageIds);
     }
 
     public static CollectionAssetCatalog create() {
@@ -54,8 +66,13 @@ public final class CollectionAssetCatalog implements AutoCloseable {
         if (type == null) {
             return null;
         }
+        String packetKey = plantPacketKey(type);
         return regionFor(
-            "PLANT_" + type.name(),
+            "P:" + type.name(),
+            packetKey.isEmpty()
+                ? null
+                : PLANT_PACKET_PREFIX + packetKey,
+            plantSpriteKey(type),
             false
         );
     }
@@ -67,28 +84,31 @@ public final class CollectionAssetCatalog implements AutoCloseable {
             return null;
         }
         return regionFor(
-            "ZOMBIE_" + type.name(),
+            "Z:" + type.name(),
+            ZOMBIE_PACKET_PREFIX + zombiePacketKey(type),
+            zombieSpriteKey(type),
             true
         );
     }
 
     private TextureRegion regionFor(
-        String token,
+        String cacheKey,
+        String preferredId,
+        String fallbackToken,
         boolean zombie
     ) {
-        String normalizedToken = normalize(token);
-        if (normalizedToken.isEmpty()) {
-            return null;
-        }
-
-        String cachedId = idCache.get(normalizedToken);
-        if (cachedId == null && idCache.containsKey(normalizedToken)) {
+        String cachedId = idCache.get(cacheKey);
+        if (cachedId == null && idCache.containsKey(cacheKey)) {
             return null;
         }
 
         if (cachedId == null) {
-            cachedId = findBestId(normalizedToken, zombie);
-            idCache.put(normalizedToken, cachedId);
+            if (preferredId != null && resourceIndex.image(preferredId) != null) {
+                cachedId = preferredId;
+            } else {
+                cachedId = findBestSpriteId(fallbackToken, zombie);
+            }
+            idCache.put(cacheKey, cachedId);
         }
 
         if (cachedId == null || cachedId.isBlank()) {
@@ -102,14 +122,16 @@ public final class CollectionAssetCatalog implements AutoCloseable {
         }
     }
 
-    private String findBestId(
-        String token,
-        boolean zombie
-    ) {
+    private String findBestSpriteId(String token, boolean zombie) {
+        String normalizedToken = normalize(token);
+        if (normalizedToken.isEmpty()) {
+            return null;
+        }
+
         String bestId = null;
         int bestScore = Integer.MIN_VALUE;
 
-        for (String id : resourceIndex.imageIds()) {
+        for (String id : imageIds) {
             if (id == null || id.isBlank()) {
                 continue;
             }
@@ -121,47 +143,153 @@ public final class CollectionAssetCatalog implements AutoCloseable {
                 continue;
             }
 
-            String haystack = (
-                id + " " + (entry.path == null ? "" : entry.path)
-            ).toUpperCase(Locale.ROOT);
+            String path = entry.path == null
+                ? ""
+                : entry.path.replace('\\', '/')
+                .toUpperCase(Locale.ROOT);
 
-            String normalized = normalize(haystack);
-            if (!normalized.contains(token)) {
+            String folder = pathFolder(path, zombie ? "/ZOMBIE/" : "/PLANT/");
+            if (!normalizedToken.equals(normalize(folder))) {
                 continue;
             }
 
-            int score = 100;
-
-            if (containsAny(haystack, "PORTRAIT", "ICON", "CARD")) {
-                score += 90;
+            if (entry.aw <= 0 || entry.ah <= 0) {
+                continue;
             }
 
-            if (containsAny(haystack, "SEEDPACKET", "SEED_PACKET")) {
-                score += zombie ? -100 : 40;
-            }
+            int minDimension = Math.min(entry.aw, entry.ah);
+            int maxDimension = Math.max(entry.aw, entry.ah);
+            int score = 1000;
 
-            if (containsAny(haystack, "ZOMBIE")) {
-                score += zombie ? 80 : -180;
-            } else if (zombie) {
-                score -= 120;
+            // Prefer a stable, compact character frame over tiny fragments.
+            if (path.contains("/INITIAL/")) {
+                score += 140;
             }
-
-            if (containsAny(haystack, "PLANT")) {
-                score += zombie ? -140 : 55;
+            if (path.contains("/FULL/")) {
+                score += 100;
             }
-
-            if (entry.aw >= 40 && entry.aw <= 500
-                && entry.ah >= 40 && entry.ah <= 500) {
-                score += 25;
+            if (minDimension >= 40 && maxDimension <= 220) {
+                score += 130;
             }
+            score += Math.max(0, 100 - Math.abs(maxDimension - 96));
+            score -= Math.abs(entry.aw - entry.ah) * 2;
 
-            if (score > bestScore) {
+            if (score > bestScore
+                || (score == bestScore && (bestId == null
+                || id.compareTo(bestId) < 0))) {
                 bestScore = score;
                 bestId = id;
             }
         }
 
         return bestId;
+    }
+
+    private static String pathFolder(String path, String marker) {
+        int markerStart = path.indexOf(marker);
+        if (markerStart < 0) {
+            return "";
+        }
+
+        int folderStart = markerStart + marker.length();
+        int folderEnd = path.indexOf('/', folderStart);
+        return folderEnd < 0
+            ? path.substring(folderStart)
+            : path.substring(folderStart, folderEnd);
+    }
+
+    private static String plantPacketKey(PlantType type) {
+        return switch (type) {
+            case CHERRY_BOMB -> "CHERRY_BOMB";
+            case GOO_PEASHOOTER -> "POISONPEASHOOTER";
+            case MEGA_GATLING_PEA -> "MEGAGATLING";
+            case ICEBERG_LETTUCE -> "ICEBURG";
+            case FUM_SHROOM -> "FUMESHROOM";
+            case PIERCE_MINT -> "SPEARMINT";
+            case ROTOBAGA, CAT_TAIL, CATTAIL_MINT -> "";
+            default -> normalize(type.name());
+        };
+    }
+
+    private static String plantSpriteKey(PlantType type) {
+        return switch (type) {
+            case ROTOBAGA -> "ROTORUTABAGA";
+            case GOO_PEASHOOTER -> "GOOPEASHOOTER";
+            case MEGA_GATLING_PEA -> "MEGAGATLING";
+            case ICEBERG_LETTUCE -> "ICEBURG";
+            case FUM_SHROOM -> "FUMESHROOM";
+            case KERNEL_PULT -> "KERNALPULT";
+            case PHAT_BEET -> "PHATBEETS";
+            case CAT_TAIL -> "CATTAIL";
+            default -> normalize(type.name());
+        };
+    }
+
+    private static String zombiePacketKey(
+        ZombieRegistry.ZombieType type
+    ) {
+        return switch (type) {
+            case NORMAL -> "TUTORIAL";
+            case CONEHEAD -> "TUTORIAL_ARMOR1";
+            case BUCKETHEAD -> "TUTORIAL_ARMOR2";
+            case BRICKHEAD -> "TUTORIAL_ARMOR4";
+            case KNIGHT -> "DARK_ARMOR4";
+            case IMP -> "TUTORIAL_IMP";
+            case GARGANTUAR -> "TUTORIAL_GARGANTUAR";
+            case ALLSTAR -> "MODERN_ALLSTAR";
+            case ARCADe -> "EIGHTIES_ARCADE";
+            case PARASOL -> "LOSTCITY_JANE";
+            case TURQUOISE -> "LOSTCITY_CRYSTALSKULL";
+            case PROSPECTOR -> "PROSPECTOR";
+            case PIANIST -> "PIANO";
+            case NEWSPAPER -> "MODERN_NEWSPAPER";
+            case BARREL_ROLLER -> "BARRELROLLER";
+            case RA -> "RA";
+            case EXPLORER -> "EXPLORER";
+            case TOMB_RAISER -> "TOMB_RAISER";
+            case DODO_RIDER -> "ICEAGE_DODO";
+            case HUNTER -> "ICEAGE_HUNTER";
+            case TROGLOBITE -> "ICEAGE_TROGLOBITE";
+            case FISHERMAN -> "BEACH_FISHERMAN";
+            case SNORKEL -> "BEACH_SNORKEL";
+            case OCTOPUS -> "BEACH_OCTOPUS";
+            case JUGGLER -> "DARK_JUGGLER";
+            case WIZARD -> "DARK_WIZARD";
+            case KING -> "DARK_KING";
+            case IMP_DRAGON -> "DARK_IMP_DRAGON";
+        };
+    }
+
+    private static String zombieSpriteKey(
+        ZombieRegistry.ZombieType type
+    ) {
+        return switch (type) {
+            case NORMAL, CONEHEAD, BUCKETHEAD, BRICKHEAD -> "ZOMBIETUTORIAL";
+            case KNIGHT -> "ZOMBIEDARKBASIC";
+            case IMP -> "ZOMBIETUTORIALIMP";
+            case GARGANTUAR -> "ZOMBIETUTORIALGARGANTUAR";
+            case ALLSTAR -> "ZOMBIEMODERNALLSTAR";
+            case ARCADe -> "ZOMBIE80SARCADE";
+            case PARASOL -> "ZOMBIELOSTCITYJANE";
+            case TURQUOISE -> "ZOMBIELOSTCITYCRYSTALSKULL";
+            case PROSPECTOR -> "ZOMBIEPROSPECTOR";
+            case PIANIST -> "ZOMBIEPIANO";
+            case NEWSPAPER -> "ZOMBIEMODERNNEWSPAPER";
+            case BARREL_ROLLER -> "ZOMBIEPIRATEBARRELPUSHERBARREL";
+            case RA -> "ZOMBIEEGYPTRA";
+            case EXPLORER -> "ZOMBIEEXPLORER";
+            case TOMB_RAISER -> "ZOMBIEEGYPTTOMBRAISER";
+            case DODO_RIDER -> "ZOMBIEICEAGEDODORIDER";
+            case HUNTER -> "ZOMBIEICEAGEHUNTER";
+            case TROGLOBITE -> "ZOMBIEICEAGETROGLOBITE";
+            case FISHERMAN -> "ZOMBIEBEACHFISHERMAN";
+            case SNORKEL -> "ZOMBIEBEACHSNORKELER";
+            case OCTOPUS -> "ZOMBIEBEACHOCTOPUS";
+            case JUGGLER -> "ZOMBIEDARKJESTER";
+            case WIZARD -> "ZOMBIEDARKWIZARD";
+            case KING -> "ZOMBIEDARKKING";
+            case IMP_DRAGON -> "ZOMBIEDARKIMPDRAGON";
+        };
     }
 
     private static String normalize(String value) {
@@ -172,18 +300,6 @@ public final class CollectionAssetCatalog implements AutoCloseable {
         return value
             .toUpperCase(Locale.ROOT)
             .replaceAll("[^A-Z0-9]", "");
-    }
-
-    private static boolean containsAny(
-        String value,
-        String... tokens
-    ) {
-        for (String token : tokens) {
-            if (value.contains(token)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     @Override

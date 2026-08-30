@@ -11,6 +11,7 @@ import view.HomeView;
 import view.LeaderBoardView;
 import view.LogInView;
 import view.NewsView;
+import view.NetworkView;
 import view.PlayView;
 import view.ProfileView;
 import view.SettingsView;
@@ -92,6 +93,13 @@ public class Home implements Menu {
                 App.setScreen(new WalletView());
                 return "Changed menu successfully to Wallet menu.";
 
+            case "network":
+            case "network menu":
+                App.setScreen(new NetworkView(
+                    new controllers.menus.secondarymenus.Network()
+                ));
+                return "Changed menu successfully to Network menu.";
+
             case "home":
             case "home menu":
             case "main":
@@ -123,8 +131,9 @@ public class Home implements Menu {
             8. Greenhouse
             9. Shop
             10. Wallet
-            11. Log Out
-            12. Exit Game
+            11. Network Play
+            12. Log Out
+            13. Exit Game
             """.trim();
     }
 

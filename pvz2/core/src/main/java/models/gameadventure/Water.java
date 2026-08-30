@@ -53,7 +53,13 @@ public class Water implements  ChapterSpecialEvent
     private void WaterEffect(BaseGame game) {
         for (Plant x : game.getPlantsInField()){
             if(x.getTileIndex() >= game.getField().getWaterCurrentSurface()){
-                if(!x.onLilyPad && !x.getTags().contains(PlantTags.WATER)){
+                boolean waterPlant = x.getTags() != null
+                    && x.getTags().contains(PlantTags.WATER);
+                if(!x.onLilyPad && !waterPlant){
+                    // Mark the plant for the normal removal path.  Calling
+                    // dispose() alone only triggers skills; it does not make
+                    // the drowned plant leave the field.
+                    x.setHP(0f);
                     x.dispose(game);
                 }
             }

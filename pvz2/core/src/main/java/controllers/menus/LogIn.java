@@ -5,6 +5,10 @@ import models.App;
 import models.User;
 import models.utils.AccountValidator;
 import models.utils.CredentialHasher;
+import network.AccountSnapshot;
+import network.NetworkClient;
+import network.NetworkResponse;
+import network.NetworkService;
 import view.HomeView;
 import view.SignUpView;
 
@@ -26,6 +30,30 @@ public class LogIn implements Menu {
     }
 
     public String login(String username, String password, boolean stayLoggedIn) {
+        if (NetworkService.isConnected()) {
+            NetworkClient client = NetworkService.getClient();
+            NetworkResponse response = client.login(username, password);
+            if (!response.success()) {
+                return "Error: " + response.message();
+            }
+            AccountSnapshot account = NetworkClient.accountFrom(response);
+            if (account == null) {
+                return "Error: server returned an invalid account.";
+            }
+            User remoteUser = new User(
+                account.username(),
+                CredentialHasher.hash(password),
+                account.nickname(),
+                account.email(),
+                account.gender()
+            );
+            remoteUser.setHighestScore(account.highestScore());
+            remoteUser.setStayLoggedIn(stayLoggedIn);
+            Data.upsertUser(remoteUser);
+            Data.setCurrentUser(remoteUser);
+            App.setScreen(new HomeView());
+            return "Logged in successfully.";
+        }
         User user = Data.getUserByUsername(username);
         if (user == null) {
             return "Error: username does not exist.";

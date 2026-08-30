@@ -3,13 +3,10 @@ package models.games.specialgames;
 import controllers.Start.PlantSelection;
 import models.App;
 import models.Constants;
-import models.entity.Plant;
 import models.entity.PlantCategory;
-import models.factory.builder.PlantBuilder;
 import models.factory.builder.PlantType;
 import models.gameadventure.Chapters;
 import models.gameadventure.levels.Level;
-import models.gamepanes.Tile;
 import models.games.NormalGame;
 
 import java.util.ArrayList;
@@ -26,6 +23,9 @@ public class PlantWhatYouGet extends NormalGame implements SpecialGame {
     @Override
     public ArrayList<PlantType> filterPlants() {
         ArrayList<PlantType> plantTypes = new ArrayList<>();
+        if (App.getCurrentuser() == null) {
+            return plantTypes;
+        }
         for (PlantType plant : App.getCurrentuser().getUnlockedPlants()) {
             if(plant.getCategory() != PlantCategory.SunProducer) plantTypes.add(plant);
         }
@@ -37,50 +37,54 @@ public class PlantWhatYouGet extends NormalGame implements SpecialGame {
 
     }
 
-    boolean selectionFinished;
-    boolean plantFinished;
+    private boolean selectionFinished;
+    private boolean wavesStarted;
+
     @Override
     public boolean startGame(String input) {
-        return selectionFinished;
+        if (availablePlants.size() != Constants.PLANTS_COUNT_IN_A_GAME) {
+            return false;
+        }
+
+        selectionFinished = true;
+        wavesStarted = false;
+        availablePlants.values().forEach(packet -> {
+            packet.setRecharge(0f);
+            packet.setAvailable(true);
+        });
+        return true;
     }
 
     @Override
     public String playGame(float delta) {
-        if(selectionFinished &&  plantFinished){
-             return super.playGame(delta);
+        if (!selectionFinished) {
+            return "Choose your plants first.";
         }
-        return "No you cannot play game now , you gotta ask the cute zombies to come \n, they're a " +
-                "little bit shy :>";
+        if (!wavesStarted) {
+            for (var packet : availablePlants.values()) {
+                packet.update(Math.max(0f, delta));
+            }
+            return "Plant your seeds, then press START WAVES.";
+        }
+        return super.playGame(delta);
     }
 
     @Override
     public boolean plant(String plantName, int x, int y) {
-        if(selectionFinished) return false;
-        try {
-            PlantBuilder builder = new PlantBuilder();
-            PlantType type = PlantType.valueOf(plantName);
-            if(!availablePlants.containsKey(type)){
-                return false;
-            }
-            float cost = availablePlants.get(type).getCost();
-            if(sunCount < cost){
-                return false;
-            }
-            sunCount -= (int) cost;
-            Plant plant = builder.build(type);
-            plant.setTileIndex(x);
-            plant.setTileIndex(y);
-            plantsInField.add(plant);
-            Tile tile = field.getTileByCoordinats(x, y);
-            tile.setEmpty(true);
-            return true;
-        }catch (IllegalArgumentException e){
+        if (!selectionFinished || wavesStarted) {
             return false;
         }
+        return super.plant(plantName, x, y);
     }
 
     public void startWaves(){
-        selectionFinished = true;
+        if (selectionFinished) {
+            wavesStarted = true;
+        }
+    }
+
+    public boolean isWavesStarted() {
+        return wavesStarted;
     }
 
 

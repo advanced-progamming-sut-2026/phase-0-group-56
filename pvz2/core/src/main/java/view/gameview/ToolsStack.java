@@ -1,14 +1,18 @@
 package view.gameview;
 
 import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.g2d.Batch;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.Touchable;
 import com.badlogic.gdx.scenes.scene2d.ui.ImageButton;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.ProgressBar;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
+import com.badlogic.gdx.scenes.scene2d.ui.Stack;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
+import com.badlogic.gdx.scenes.scene2d.ui.Widget;
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.scenes.scene2d.utils.Drawable;
 import com.badlogic.gdx.utils.Align;
@@ -17,6 +21,8 @@ import controllers.menus.gamecontroller.GameController;
 import models.factory.builder.PlantType;
 import models.games.BaseGame;
 import models.games.specialgames.ConveyorBelt;
+import models.games.specialgames.TimedWar;
+import pvz.libpvz.textures.TextureBank;
 import pvz.skin.PvzSkin;
 
 import java.util.ArrayList;
@@ -50,12 +56,16 @@ public final class ToolsStack extends Table {
     private final Label speedLabel;
     private final Label waveLabel;
     private final ProgressBar waveProgress;
+    private final WaveMarkerLayer waveMarkers;
+    private final TextureBank textureBank;
+
 
     private final Table seedRow;
     private final ImageButton shovelButton;
     private final ImageButton plantFoodButton;
     private final ImageButton pauseButton;
     private final ImageButton speedButton;
+    private final TextButton startWavesButton;
     private final TextButton debugButton;
     private final Table debugControls;
 
@@ -67,12 +77,17 @@ public final class ToolsStack extends Table {
     private String seedSignature = "";
 
     public ToolsStack(GameController controller) {
+        this(controller, null);
+    }
+
+    public ToolsStack(GameController controller, TextureBank textureBank) {
         if (controller == null) {
             throw new IllegalArgumentException("controller cannot be null");
         }
 
         this.controller = controller;
         this.skin = PvzSkin.get();
+        this.textureBank = textureBank;
 
         setFillParent(true);
         top();
@@ -89,12 +104,13 @@ public final class ToolsStack extends Table {
 
         sunLabel = new Label("SUN: 0", skin, "medium_outline");
         plantFoodLabel = new Label("0", skin, "medium_outline");
-        statusLabel = new Label("", skin);
+        statusLabel = new Label("", skin, "medium_outline");
         speedLabel = new Label("1x", skin, "medium_outline");
         waveLabel = new Label("WAVE 0", skin, "medium_outline");
 
         statusLabel.setAlignment(Align.center);
-        statusLabel.setColor(Color.WHITE);
+        statusLabel.setColor(Color.RED);
+        statusLabel.setWrap(true);
 
         seedRow = new Table();
 
@@ -102,6 +118,7 @@ public final class ToolsStack extends Table {
         plantFoodButton = new ImageButton(skin, "plantfood");
         pauseButton = new ImageButton(skin, "ingame_pause");
         speedButton = new ImageButton(skin, "ingame_2x");
+        startWavesButton = new TextButton("START WAVES", skin, "green_small");
         debugButton = new TextButton("DEBUG", skin, "brown");
         debugControls = new Table();
         debugControls.setVisible(false);
@@ -115,6 +132,13 @@ public final class ToolsStack extends Table {
             "ingame_progress"
         );
         waveProgress.setAnimateDuration(0.15f);
+        TextureRegion markerRegion = loadWaveMarker();
+        waveMarkers = new WaveMarkerLayer(markerRegion);
+        waveMarkers.setTouchable(Touchable.disabled);
+
+        Stack progressStack = new Stack();
+        progressStack.add(waveProgress);
+        progressStack.add(waveMarkers);
 
         hookToolButtons();
         hookDebugControls();
@@ -133,13 +157,14 @@ public final class ToolsStack extends Table {
         hud.add(plantFoodHolder).padLeft(6f);
         hud.add(pauseButton).size(58f).padLeft(6f);
         hud.add(speedHolder).padLeft(6f);
+        hud.add(startWavesButton).width(122f).height(52f).padLeft(6f);
         hud.add(debugButton).width(88f).height(52f).padLeft(6f);
 
         add(hud).expandX().fillX().top().row();
 
         Table progressRow = new Table();
         progressRow.add(waveLabel).width(120f).left();
-        progressRow.add(waveProgress).width(420f).height(24f).center();
+        progressRow.add(progressStack).width(420f).height(24f).center();
         progressRow.add(statusLabel).expandX().fillX().padLeft(16f);
 
         add(progressRow)
@@ -204,6 +229,17 @@ public final class ToolsStack extends Table {
                 speedLabel.setText(timeScale == 1f ? "1x" : "2x");
             }
         });
+
+        startWavesButton.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                setStatus(controller.startZombieWaves());
+                if (!controller.isWaitingForZombieWaves()) {
+                    finishWorldAction();
+                }
+                refresh();
+            }
+        });
     }
 
     private void hookDebugControls() {
@@ -239,8 +275,11 @@ public final class ToolsStack extends Table {
         plantFoodLabel.setText(String.valueOf(game.getPlantFoodsCount()));
 
         boolean playing = game.getState() == BaseGame.GameState.PLAYING;
+        boolean waitingForWaves = controller.isWaitingForZombieWaves();
         shovelButton.setDisabled(!playing);
         plantFoodButton.setDisabled(!playing || game.getPlantFoodsCount() <= 0);
+        startWavesButton.setVisible(waitingForWaves);
+        startWavesButton.setDisabled(!waitingForWaves);
         debugButton.setDisabled(!playing);
         if (!playing) {
             debugControls.setVisible(false);
@@ -285,7 +324,9 @@ public final class ToolsStack extends Table {
             return;
         }
 
-        TextButton button = new TextButton(shortPlantName(type), skin, "brown");
+        TextButton button = packet != null && packet.getBoost()
+            ? new TextButton(shortPlantName(type), boostedSeedStyle())
+            : new TextButton(shortPlantName(type), skin, "brown");
         button.getLabel().setWrap(true);
         button.getLabel().setAlignment(Align.center);
 
@@ -324,7 +365,7 @@ public final class ToolsStack extends Table {
 
         seedButtons.put(type, button);
         seedRow.add(button)
-            .width(104f)
+            .width(70f)
             .height(64f)
             .padRight(4f);
     }
@@ -378,10 +419,38 @@ public final class ToolsStack extends Table {
         }
 
         StringBuilder signature = new StringBuilder("PACKETS:");
-        for (PlantType type : game.getAvailable_plants().keySet()) {
-            signature.append(type.name()).append('|');
+        for (Map.Entry<PlantType, SeedPackage> entry : game.getAvailable_plants().entrySet()) {
+            SeedPackage packet = entry.getValue();
+            signature.append(entry.getKey().name())
+                .append(':')
+                .append(packet != null && packet.getBoost())
+                .append('|');
         }
         return signature.toString();
+    }
+
+    /** Creates a high-contrast yellow card for a one-shot greenhouse boost. */
+    private TextButton.TextButtonStyle boostedSeedStyle() {
+        TextButton.TextButtonStyle base = skin.get("brown" ,TextButton.TextButtonStyle.class);
+        TextButton.TextButtonStyle boosted = new TextButton.TextButtonStyle(base);
+        Drawable background = base.up;
+                if (background != null) {
+                        boosted.up = skin.newDrawable(background, new Color(1f, 0.78f, 0.08f, 1f));
+                        boosted.down = skin.newDrawable(background, new Color(0.86f, 0.61f, 0.03f, 1f));
+                        boosted.over = skin.newDrawable(background, new Color(1f, 0.88f, 0.28f, 1f));
+                        boosted.checked = boosted.down;
+                        boosted.disabled = skin.newDrawable(
+                              background,
+                                new Color(0.55f, 0.47f, 0.20f, 1f)
+                                );
+                }
+
+        boosted.fontColor = Color.BLACK;
+        boosted.downFontColor = Color.BLACK;
+        boosted.overFontColor = Color.BLACK;
+        boosted.checkedFontColor = Color.BLACK;
+        boosted.disabledFontColor = new Color(0.20f, 0.18f, 0.10f, 1f);
+        return boosted;
     }
 
     private void refreshWaveProgress() {
@@ -391,7 +460,29 @@ public final class ToolsStack extends Table {
 
         float progress = Math.min(1f, (float) current / totalWaves);
         waveProgress.setValue(progress);
-        waveLabel.setText("WAVE " + Math.min(current, totalWaves) + "/" + totalWaves);
+        String waveText = "WAVE " + Math.min(current, totalWaves) + "/" + totalWaves;
+        if (game instanceof TimedWar timedWar) {
+            waveText += "\nTIME " + Math.max(0, (int) Math.ceil(timedWar.getTimeRemaining())) + "s";
+        }
+        waveLabel.setText(waveText);
+        if (!waveMarkers.hasMarker()) {
+            waveMarkers.setMarkerRegion(loadWaveMarker());
+        }
+        waveMarkers.setTotalWaves(totalWaves);
+    }
+
+    private TextureRegion loadWaveMarker() {
+        if (textureBank == null) {
+            return null;
+        }
+        try {
+            return textureBank.region(
+                "IMAGE_UI_HUD_INGAME_PROGRESS_METER_FLAG_POLE"
+            );
+        } catch (RuntimeException ignored) {
+            // Extracted assets are optional; the bar remains usable without markers.
+            return null;
+        }
     }
 
     public InteractionMode getInteractionMode() {
@@ -446,5 +537,54 @@ public final class ToolsStack extends Table {
         }
 
         return result.toString();
+    }
+
+    /** Draws the supplied zombie-head asset at each wave start on the meter. */
+    private static final class WaveMarkerLayer extends Widget {
+        private TextureRegion markerRegion;
+        private int totalWaves = 1;
+
+        private WaveMarkerLayer(TextureRegion markerRegion) {
+            this.markerRegion = markerRegion;
+        }
+
+        private void setTotalWaves(int totalWaves) {
+            this.totalWaves = Math.max(1, totalWaves);
+        }
+
+        private void setMarkerRegion(TextureRegion markerRegion) {
+            this.markerRegion = markerRegion;
+        }
+
+        private boolean hasMarker() {
+            return markerRegion != null;
+        }
+
+        @Override
+        public void draw(Batch batch, float parentAlpha) {
+            if (markerRegion == null || getWidth() <= 0f || getHeight() <= 0f) {
+                return;
+            }
+
+            float markerHeight = Math.min(30f, Math.max(20f, getHeight() + 6f));
+            float markerWidth = markerHeight
+                * markerRegion.getRegionWidth()
+                / Math.max(1f, markerRegion.getRegionHeight());
+            Color previous = new Color(batch.getColor());
+            batch.setColor(1f, 1f, 1f, parentAlpha);
+            for (int wave = 1; wave <= totalWaves; wave++) {
+                float centerX = getWidth() * wave / totalWaves;
+                centerX = Math.max(markerWidth * 0.5f,
+                    Math.min(getWidth() - markerWidth * 0.5f, centerX));
+                batch.draw(
+                    markerRegion,
+                    centerX - markerWidth * 0.5f,
+                    (getHeight() - markerHeight) * 0.5f,
+                    markerWidth,
+                    markerHeight
+                );
+            }
+            batch.setColor(previous);
+        }
     }
 }

@@ -5,12 +5,22 @@ import models.gamepanes.Tile;
 import models.games.BaseGame;
 
 public class Sun extends Entity{
+    public enum AnimationType {
+        NORMAL,
+        SPECIAL,
+        RADIOACTIVE
+    }
+
     Plant producer;
-     float velocity = 70f;
+    float velocity = 70f;
     static float width = 50;
     static float height = 50;
     private int price;
     private boolean radioActive = false;
+    /* Kept separately so the visual type remains radioactive even if callers
+       change the gameplay flag while the collectible is alive. */
+    private boolean radioactiveVisual;
+    private AnimationType animationType = AnimationType.NORMAL;
     boolean ground = false;
     private float remainingTime;
     public Sun(){}
@@ -33,22 +43,19 @@ public class Sun extends Entity{
         if(!ground)
         {
             this.y -= delta * Constants.SUN_DROPPING_VELOCITY;
-        if(this.y + Sun.height / 2 <= this.line * Tile.getHeight()
+            if(this.y + Sun.height / 2 <= this.line * Tile.getHeight()
                 + Tile.getHeight() / 2 ){
-            ground = true;
-            if(radioActive) {
-               radioActive = false;
-            }
-            return "Sun landed at " + this.tileIndex +
+                ground = true;
+                return "Sun landed at " + this.tileIndex +
                     " , " + this.line;
-        }
-        return null;
+            }
+            return null;
         }
         if(ground){
             remainingTime  -= delta;
         }
         return "sun is waiting in (" + this.tileIndex + " , " + this.line + ")" +
-                "\n time remaining: " + remainingTime ;
+            "\n time remaining: " + remainingTime ;
     }
 
     public void dispose(BaseGame game){
@@ -60,7 +67,7 @@ public class Sun extends Entity{
                 float zCentreX = zombie.getX() + zombie.getWidth() / 2;
                 float zCentreY = zombie.getY() + zombie.getHeight() / 2;
                 if (Math.abs(centreX - zCentreX) <= Tile.getWidth() * 2 &&
-                        Math.abs(centreY - zCentreY) <= Tile.getHeight() * 2) {
+                    Math.abs(centreY - zCentreY) <= Tile.getHeight() * 2) {
                     zombie.setHp(zombie.getHp() - 150);
                 }
             }
@@ -68,7 +75,7 @@ public class Sun extends Entity{
                 float pCentreX = x.getX() + x.getWidth() / 2;
                 float pCentreY = x.getY() + x.getHeight() / 2;
                 if (Math.abs(centreX - pCentreX) <= Tile.getWidth() &&
-                        Math.abs(centreY - pCentreY) <= Tile.getHeight()) {
+                    Math.abs(centreY - pCentreY) <= Tile.getHeight()) {
                     x.setHp(x.getHp() - 80);
                 }
             }
@@ -84,6 +91,9 @@ public class Sun extends Entity{
 
     public void setPrice(int price) {
         this.price = price;
+        if (!radioactiveVisual && price >= 100) {
+            animationType = AnimationType.SPECIAL;
+        }
     }
 
     public boolean isRadioActive() {
@@ -92,6 +102,31 @@ public class Sun extends Entity{
 
     public void setRadioActive(boolean radioActive) {
         this.radioActive = radioActive;
+        if (radioActive) {
+            radioactiveVisual = true;
+            animationType = AnimationType.RADIOACTIVE;
+        }
+    }
+
+    public AnimationType getAnimationType() {
+        if (radioActive || radioactiveVisual) {
+            return AnimationType.RADIOACTIVE;
+        }
+        if (animationType == AnimationType.SPECIAL || price >= 100) {
+            return AnimationType.SPECIAL;
+        }
+        return AnimationType.NORMAL;
+    }
+
+    public void setAnimationType(AnimationType animationType) {
+        if (animationType == null) {
+            this.animationType = AnimationType.NORMAL;
+            return;
+        }
+        this.animationType = animationType;
+        if (animationType == AnimationType.RADIOACTIVE) {
+            radioactiveVisual = true;
+        }
     }
 
     public float getRemainingTime() {
@@ -144,4 +179,3 @@ public class Sun extends Entity{
         this.x =  tileIndex * Tile.getWidth();
     }
 }
-

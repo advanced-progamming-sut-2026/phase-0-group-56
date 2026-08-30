@@ -15,7 +15,10 @@ public class Deadline extends NormalGame implements SpecialGame {
 
     public Deadline(Chapters chapter, Level level) {
         super(chapter, level);
-        deadLine = Constants.DEAD_LINE_TILE_INDEX + level.getId();
+        // Keep the marker inside the nine-column lawn.  Level ids are global
+        // (1..16), so using the raw id would put the deadline outside the map
+        // and immediately lose level 7 when zombies spawn at column 8.
+        deadLine = Math.min(7, Constants.DEAD_LINE_TILE_INDEX + Math.max(0, level.getId() - 7));
     }
 
     /**
@@ -28,7 +31,7 @@ public class Deadline extends NormalGame implements SpecialGame {
 
     @Override
     public ArrayList<PlantType> filterPlants() {
-        return null;
+        return new ArrayList<>(selection.getPlantsToChoose());
     }
 
     @Override
@@ -39,13 +42,16 @@ public class Deadline extends NormalGame implements SpecialGame {
     public Result check_endGame() {
         for (Zombie z : zombies) {
             if (z.getTileIndex() <= deadLine) {
+                won = false;
+                state = GameState.END;
                 return new Result(true, "Loss", null);
             }
         }
-        return new Result(false, null, null);
+        return super.check_endGame();
     }
 
     @Override
     public void endGame() {
+        super.endGame();
     }
 }

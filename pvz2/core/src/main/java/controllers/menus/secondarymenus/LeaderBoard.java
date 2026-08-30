@@ -4,6 +4,9 @@ import controllers.datacontroller.Data;
 import controllers.menus.Menu;
 import models.App;
 import models.User;
+import network.LeaderboardEntry;
+import network.NetworkClient;
+import network.NetworkService;
 import view.HomeView;
 
 import java.util.ArrayList;
@@ -52,6 +55,19 @@ public class LeaderBoard implements Menu {
         }
 
         return formatTable(users);
+    }
+
+    /** Returns the authoritative server leaderboard when a network session exists. */
+    public List<LeaderboardEntry> getNetworkLeaderboard() {
+        NetworkClient client = NetworkService.getClient();
+        if (client == null || !client.isConnected()) {
+            return List.of();
+        }
+        try {
+            return NetworkClient.leaderboardFrom(client.requestLeaderboard());
+        } catch (RuntimeException exception) {
+            return List.of();
+        }
     }
 
     public String sortLeaderBoard(String criteria) {

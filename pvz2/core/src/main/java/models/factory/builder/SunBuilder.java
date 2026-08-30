@@ -27,8 +27,9 @@ public class SunBuilder {
         }else{
             cooldownTillNextSun -= delta;
         }
-        return new Result(true , "time till next sun dropping : "
-                + cooldownTillNextSun , null);
+        // The HUD already shows the current sun count; exposing the internal
+        // spawn timer every frame only replaces useful gameplay messages.
+        return new Result(false, "", null);
     }
 
     private Sun drop() {

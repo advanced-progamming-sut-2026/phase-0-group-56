@@ -93,6 +93,8 @@ public final class VaseBreakerView extends View {
     private int hoverRow = -1;
     private Label statusLabel;
     private Label modeLabel;
+    private Label resultLabel;
+    private Table resultPanel;
 
     private Cursor blankCursor;
     private boolean disposed;
@@ -156,12 +158,10 @@ public final class VaseBreakerView extends View {
         updateBreakEffects(safeDelta);
 
         String gameLog = controller.playGame(safeDelta);
-        if (App.getScreen() != this) {
-            return;
-        }
         if (gameLog != null && !gameLog.isBlank()) {
             setStatus(gameLog);
         }
+        refreshResultPanel();
 
         ScreenUtils.clear(0.04f, 0.08f, 0.06f, 1f);
         renderMap();
@@ -436,6 +436,10 @@ public final class VaseBreakerView extends View {
             public boolean touchDown(int screenX, int screenY, int pointer, int button) {
                 updatePointerFromScreen(screenX, screenY);
 
+                if (controller.getGame().getState() == models.games.BaseGame.GameState.END) {
+                    return true;
+                }
+
                 if (button == Input.Buttons.RIGHT) {
                     setNormalMode(true);
                     return true;
@@ -629,7 +633,70 @@ public final class VaseBreakerView extends View {
             .padTop(6f);
 
         uiStage.addActor(root);
+        buildResultPanel();
         refreshModeLabel();
+    }
+
+    private void buildResultPanel() {
+        resultPanel = new Table();
+        resultPanel.setFillParent(true);
+        resultPanel.center();
+        resultPanel.setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.disabled);
+        resultPanel.setVisible(false);
+
+        Table card = new Table();
+        card.pad(24f);
+        com.badlogic.gdx.scenes.scene2d.utils.Drawable background =
+            getSkinDrawableSafe("image_ui_quests_panel_edge_to_edge_ten");
+        if (background != null) {
+            card.setBackground(background);
+        }
+
+        resultLabel = new Label("", skin, "big_outline");
+        resultLabel.setAlignment(Align.center);
+        card.add(resultLabel).colspan(2).width(440f).padBottom(16f).row();
+
+        TextButton retry = new TextButton("RETRY", skin, "green");
+        retry.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                App.setScreen(new VaseBreakerView(controller.getLevelNumber()));
+            }
+        });
+        TextButton back = new TextButton("MINIGAMES", skin, "brown");
+        back.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                App.setScreen(new MiniGamesView());
+            }
+        });
+        card.add(retry).width(170f).height(58f).pad(5f);
+        card.add(back).width(200f).height(58f).pad(5f);
+        resultPanel.add(card).center();
+        uiStage.addActor(resultPanel);
+    }
+
+    private void refreshResultPanel() {
+        if (resultPanel == null || resultLabel == null) {
+            return;
+        }
+
+        boolean ended = controller.getGame().getState() == models.games.BaseGame.GameState.END;
+        resultPanel.setVisible(ended);
+        resultPanel.setTouchable(
+            ended
+                ? com.badlogic.gdx.scenes.scene2d.Touchable.enabled
+                : com.badlogic.gdx.scenes.scene2d.Touchable.disabled
+        );
+        if (ended) {
+            boolean won = "Won".equalsIgnoreCase(controller.getResultMessage());
+            resultLabel.setText(won ? "YOU WIN!" : "YOU LOSE!");
+            resultLabel.setColor(
+                won
+                    ? new Color(0.20f, 0.95f, 0.22f, 1f)
+                    : new Color(0.95f, 0.04f, 0.04f, 1f)
+            );
+        }
     }
 
     private void refreshModeLabel() {

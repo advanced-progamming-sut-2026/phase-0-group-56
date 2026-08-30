@@ -10,6 +10,7 @@ import models.gamepanes.Tile;
 import models.games.NormalGame;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Random;
 
 public class ConveyorBelt extends NormalGame implements SpecialGame {
@@ -19,7 +20,9 @@ public class ConveyorBelt extends NormalGame implements SpecialGame {
     public  ConveyorBelt(Chapters chapter, Level level) {
         super(chapter, level);
         initPlants(5);
-        belt.add(plants.getFirst());
+        if (!plants.isEmpty()) {
+            belt.add(plants.getFirst());
+        }
         state = GameState.PLAYING;
     }
 
@@ -27,16 +30,19 @@ public class ConveyorBelt extends NormalGame implements SpecialGame {
 
 
 
-    private void initPlants(int i){
-        if(i == 0) return;
-        int index = random.nextInt(App.getCurrentuser().getUnlockedPlants().size());
-        PlantType type = App.getCurrentuser().getUnlockedPlants().get(index);
-        if(plants.contains(type)){
-            initPlants(i);
+    private void initPlants(int count){
+        if (App.getCurrentuser() == null || App.getCurrentuser().getUnlockedPlants().isEmpty()) {
+            return;
         }
-        else {
-            plants.add(type);
-            initPlants(i - 1);
+        ArrayList<PlantType> unlocked = new ArrayList<>(App.getCurrentuser().getUnlockedPlants());
+        Collections.shuffle(unlocked, random);
+        for (PlantType type : unlocked) {
+            if (type != null && !plants.contains(type)) {
+                plants.add(type);
+            }
+            if (plants.size() >= count) {
+                break;
+            }
         }
     }
     @Override
@@ -49,15 +55,7 @@ public class ConveyorBelt extends NormalGame implements SpecialGame {
     Random rand = new Random();
     @Override
     public ArrayList<PlantType> filterPlants() {
-        if(counter == 0) return null;
-        int random = rand.nextInt(App.getCurrentuser().getUnlockedPlants().size());
-        PlantType toAdd = App.getCurrentuser().getUnlockedPlants().get(random);
-       if(!plants.contains(toAdd)){
-           plants.add(toAdd);
-           counter--;
-       }
-       filterPlants();
-        return null;
+        return new ArrayList<>(plants);
     }
 
     @Override
@@ -69,18 +67,23 @@ public class ConveyorBelt extends NormalGame implements SpecialGame {
     public boolean plant(String plantName, int x, int y) {
         try {
             PlantType type = PlantType.valueOf(plantName.toUpperCase());
-            if(belt.contains(type)){
-                belt.remove(type);
-                PlantFactory factory = new PlantFactory();
-                Plant plant = factory.createPlant(type);
+            if (field == null || x < 0 || x >= 9 || y < 0 || y >= 5 || !belt.contains(type)) {
+                return false;
+            }
+            Tile tile = field.getTileByCoordinats(x, y);
+            PlantFactory factory = new PlantFactory();
+            Plant plant = factory.createPlant(type);
+            if (plant == null || !tile.isEmpty() || !tile.isPlantable()) {
+                return false;
+            }
+            if (belt.remove(type)) {
                 plant.setLine(y);
                 plant.setTileIndex(x);
-                Tile tile = this.field.getTileByCoordinats(x,y);
-                tile.setEmpty(true);
+                tile.setEmpty(false);
                 this.plantsInField.add(plant);
-            return true;
+                return true;
             }
-            else return false;
+            return false;
         }catch (Exception e){
             return false;
         }
@@ -88,10 +91,16 @@ public class ConveyorBelt extends NormalGame implements SpecialGame {
 
     float beltTimer = 0;
     private void updateBelt(float delta){
+        if (plants.isEmpty() || belt.size() >= 5) {
+            return;
+        }
         if(beltTimer <= 0){
             beltTimer = 12;
-            int index = rand.nextInt(plants.size());
-            belt.add(plants.get(index));
+            ArrayList<PlantType> candidates = new ArrayList<>(plants);
+            candidates.removeAll(belt);
+            if (!candidates.isEmpty()) {
+                belt.add(candidates.get(rand.nextInt(candidates.size())));
+            }
         }
         else beltTimer -= delta;
     }
