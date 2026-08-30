@@ -370,14 +370,14 @@ public final class NetworkServer implements Closeable {
             response(session, false, "MATCH_NOT_FOUND", "Join a match before playing.");
             return;
         }
-        Integer column = parseCoordinate(values[1]);
-        Integer row = parseCoordinate(values[2]);
+        Integer column = parseCoordinate(values[2]);
+        Integer row = parseCoordinate(values[3]);
         if (column == null || row == null) {
             response(session, false, "INVALID_ACTION", "Column and row must be integers.");
             return;
         }
         IZombieNetworkMatch.ActionResult result = runtime.match.placePlant(
-            session.role, values[0], column, row);
+            session.role, values[1], column, row);
         respondAction(session, result);
         if (result.success()) {
             broadcastState(runtime);
@@ -394,14 +394,14 @@ public final class NetworkServer implements Closeable {
             response(session, false, "MATCH_NOT_FOUND", "Join a match before playing.");
             return;
         }
-        Integer column = parseCoordinate(values[1]);
-        Integer row = parseCoordinate(values[2]);
+        Integer column = parseCoordinate(values[2]);
+        Integer row = parseCoordinate(values[3]);
         if (column == null || row == null) {
             response(session, false, "INVALID_ACTION", "Column and row must be integers.");
             return;
         }
         IZombieNetworkMatch.ActionResult result = runtime.match.placeZombie(
-            session.role, values[0], column, row);
+            session.role, values[1], column, row);
         respondAction(session, result);
         if (result.success()) {
             broadcastState(runtime);
