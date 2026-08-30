@@ -115,9 +115,8 @@ public class HomeView extends View {
         navigation.add(homeTile("pot", null, "almanac",
             "PROFILE", "Your garden", () -> openMenu("Profile menu")));
         navigation.row();
-        // Keep the final two destinations centered after removing the
-        // obsolete Events and Boosts tiles from the Home navigation.
-        navigation.add().width(210f).height(136f).pad(5f);
+        navigation.add(homeTile("almanac", null, "almanac",
+            "NETWORK PLAY", "Two-player I, Zombie", () -> openMenu("Network menu")));
         navigation.add(homeTile("coin", null, "shop",
             "WALLET", "Currencies", () -> openMenu("Wallet menu")));
         navigation.add(homeTile("settings", null, "settings",

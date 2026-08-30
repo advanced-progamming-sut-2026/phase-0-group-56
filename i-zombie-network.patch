@@ -1,0 +1,2407 @@
+diff --git a/pvz2/core/src/main/java/controllers/menus/gamecontroller/CouchIZombieController.java b/pvz2/core/src/main/java/controllers/menus/gamecontroller/CouchIZombieController.java
+new file mode 100644
+index 0000000..f0c39c8
+--- /dev/null
++++ b/pvz2/core/src/main/java/controllers/menus/gamecontroller/CouchIZombieController.java
+@@ -0,0 +1,34 @@
++package controllers.menus.gamecontroller;
++
++import models.games.minigames.CouchIZombieGame;
++import network.IZombieNetworkMatch;
++import network.IZombieNetworkState;
++
++/** Controller for simultaneous mouse/keyboard Couch Play input. */
++public final class CouchIZombieController {
++    private final CouchIZombieGame game = new CouchIZombieGame();
++
++    public String placePlant(String type, int column, int row) {
++        return message(game.placePlant(type, column, row));
++    }
++
++    public String placeZombie(String type, int column, int row) {
++        return message(game.placeZombie(type, column, row));
++    }
++
++    public String react(IZombieNetworkState.Role role, String category, String value) {
++        return message(game.react(role, category, value));
++    }
++
++    public void playGame(float delta) {
++        game.tick(delta);
++    }
++
++    public CouchIZombieGame getGame() {
++        return game;
++    }
++
++    private static String message(IZombieNetworkMatch.ActionResult result) {
++        return result == null ? "Action failed." : result.message();
++    }
++}
+diff --git a/pvz2/core/src/main/java/controllers/menus/gamecontroller/IZombieNetworkController.java b/pvz2/core/src/main/java/controllers/menus/gamecontroller/IZombieNetworkController.java
+new file mode 100644
+index 0000000..ea9ef6b
+--- /dev/null
++++ b/pvz2/core/src/main/java/controllers/menus/gamecontroller/IZombieNetworkController.java
+@@ -0,0 +1,130 @@
++package controllers.menus.gamecontroller;
++
++import network.IZombieNetworkState;
++import network.NetworkClient;
++import network.NetworkEvent;
++
++import java.util.concurrent.ConcurrentLinkedQueue;
++import java.util.function.Consumer;
++
++/** MVC controller for a server-authoritative network I, Zombie match. */
++public final class IZombieNetworkController implements AutoCloseable {
++    private final NetworkClient client;
++    private final String matchId;
++    private final IZombieNetworkState.Role role;
++    private final ConcurrentLinkedQueue<Reaction> reactions = new ConcurrentLinkedQueue<>();
++    private final Consumer<NetworkEvent> listener = this::onEvent;
++    private volatile IZombieNetworkState state;
++    private volatile String status = "Connecting to match...";
++    private boolean closed;
++    private boolean scoreSubmitted;
++
++    public IZombieNetworkController(
++        NetworkClient client, String matchId, IZombieNetworkState.Role role
++    ) {
++        if (client == null || matchId == null || matchId.isBlank() || role == null) {
++            throw new IllegalArgumentException("A client, match id, and role are required.");
++        }
++        this.client = client;
++        this.matchId = matchId;
++        this.role = role;
++        client.addEventListener(listener);
++    }
++
++    public String join() {
++        network.NetworkResponse response = client.joinGame(matchId);
++        status = response.message();
++        return response.message();
++    }
++
++    public String placePlant(String type, int column, int row) {
++        return client.placePlant(matchId, type, column, row).message();
++    }
++
++    public String placeZombie(String type, int column, int row) {
++        return client.placeZombie(matchId, type, column, row).message();
++    }
++
++    public String sendReaction(String category, String value) {
++        return client.sendReaction(matchId, category, value).message();
++    }
++
++    public String submitScore() {
++        if (scoreSubmitted) {
++            return "Score already saved on the server.";
++        }
++        IZombieNetworkState current = state;
++        if (current == null || current.phase() == IZombieNetworkState.Phase.PLAYING
++            || current.phase() == IZombieNetworkState.Phase.WAITING) {
++            return "The match has not ended yet.";
++        }
++        int score = role == IZombieNetworkState.Role.PLANTS
++            ? current.plantScore() : current.zombieScore();
++        network.NetworkResponse response = client.submitScore(matchId, score);
++        if (response.success()) {
++            scoreSubmitted = true;
++        }
++        return response.message();
++    }
++
++    public IZombieNetworkState getState() {
++        return state;
++    }
++
++    public IZombieNetworkState.Role getRole() {
++        return role;
++    }
++
++    public String getMatchId() {
++        return matchId;
++    }
++
++    public String getStatus() {
++        return status;
++    }
++
++    public boolean isScoreSubmitted() {
++        return scoreSubmitted;
++    }
++
++    public Reaction pollReaction() {
++        return reactions.poll();
++    }
++
++    public void leave() {
++        if (closed) {
++            return;
++        }
++        client.leaveGame();
++    }
++
++    private void onEvent(NetworkEvent event) {
++        if (event == null) {
++            return;
++        }
++        if ("GAME_STATE".equals(event.type())) {
++            IZombieNetworkState decoded = NetworkClient.stateFrom(event);
++            if (decoded != null && matchId.equals(decoded.matchId())) {
++                state = decoded;
++                status = decoded.phase().name();
++            }
++        } else if ("REACTION".equals(event.type()) && event.data().length >= 3) {
++            reactions.offer(new Reaction(event.data()[0], event.data()[1], event.data()[2]));
++        } else if ("MATCH_ABORTED".equals(event.type())) {
++            status = event.data().length == 0 ? "Match aborted." : event.data()[0];
++        } else if ("GAME_OVER".equals(event.type())) {
++            status = event.data().length == 0 ? "Match finished." : "Winner: " + event.data()[0];
++        }
++    }
++
++    @Override
++    public void close() {
++        if (!closed) {
++            closed = true;
++            client.removeEventListener(listener);
++        }
++    }
++
++    public record Reaction(String sender, String category, String value) {
++    }
++}
+diff --git a/pvz2/core/src/main/java/controllers/menus/secondarymenus/LeaderBoard.java b/pvz2/core/src/main/java/controllers/menus/secondarymenus/LeaderBoard.java
+index c027301..042dda8 100644
+--- a/pvz2/core/src/main/java/controllers/menus/secondarymenus/LeaderBoard.java
++++ b/pvz2/core/src/main/java/controllers/menus/secondarymenus/LeaderBoard.java
+@@ -4,6 +4,9 @@ import controllers.datacontroller.Data;
+ import controllers.menus.Menu;
+ import models.App;
+ import models.User;
++import network.LeaderboardEntry;
++import network.NetworkClient;
++import network.NetworkService;
+ import view.HomeView;
+ 
+ import java.util.ArrayList;
+@@ -54,6 +57,19 @@ public class LeaderBoard implements Menu {
+         return formatTable(users);
+     }
+ 
++    /** Returns the authoritative server leaderboard when a network session exists. */
++    public List<LeaderboardEntry> getNetworkLeaderboard() {
++        NetworkClient client = NetworkService.getClient();
++        if (client == null || !client.isConnected()) {
++            return List.of();
++        }
++        try {
++            return NetworkClient.leaderboardFrom(client.requestLeaderboard());
++        } catch (RuntimeException exception) {
++            return List.of();
++        }
++    }
++
+     public String sortLeaderBoard(String criteria) {
+         return sortLeaderBoard(criteria, true);
+     }
+diff --git a/pvz2/core/src/main/java/models/games/minigames/CouchIZombieGame.java b/pvz2/core/src/main/java/models/games/minigames/CouchIZombieGame.java
+new file mode 100644
+index 0000000..0d7bad6
+--- /dev/null
++++ b/pvz2/core/src/main/java/models/games/minigames/CouchIZombieGame.java
+@@ -0,0 +1,36 @@
++package models.games.minigames;
++
++import network.IZombieNetworkMatch;
++import network.IZombieNetworkState;
++
++/** Local two-player variant using the exact same rules as network matches. */
++public final class CouchIZombieGame {
++    private final IZombieNetworkMatch match = new IZombieNetworkMatch("couch");
++
++    public CouchIZombieGame() {
++        match.join(IZombieNetworkState.Role.PLANTS);
++        match.join(IZombieNetworkState.Role.ZOMBIES);
++    }
++
++    public IZombieNetworkMatch.ActionResult placePlant(String type, int column, int row) {
++        return match.placePlant(IZombieNetworkState.Role.PLANTS, type, column, row);
++    }
++
++    public IZombieNetworkMatch.ActionResult placeZombie(String type, int column, int row) {
++        return match.placeZombie(IZombieNetworkState.Role.ZOMBIES, type, column, row);
++    }
++
++    public void tick(float delta) {
++        match.tick(delta);
++    }
++
++    public IZombieNetworkState snapshot() {
++        return match.snapshot();
++    }
++
++    public IZombieNetworkMatch.ActionResult react(
++        IZombieNetworkState.Role role, String category, String value
++    ) {
++        return match.react(role, category, value);
++    }
++}
+diff --git a/pvz2/core/src/main/java/network/IZombieNetworkMatch.java b/pvz2/core/src/main/java/network/IZombieNetworkMatch.java
+new file mode 100644
+index 0000000..3f4760d
+--- /dev/null
++++ b/pvz2/core/src/main/java/network/IZombieNetworkMatch.java
+@@ -0,0 +1,434 @@
++package network;
++
++import java.util.ArrayList;
++import java.util.Iterator;
++import java.util.LinkedHashMap;
++import java.util.List;
++import java.util.Map;
++
++/**
++ * Deterministic server-side simulation for the network I, Zombie minigame.
++ * Clients never mutate this object; they submit role-checked actions instead.
++ */
++public final class IZombieNetworkMatch {
++    public static final int ROW_COUNT = 5;
++    public static final int COLUMN_COUNT = 9;
++    public static final int FIRST_ZOMBIE_COLUMN = 5;
++    public static final int MATCH_DURATION_SECONDS = 120;
++
++    private static final List<Card> PLANT_CARDS = List.of(
++        new Card("peashooter", 100, 300, 20f, 1.2f, 0f),
++        new Card("wall_nut", 50, 1200, 0f, 0f, 0f),
++        new Card("sunflower", 50, 200, 0f, 0f, 25f)
++    );
++    private static final List<Card> ZOMBIE_CARDS = List.of(
++        new Card("normal", 50, 190, 0f, 0.55f, 10f),
++        new Card("cone", 75, 300, 0f, 0.42f, 12f),
++        new Card("imp", 50, 120, 0f, 0.72f, 8f)
++    );
++
++    private final String matchId;
++    private final Map<Long, MutableUnit> plants = new LinkedHashMap<>();
++    private final Map<Long, MutableUnit> zombies = new LinkedHashMap<>();
++    private final Map<Long, MutableProjectile> projectiles = new LinkedHashMap<>();
++    private final boolean[] eatenBrains = new boolean[ROW_COUNT];
++    private long nextId = 1;
++    private long revision;
++    private float elapsed;
++    private float plantIncomeTimer;
++    private float zombieIncomeTimer;
++    private int plantSun = 300;
++    private int zombieSun = 150;
++    private int plantScore;
++    private int zombieScore;
++    private boolean plantsJoined;
++    private boolean zombiesJoined;
++    private IZombieNetworkState.Phase phase = IZombieNetworkState.Phase.WAITING;
++    private IZombieNetworkState.Role winner;
++
++    public IZombieNetworkMatch(String matchId) {
++        this.matchId = matchId == null ? "" : matchId;
++    }
++
++    public static List<Card> plantCards() {
++        return PLANT_CARDS;
++    }
++
++    public static List<Card> zombieCards() {
++        return ZOMBIE_CARDS;
++    }
++
++    public static List<String> textReactions() {
++        return List.of("NICE_MOVE", "HURRY_UP", "GOOD_GAME");
++    }
++
++    public static List<String> emojiReactions() {
++        return List.of("😀", "😎", "🌻");
++    }
++
++    public static List<String> stickerReactions() {
++        return List.of("SUN_DANCE", "ZOMBIE_DANCE", "BRAIN_POP");
++    }
++
++    public synchronized ActionResult join(IZombieNetworkState.Role role) {
++        if (role == null) {
++            return ActionResult.error("INVALID_ROLE", "A valid role is required.");
++        }
++        if (phase != IZombieNetworkState.Phase.WAITING) {
++            return ActionResult.error("MATCH_STARTED", "The match has already started.");
++        }
++        if (role == IZombieNetworkState.Role.PLANTS) {
++            if (plantsJoined) {
++                return ActionResult.error("ROLE_TAKEN", "The plants role is already taken.");
++            }
++            plantsJoined = true;
++        } else {
++            if (zombiesJoined) {
++                return ActionResult.error("ROLE_TAKEN", "The zombies role is already taken.");
++            }
++            zombiesJoined = true;
++        }
++        if (plantsJoined && zombiesJoined) {
++            phase = IZombieNetworkState.Phase.PLAYING;
++        }
++        revision++;
++        return ActionResult.ok("Joined the match.");
++    }
++
++    public synchronized ActionResult placePlant(
++        IZombieNetworkState.Role role, String type, int column, int row
++    ) {
++        if (!canAct(role, IZombieNetworkState.Phase.PLAYING)) {
++            return ActionResult.error("NOT_ALLOWED", "Only the plants player can place plants now.");
++        }
++        if (column < 0 || column >= FIRST_ZOMBIE_COLUMN || row < 0 || row >= ROW_COUNT) {
++            return ActionResult.error("INVALID_TILE", "Plants must be placed on the left side of the lawn.");
++        }
++        Card card = card(PLANT_CARDS, type);
++        if (card == null) {
++            return ActionResult.error("UNKNOWN_PLANT", "That plant is not available in this match.");
++        }
++        if (plantSun < card.cost()) {
++            return ActionResult.error("NOT_ENOUGH_SUN", "Not enough plant sun.");
++        }
++        for (MutableUnit plant : plants.values()) {
++            if (plant.row == row && Math.abs(plant.x - (column + 0.5f)) < 0.01f) {
++                return ActionResult.error("OCCUPIED", "That tile is occupied.");
++            }
++        }
++        long id = nextId++;
++        plants.put(id, new MutableUnit(id, card.type(), row, column + 0.5f, card.hp()));
++        plantSun -= card.cost();
++        revision++;
++        return ActionResult.ok("Plant placed.");
++    }
++
++    public synchronized ActionResult placeZombie(
++        IZombieNetworkState.Role role, String type, int column, int row
++    ) {
++        if (!canAct(role, IZombieNetworkState.Phase.PLAYING)) {
++            return ActionResult.error("NOT_ALLOWED", "Only the zombies player can deploy zombies now.");
++        }
++        if (column < FIRST_ZOMBIE_COLUMN || column >= COLUMN_COUNT
++            || row < 0 || row >= ROW_COUNT) {
++            return ActionResult.error("INVALID_TILE", "Zombies must be deployed right of the red line.");
++        }
++        Card card = card(ZOMBIE_CARDS, type);
++        if (card == null) {
++            return ActionResult.error("UNKNOWN_ZOMBIE", "That zombie is not available in this match.");
++        }
++        if (zombieSun < card.cost()) {
++            return ActionResult.error("NOT_ENOUGH_SUN", "Not enough zombie sun.");
++        }
++        for (MutableUnit zombie : zombies.values()) {
++            if (zombie.row == row && Math.abs(zombie.x - (column + 0.5f)) < 0.01f) {
++                return ActionResult.error("OCCUPIED", "That tile is occupied.");
++            }
++        }
++        long id = nextId++;
++        zombies.put(id, new MutableUnit(id, card.type(), row, column + 0.5f, card.hp()));
++        zombieSun -= card.cost();
++        revision++;
++        return ActionResult.ok("Zombie deployed.");
++    }
++
++    public synchronized void tick(float delta) {
++        if (phase != IZombieNetworkState.Phase.PLAYING) {
++            return;
++        }
++        float safeDelta = Math.max(0f, Math.min(delta, 0.25f));
++        elapsed += safeDelta;
++        plantIncomeTimer += safeDelta;
++        zombieIncomeTimer += safeDelta;
++        while (plantIncomeTimer >= 6f) {
++            plantSun += 25;
++            plantIncomeTimer -= 6f;
++        }
++        while (zombieIncomeTimer >= 8f) {
++            zombieSun += 25;
++            zombieIncomeTimer -= 8f;
++        }
++        updatePlants(safeDelta);
++        updateProjectiles(safeDelta);
++        updateZombies(safeDelta);
++        evaluateEnd();
++        revision++;
++    }
++
++    public synchronized IZombieNetworkState snapshot() {
++        List<IZombieNetworkState.Unit> plantCopy = new ArrayList<>();
++        for (MutableUnit unit : plants.values()) {
++            plantCopy.add(unit.snapshot());
++        }
++        List<IZombieNetworkState.Unit> zombieCopy = new ArrayList<>();
++        for (MutableUnit unit : zombies.values()) {
++            zombieCopy.add(unit.snapshot());
++        }
++        List<IZombieNetworkState.Projectile> projectileCopy = new ArrayList<>();
++        for (MutableProjectile projectile : projectiles.values()) {
++            projectileCopy.add(projectile.snapshot());
++        }
++        return new IZombieNetworkState(matchId, revision, phase, winner,
++            Math.max(0L, (long) ((MATCH_DURATION_SECONDS - elapsed) * 1000f)),
++            plantSun, zombieSun, countBrains(), plantScore, zombieScore,
++            eatenBrains, plantCopy, zombieCopy, projectileCopy);
++    }
++
++    public synchronized ActionResult react(
++        IZombieNetworkState.Role role, String category, String value
++    ) {
++        if (!canAct(role, IZombieNetworkState.Phase.PLAYING)) {
++            return ActionResult.error("NOT_ALLOWED", "Reactions are available while the match is running.");
++        }
++        if (!validReaction(category, value)) {
++            return ActionResult.error("INVALID_REACTION", "That reaction is not available.");
++        }
++        return ActionResult.ok("Reaction sent.");
++    }
++
++    public synchronized ActionResult leave(IZombieNetworkState.Role role) {
++        if (role == IZombieNetworkState.Role.PLANTS) {
++            plantsJoined = false;
++        } else if (role == IZombieNetworkState.Role.ZOMBIES) {
++            zombiesJoined = false;
++        }
++        if (phase == IZombieNetworkState.Phase.PLAYING) {
++            phase = IZombieNetworkState.Phase.ABORTED;
++        }
++        revision++;
++        return ActionResult.ok("Left the match.");
++    }
++
++    private void updatePlants(float delta) {
++        for (MutableUnit plant : plants.values()) {
++            plant.cooldown -= delta;
++            if ("sunflower".equals(plant.type) && plant.cooldown <= 0f) {
++                plantSun += 25;
++                plant.cooldown = 8f;
++            }
++            if (!"peashooter".equals(plant.type) || plant.cooldown > 0f) {
++                continue;
++            }
++            MutableUnit target = nearestZombie(plant.row, plant.x);
++            if (target != null) {
++                long id = nextId++;
++                projectiles.put(id, new MutableProjectile(id, plant.row, plant.x + 0.35f, 20f));
++                plant.cooldown = 1.2f;
++            }
++        }
++    }
++
++    private void updateProjectiles(float delta) {
++        Iterator<MutableProjectile> iterator = projectiles.values().iterator();
++        while (iterator.hasNext()) {
++            MutableProjectile projectile = iterator.next();
++            projectile.x += 4.2f * delta;
++            MutableUnit target = null;
++            for (MutableUnit zombie : zombies.values()) {
++                if (zombie.row == projectile.row
++                    && Math.abs(zombie.x - projectile.x) < 0.28f) {
++                    target = zombie;
++                    break;
++                }
++            }
++            if (target != null) {
++                target.hp -= projectile.damage;
++                if (target.hp <= 0f) {
++                    zombies.remove(target.id);
++                    plantScore += 50;
++                }
++                iterator.remove();
++            } else if (projectile.x > COLUMN_COUNT + 1f) {
++                iterator.remove();
++            }
++        }
++    }
++
++    private void updateZombies(float delta) {
++        for (MutableUnit zombie : zombies.values()) {
++            Card card = card(ZOMBIE_CARDS, zombie.type);
++            MutableUnit target = nearestPlant(zombie.row, zombie.x);
++            if (target != null && zombie.x - target.x < 0.75f) {
++                zombie.cooldown -= delta;
++                if (zombie.cooldown <= 0f) {
++                    target.hp -= card == null ? 10f : card.damage();
++                    zombie.cooldown = "imp".equals(zombie.type) ? 0.55f : 0.85f;
++                    if (target.hp <= 0f) {
++                        plants.remove(target.id);
++                        zombieScore += 25;
++                    }
++                }
++            } else {
++                zombie.x -= card == null ? 0.5f * delta : card.speed() * delta;
++            }
++        }
++        Iterator<MutableUnit> iterator = zombies.values().iterator();
++        while (iterator.hasNext()) {
++            MutableUnit zombie = iterator.next();
++            if (zombie.x <= 0.1f) {
++                eatenBrains[zombie.row] = true;
++                zombieScore += 100;
++                iterator.remove();
++            }
++        }
++    }
++
++    private void evaluateEnd() {
++        if (countBrains() == ROW_COUNT) {
++            winner = IZombieNetworkState.Role.ZOMBIES;
++            phase = IZombieNetworkState.Phase.ZOMBIES_WON;
++            return;
++        }
++        if (elapsed >= MATCH_DURATION_SECONDS) {
++            winner = IZombieNetworkState.Role.PLANTS;
++            phase = IZombieNetworkState.Phase.PLANTS_WON;
++        }
++    }
++
++    private int countBrains() {
++        int count = 0;
++        for (boolean eaten : eatenBrains) {
++            if (eaten) {
++                count++;
++            }
++        }
++        return count;
++    }
++
++    private MutableUnit nearestZombie(int row, float x) {
++        MutableUnit result = null;
++        for (MutableUnit zombie : zombies.values()) {
++            if (zombie.row != row || zombie.x < x) {
++                continue;
++            }
++            if (result == null || zombie.x < result.x) {
++                result = zombie;
++            }
++        }
++        return result;
++    }
++
++    private MutableUnit nearestPlant(int row, float x) {
++        MutableUnit result = null;
++        for (MutableUnit plant : plants.values()) {
++            if (plant.row != row || plant.x > x) {
++                continue;
++            }
++            if (result == null || plant.x > result.x) {
++                result = plant;
++            }
++        }
++        return result;
++    }
++
++    private boolean canAct(IZombieNetworkState.Role role, IZombieNetworkState.Phase required) {
++        return role != null && phase == required
++            && ((role == IZombieNetworkState.Role.PLANTS && plantsJoined)
++                || (role == IZombieNetworkState.Role.ZOMBIES && zombiesJoined));
++    }
++
++    private static Card card(List<Card> cards, String type) {
++        if (type == null) {
++            return null;
++        }
++        for (Card card : cards) {
++            if (card.type().equalsIgnoreCase(type.trim())) {
++                return card;
++            }
++        }
++        return null;
++    }
++
++    private static boolean validReaction(String category, String value) {
++        if (category == null || value == null) {
++            return false;
++        }
++        String normalized = category.trim().toUpperCase(java.util.Locale.ROOT);
++        List<String> allowed = switch (normalized) {
++            case "TEXT" -> textReactions();
++            case "EMOJI" -> emojiReactions();
++            case "STICKER" -> stickerReactions();
++            default -> List.of();
++        };
++        return allowed.contains(value.trim());
++    }
++
++    public record Card(String type, int cost, int hp, float damage, float speed, float income) {
++        public Card {
++            if (type == null || type.isBlank() || cost <= 0 || hp <= 0) {
++                throw new IllegalArgumentException("Invalid I, Zombie card.");
++            }
++        }
++    }
++
++    public record ActionResult(boolean success, String code, String message) {
++        public static ActionResult ok(String message) {
++            return new ActionResult(true, "OK", message);
++        }
++
++        public static ActionResult error(String code, String message) {
++            return new ActionResult(false, code, message);
++        }
++    }
++
++    private static final class MutableUnit {
++        private final long id;
++        private final String type;
++        private final int row;
++        private float x;
++        private float hp;
++        private final float maxHp;
++        private float cooldown;
++
++        private MutableUnit(long id, String type, int row, float x, float hp) {
++            this.id = id;
++            this.type = type;
++            this.row = row;
++            this.x = x;
++            this.hp = hp;
++            this.maxHp = hp;
++        }
++
++        private IZombieNetworkState.Unit snapshot() {
++            return new IZombieNetworkState.Unit(id, type, row, x, row, hp, maxHp);
++        }
++    }
++
++    private static final class MutableProjectile {
++        private final long id;
++        private final int row;
++        private float x;
++        private final float damage;
++
++        private MutableProjectile(long id, int row, float x, float damage) {
++            this.id = id;
++            this.row = row;
++            this.x = x;
++            this.damage = damage;
++        }
++
++        private IZombieNetworkState.Projectile snapshot() {
++            return new IZombieNetworkState.Projectile(id, row, x, row, damage);
++        }
++    }
++}
+diff --git a/pvz2/core/src/main/java/network/IZombieNetworkState.java b/pvz2/core/src/main/java/network/IZombieNetworkState.java
+new file mode 100644
+index 0000000..5d83a7d
+--- /dev/null
++++ b/pvz2/core/src/main/java/network/IZombieNetworkState.java
+@@ -0,0 +1,86 @@
++package network;
++
++import java.util.ArrayList;
++import java.util.Arrays;
++import java.util.Collections;
++import java.util.List;
++
++/** Immutable, wire-friendly snapshot of a network I, Zombie match. */
++public record IZombieNetworkState(
++    String matchId,
++    long revision,
++    Phase phase,
++    Role winner,
++    long remainingMillis,
++    int plantSun,
++    int zombieSun,
++    int brainsEaten,
++    int plantScore,
++    int zombieScore,
++    boolean[] eatenBrains,
++    List<Unit> plants,
++    List<Unit> zombies,
++    List<Projectile> projectiles
++) {
++    public IZombieNetworkState {
++        matchId = matchId == null ? "" : matchId;
++        phase = phase == null ? Phase.WAITING : phase;
++        eatenBrains = normalizeBrains(eatenBrains);
++        plants = immutableCopy(plants);
++        zombies = immutableCopy(zombies);
++        projectiles = projectiles == null
++            ? List.of()
++            : Collections.unmodifiableList(new ArrayList<>(projectiles));
++    }
++
++    @Override
++    public boolean[] eatenBrains() {
++        return Arrays.copyOf(eatenBrains, eatenBrains.length);
++    }
++
++    private static <T> List<T> immutableCopy(List<T> values) {
++        return values == null
++            ? List.of()
++            : Collections.unmodifiableList(new ArrayList<>(values));
++    }
++
++    private static boolean[] normalizeBrains(boolean[] values) {
++        return values == null ? new boolean[5] : Arrays.copyOf(values, 5);
++    }
++
++    public enum Phase {
++        WAITING,
++        PLAYING,
++        PLANTS_WON,
++        ZOMBIES_WON,
++        ABORTED
++    }
++
++    public enum Role {
++        PLANTS,
++        ZOMBIES
++    }
++
++    public record Unit(
++        long id,
++        String type,
++        int row,
++        float x,
++        float y,
++        float hp,
++        float maxHp
++    ) {
++        public Unit {
++            type = type == null ? "" : type;
++        }
++    }
++
++    public record Projectile(
++        long id,
++        int row,
++        float x,
++        float y,
++        float damage
++    ) {
++    }
++}
+diff --git a/pvz2/core/src/main/java/network/IZombieNetworkStateCodec.java b/pvz2/core/src/main/java/network/IZombieNetworkStateCodec.java
+new file mode 100644
+index 0000000..389642a
+--- /dev/null
++++ b/pvz2/core/src/main/java/network/IZombieNetworkStateCodec.java
+@@ -0,0 +1,135 @@
++package network;
++
++import java.util.ArrayList;
++import java.util.List;
++
++/** Compact field codec used by the line-oriented network protocol. */
++public final class IZombieNetworkStateCodec {
++    private IZombieNetworkStateCodec() {
++    }
++
++    public static String[] encode(IZombieNetworkState state) {
++        if (state == null) {
++            return new String[0];
++        }
++        List<String> fields = new ArrayList<>();
++        fields.add(state.matchId());
++        fields.add(Long.toString(state.revision()));
++        fields.add(state.phase().name());
++        fields.add(state.winner() == null ? "" : state.winner().name());
++        fields.add(Long.toString(state.remainingMillis()));
++        fields.add(Integer.toString(state.plantSun()));
++        fields.add(Integer.toString(state.zombieSun()));
++        fields.add(Integer.toString(state.brainsEaten()));
++        fields.add(Integer.toString(state.plantScore()));
++        fields.add(Integer.toString(state.zombieScore()));
++        StringBuilder brains = new StringBuilder();
++        for (boolean eaten : state.eatenBrains()) {
++            brains.append(eaten ? '1' : '0');
++        }
++        fields.add(brains.toString());
++        addUnits(fields, state.plants());
++        addUnits(fields, state.zombies());
++        fields.add(Integer.toString(state.projectiles().size()));
++        for (IZombieNetworkState.Projectile projectile : state.projectiles()) {
++            fields.add(Long.toString(projectile.id()));
++            fields.add(Integer.toString(projectile.row()));
++            fields.add(Float.toString(projectile.x()));
++            fields.add(Float.toString(projectile.y()));
++            fields.add(Float.toString(projectile.damage()));
++        }
++        return fields.toArray(String[]::new);
++    }
++
++    public static IZombieNetworkState decode(String[] data) {
++        if (data == null || data.length < 14) {
++            return null;
++        }
++        try {
++            int index = 0;
++            String matchId = data[index++];
++            long revision = Long.parseLong(data[index++]);
++            IZombieNetworkState.Phase phase = IZombieNetworkState.Phase.valueOf(data[index++]);
++            String winnerValue = data[index++];
++            IZombieNetworkState.Role winner = winnerValue.isBlank()
++                ? null : IZombieNetworkState.Role.valueOf(winnerValue);
++            long remaining = Long.parseLong(data[index++]);
++            int plantSun = Integer.parseInt(data[index++]);
++            int zombieSun = Integer.parseInt(data[index++]);
++            int brains = Integer.parseInt(data[index++]);
++            int plantScore = Integer.parseInt(data[index++]);
++            int zombieScore = Integer.parseInt(data[index++]);
++            boolean[] eaten = decodeBrains(data[index++]);
++            UnitResult plants = readUnits(data, index);
++            index = plants.nextIndex;
++            UnitResult zombies = readUnits(data, index);
++            index = zombies.nextIndex;
++            int projectileCount = readInt(data, index++);
++            if (projectileCount < 0 || projectileCount > 1000) {
++                return null;
++            }
++            List<IZombieNetworkState.Projectile> projectiles = new ArrayList<>();
++            for (int i = 0; i < projectileCount && index + 4 < data.length; i++) {
++                projectiles.add(new IZombieNetworkState.Projectile(
++                    Long.parseLong(data[index++]), Integer.parseInt(data[index++]),
++                    Float.parseFloat(data[index++]), Float.parseFloat(data[index++]),
++                    Float.parseFloat(data[index++])));
++            }
++            return new IZombieNetworkState(matchId, revision, phase, winner, remaining,
++                plantSun, zombieSun, brains, plantScore, zombieScore, eaten,
++                plants.units, zombies.units, projectiles);
++        } catch (RuntimeException exception) {
++            return null;
++        }
++    }
++
++    private static void addUnits(List<String> fields, List<IZombieNetworkState.Unit> units) {
++        fields.add(Integer.toString(units.size()));
++        for (IZombieNetworkState.Unit unit : units) {
++            fields.add(Long.toString(unit.id()));
++            fields.add(unit.type());
++            fields.add(Integer.toString(unit.row()));
++            fields.add(Float.toString(unit.x()));
++            fields.add(Float.toString(unit.y()));
++            fields.add(Float.toString(unit.hp()));
++            fields.add(Float.toString(unit.maxHp()));
++        }
++    }
++
++    private static UnitResult readUnits(String[] data, int start) {
++        int index = start;
++        int count = readInt(data, index++);
++        if (count < 0 || count > 1000) {
++            throw new IllegalArgumentException("Invalid entity count.");
++        }
++        List<IZombieNetworkState.Unit> units = new ArrayList<>();
++        for (int i = 0; i < count && index + 6 < data.length; i++) {
++            units.add(new IZombieNetworkState.Unit(
++                Long.parseLong(data[index++]), data[index++], Integer.parseInt(data[index++]),
++                Float.parseFloat(data[index++]), Float.parseFloat(data[index++]),
++                Float.parseFloat(data[index++]), Float.parseFloat(data[index++])));
++        }
++        return new UnitResult(units, index);
++    }
++
++    private static boolean[] decodeBrains(String value) {
++        boolean[] result = new boolean[IZombieNetworkMatch.ROW_COUNT];
++        if (value == null) {
++            return result;
++        }
++        for (int index = 0; index < result.length && index < value.length(); index++) {
++            result[index] = value.charAt(index) == '1';
++        }
++        return result;
++    }
++
++    private static int readInt(String[] data, int index) {
++        if (index < 0 || index >= data.length) {
++            throw new IllegalArgumentException("Missing snapshot field.");
++        }
++        return Integer.parseInt(data[index]);
++    }
++
++    private record UnitResult(List<IZombieNetworkState.Unit> units, int nextIndex) {
++    }
++}
+diff --git a/pvz2/core/src/main/java/network/LeaderboardEntry.java b/pvz2/core/src/main/java/network/LeaderboardEntry.java
+new file mode 100644
+index 0000000..51fe704
+--- /dev/null
++++ b/pvz2/core/src/main/java/network/LeaderboardEntry.java
+@@ -0,0 +1,5 @@
++package network;
++
++/** Public leaderboard row returned by the network server. */
++public record LeaderboardEntry(String username, String nickname, int score) {
++}
+diff --git a/pvz2/core/src/main/java/network/NetworkClient.java b/pvz2/core/src/main/java/network/NetworkClient.java
+index cd92ef1..050aabd 100644
+--- a/pvz2/core/src/main/java/network/NetworkClient.java
++++ b/pvz2/core/src/main/java/network/NetworkClient.java
+@@ -15,6 +15,8 @@ import java.util.concurrent.BlockingQueue;
+ import java.util.concurrent.CopyOnWriteArrayList;
+ import java.util.concurrent.LinkedBlockingQueue;
+ import java.util.function.Consumer;
++import java.util.ArrayList;
++import java.util.List;
+ 
+ /** TCP client used by menus and future multiplayer game controllers. */
+ public final class NetworkClient implements Closeable {
+@@ -23,7 +25,7 @@ public final class NetworkClient implements Closeable {
+     private final BlockingQueue<NetworkResponse> responses = new LinkedBlockingQueue<>();
+     private final CopyOnWriteArrayList<Consumer<NetworkEvent>> listeners = new CopyOnWriteArrayList<>();
+     private final Object requestLock = new Object();
+-    private Socket socket;
++    private volatile Socket socket;
+     private BufferedReader reader;
+     private BufferedWriter writer;
+     private volatile boolean running;
+@@ -85,6 +87,60 @@ public final class NetworkClient implements Closeable {
+         return request("CANCEL_MATCH");
+     }
+ 
++    public NetworkResponse joinGame(String matchId) {
++        return request("GAME_JOIN", matchId);
++    }
++
++    public NetworkResponse placePlant(String matchId, String type, int column, int row) {
++        return request("GAME_PLANT", matchId, type, Integer.toString(column), Integer.toString(row));
++    }
++
++    public NetworkResponse placeZombie(String matchId, String type, int column, int row) {
++        return request("GAME_ZOMBIE", matchId, type, Integer.toString(column), Integer.toString(row));
++    }
++
++    public NetworkResponse sendReaction(String matchId, String category, String value) {
++        return request("GAME_REACTION", matchId, category, value);
++    }
++
++    public NetworkResponse leaveGame() {
++        return request("GAME_LEAVE");
++    }
++
++    public NetworkResponse submitScore(String matchId, int score) {
++        return request("SCORE_SUBMIT", matchId, Integer.toString(score));
++    }
++
++    public NetworkResponse requestLeaderboard() {
++        return request("LEADERBOARD");
++    }
++
++    public static IZombieNetworkState stateFrom(NetworkEvent event) {
++        if (event == null || !"GAME_STATE".equals(event.type())) {
++            return null;
++        }
++        return IZombieNetworkStateCodec.decode(event.data());
++    }
++
++    public static List<LeaderboardEntry> leaderboardFrom(NetworkResponse response) {
++        if (response == null || !response.success() || response.data().length == 0) {
++            return List.of();
++        }
++        String[] values = response.data();
++        try {
++            int count = Integer.parseInt(values[0]);
++            List<LeaderboardEntry> result = new ArrayList<>();
++            for (int index = 0; index < count && 1 + index * 3 + 2 < values.length; index++) {
++                int offset = 1 + index * 3;
++                result.add(new LeaderboardEntry(values[offset], values[offset + 1],
++                    Integer.parseInt(values[offset + 2])));
++            }
++            return List.copyOf(result);
++        } catch (NumberFormatException exception) {
++            return List.of();
++        }
++    }
++
+     public void addEventListener(Consumer<NetworkEvent> listener) {
+         if (listener != null) {
+             listeners.add(listener);
+@@ -121,6 +177,7 @@ public final class NetworkClient implements Closeable {
+     }
+ 
+     private void startReader() {
++        Socket activeSocket = socket;
+         Thread readerThread = new Thread(() -> {
+             try {
+                 String line;
+@@ -130,8 +187,10 @@ public final class NetworkClient implements Closeable {
+             } catch (IOException ignored) {
+                 // The waiting request receives a connection error when the socket closes.
+             } finally {
+-                running = false;
+-                responses.offer(NetworkResponse.error("CONNECTION_LOST", "Connection to server was lost."));
++                if (socket == activeSocket) {
++                    running = false;
++                    responses.offer(NetworkResponse.error("CONNECTION_LOST", "Connection to server was lost."));
++                }
+             }
+         }, "pvz-network-client-reader");
+         readerThread.setDaemon(true);
+@@ -176,7 +235,12 @@ public final class NetworkClient implements Closeable {
+             || "REQUEST_SENT".equals(code)
+             || "REQUEST_ACCEPTED".equals(code)
+             || "REQUEST_REJECTED".equals(code)
+-            || "MATCH_CANCELLED".equals(code);
++            || "MATCH_CANCELLED".equals(code)
++            || "GAME_JOINED".equals(code)
++            || "ACTION_ACCEPTED".equals(code)
++            || "GAME_LEFT".equals(code)
++            || "SCORE_UPDATED".equals(code)
++            || "LEADERBOARD".equals(code);
+     }
+ 
+     public static AccountSnapshot accountFrom(NetworkResponse response) {
+diff --git a/pvz2/core/src/main/java/network/NetworkServer.java b/pvz2/core/src/main/java/network/NetworkServer.java
+index e146a5d..41d0338 100644
+--- a/pvz2/core/src/main/java/network/NetworkServer.java
++++ b/pvz2/core/src/main/java/network/NetworkServer.java
+@@ -17,11 +17,17 @@ import java.nio.file.Files;
+ import java.nio.file.Path;
+ import java.nio.file.StandardCopyOption;
+ import java.util.ArrayDeque;
++import java.util.ArrayList;
++import java.util.Comparator;
++import java.util.List;
+ import java.util.Locale;
+ import java.util.Map;
+ import java.util.Properties;
+ import java.util.UUID;
+ import java.util.concurrent.ConcurrentHashMap;
++import java.util.concurrent.Executors;
++import java.util.concurrent.ScheduledExecutorService;
++import java.util.concurrent.TimeUnit;
+ 
+ /** Authoritative TCP server for accounts and pre-game matchmaking. */
+ public final class NetworkServer implements Closeable {
+@@ -33,10 +39,18 @@ public final class NetworkServer implements Closeable {
+     private final Map<String, Account> accounts = new ConcurrentHashMap<>();
+     private final Map<String, Session> online = new ConcurrentHashMap<>();
+     private final Map<String, Challenge> challenges = new ConcurrentHashMap<>();
++    private final Map<String, MatchRuntime> matches = new ConcurrentHashMap<>();
+     private final ArrayDeque<Session> randomQueue = new ArrayDeque<>();
+     private final Object queueLock = new Object();
++    private final ScheduledExecutorService gameTicker =
++        Executors.newSingleThreadScheduledExecutor(runnable -> {
++            Thread thread = new Thread(runnable, "pvz-network-match-ticker");
++            thread.setDaemon(true);
++            return thread;
++        });
+     private volatile boolean running;
+     private ServerSocket serverSocket;
++    private boolean tickerStarted;
+ 
+     public NetworkServer() {
+         this(DEFAULT_PORT, Path.of(System.getProperty("user.home"), DEFAULT_FILE));
+@@ -61,6 +75,10 @@ public final class NetworkServer implements Closeable {
+         Thread acceptThread = new Thread(this::acceptLoop, "pvz-network-server-acceptor");
+         acceptThread.setDaemon(true);
+         acceptThread.start();
++        if (!tickerStarted) {
++            tickerStarted = true;
++            gameTicker.scheduleAtFixedRate(this::tickMatches, 50, 50, TimeUnit.MILLISECONDS);
++        }
+     }
+ 
+     public boolean isRunning() {
+@@ -76,9 +94,15 @@ public final class NetworkServer implements Closeable {
+         if (user == null || user.getName() == null || user.getPasswordHash() == null) {
+             return;
+         }
+-        accounts.putIfAbsent(user.getName().toLowerCase(Locale.ROOT),
+-            new Account(user.getName(), user.getPasswordHash(), user.getNickname(),
+-                user.getEmail(), user.getGender(), 1, CredentialHasher.hash("")));
++        String key = user.getName().toLowerCase(Locale.ROOT);
++        accounts.compute(key, (ignored, existing) -> {
++            if (existing == null) {
++                return new Account(user.getName(), user.getPasswordHash(), user.getNickname(),
++                    user.getEmail(), user.getGender(), 1, CredentialHasher.hash(""),
++                    user.getHighestScore());
++            }
++            return existing.withHighestScore(user.getHighestScore());
++        });
+         saveAccounts();
+     }
+ 
+@@ -131,6 +155,13 @@ public final class NetworkServer implements Closeable {
+             case "CHALLENGE" -> challenge(session, values);
+             case "RESPOND" -> respond(session, values);
+             case "CANCEL_MATCH" -> cancelMatch(session);
++            case "GAME_JOIN" -> joinGame(session, values);
++            case "GAME_PLANT" -> placeNetworkPlant(session, values);
++            case "GAME_ZOMBIE" -> placeNetworkZombie(session, values);
++            case "GAME_REACTION" -> sendReaction(session, values);
++            case "GAME_LEAVE" -> leaveGame(session);
++            case "SCORE_SUBMIT" -> submitScore(session, values);
++            case "LEADERBOARD" -> sendLeaderboard(session);
+             default -> response(session, false, "UNKNOWN_COMMAND", "Unknown network command.");
+         }
+     }
+@@ -211,7 +242,7 @@ public final class NetworkServer implements Closeable {
+     }
+ 
+     private void logout(Session session) {
+-        disconnectUser(session);
++        disconnect(session);
+         response(session, true, "OK", "Logged out successfully.");
+     }
+ 
+@@ -220,6 +251,10 @@ public final class NetworkServer implements Closeable {
+             response(session, false, "NOT_LOGGED_IN", "Log in before matchmaking.");
+             return;
+         }
++        if (session.matchId != null || session.assignedMatchId != null) {
++            response(session, false, "ALREADY_IN_MATCH", "You are already assigned to a match.");
++            return;
++        }
+         synchronized (queueLock) {
+             removeFromQueue(session);
+             Session opponent = randomQueue.pollFirst();
+@@ -238,6 +273,10 @@ public final class NetworkServer implements Closeable {
+             response(session, false, "INVALID_CHALLENGE", "A logged-in opponent is required.");
+             return;
+         }
++        if (session.matchId != null || session.assignedMatchId != null) {
++            response(session, false, "ALREADY_IN_MATCH", "You are already assigned to a match.");
++            return;
++        }
+         Session target = online.get(values[0].trim().toLowerCase(Locale.ROOT));
+         if (target == null) {
+             response(session, false, "OPPONENT_UNAVAILABLE", "Opponent is offline or does not exist.");
+@@ -247,6 +286,10 @@ public final class NetworkServer implements Closeable {
+             response(session, false, "INVALID_CHALLENGE", "You cannot challenge yourself.");
+             return;
+         }
++        if (target.matchId != null || target.assignedMatchId != null) {
++            response(session, false, "OPPONENT_BUSY", "Opponent is already in a match.");
++            return;
++        }
+         synchronized (queueLock) {
+             removeFromQueue(session);
+             removeFromQueue(target);
+@@ -282,14 +325,248 @@ public final class NetworkServer implements Closeable {
+ 
+     private void createMatch(Session first, Session second) {
+         String matchId = UUID.randomUUID().toString();
++        MatchRuntime runtime = new MatchRuntime(matchId, first, second);
++        matches.put(matchId, runtime);
++        first.assignedMatchId = matchId;
++        first.assignedRole = IZombieNetworkState.Role.PLANTS;
++        second.assignedMatchId = matchId;
++        second.assignedRole = IZombieNetworkState.Role.ZOMBIES;
+         event(first, "MATCH_FOUND", second.username, matchId, "PLANTS");
+         event(second, "MATCH_FOUND", first.username, matchId, "ZOMBIES");
+     }
+ 
++    private void joinGame(Session session, String[] values) {
++        if (!loggedIn(session) || values.length == 0 || values[0].isBlank()) {
++            response(session, false, "INVALID_GAME_JOIN", "A match id is required.");
++            return;
++        }
++        MatchRuntime runtime = matches.get(values[0]);
++        if (runtime == null || !runtime.has(session)) {
++            response(session, false, "MATCH_NOT_FOUND", "The match is no longer available.");
++            return;
++        }
++        if (session.assignedRole == null || !values[0].equals(session.assignedMatchId)) {
++            response(session, false, "INVALID_GAME_JOIN", "This player was not assigned to that match.");
++            return;
++        }
++        IZombieNetworkMatch.ActionResult result = runtime.match.join(session.assignedRole);
++        if (result.success()) {
++            session.matchId = values[0];
++            session.role = session.assignedRole;
++            response(session, true, "GAME_JOINED", result.message(), session.role.name());
++            broadcastState(runtime);
++        } else {
++            response(session, false, result.code(), result.message());
++        }
++    }
++
++    private void placeNetworkPlant(Session session, String[] values) {
++        if (values.length < 4) {
++            response(session, false, "INVALID_ACTION", "Plant type, column and row are required.");
++            return;
++        }
++        MatchRuntime runtime = matchFor(session, values[0]);
++        if (runtime == null) {
++            response(session, false, "MATCH_NOT_FOUND", "Join a match before playing.");
++            return;
++        }
++        Integer column = parseCoordinate(values[1]);
++        Integer row = parseCoordinate(values[2]);
++        if (column == null || row == null) {
++            response(session, false, "INVALID_ACTION", "Column and row must be integers.");
++            return;
++        }
++        IZombieNetworkMatch.ActionResult result = runtime.match.placePlant(
++            session.role, values[0], column, row);
++        respondAction(session, result);
++        if (result.success()) {
++            broadcastState(runtime);
++        }
++    }
++
++    private void placeNetworkZombie(Session session, String[] values) {
++        if (values.length < 4) {
++            response(session, false, "INVALID_ACTION", "Zombie type, column and row are required.");
++            return;
++        }
++        MatchRuntime runtime = matchFor(session, values[0]);
++        if (runtime == null) {
++            response(session, false, "MATCH_NOT_FOUND", "Join a match before playing.");
++            return;
++        }
++        Integer column = parseCoordinate(values[1]);
++        Integer row = parseCoordinate(values[2]);
++        if (column == null || row == null) {
++            response(session, false, "INVALID_ACTION", "Column and row must be integers.");
++            return;
++        }
++        IZombieNetworkMatch.ActionResult result = runtime.match.placeZombie(
++            session.role, values[0], column, row);
++        respondAction(session, result);
++        if (result.success()) {
++            broadcastState(runtime);
++        }
++    }
++
++    private void sendReaction(Session session, String[] values) {
++        if (values.length < 3) {
++            response(session, false, "INVALID_REACTION", "Category, value and match id are required.");
++            return;
++        }
++        MatchRuntime runtime = matchFor(session, values[0]);
++        if (runtime == null) {
++            response(session, false, "MATCH_NOT_FOUND", "Join a match before sending reactions.");
++            return;
++        }
++        IZombieNetworkMatch.ActionResult result = runtime.match.react(session.role, values[1], values[2]);
++        respondAction(session, result);
++        if (result.success()) {
++            Session opponent = runtime.opponent(session);
++            if (opponent != null) {
++                event(opponent, "REACTION", session.username, values[1], values[2]);
++            }
++        }
++    }
++
++    private void leaveGame(Session session) {
++        String activeMatchId = session.matchId == null ? session.assignedMatchId : session.matchId;
++        MatchRuntime runtime = activeMatchId == null ? null : matches.get(activeMatchId);
++        IZombieNetworkState.Role activeRole = session.role == null ? session.assignedRole : session.role;
++        if (runtime != null && activeRole != null) {
++            runtime.match.leave(activeRole);
++            Session opponent = runtime.opponent(session);
++            if (opponent != null) {
++                event(opponent, "MATCH_ABORTED", "The other player left the match.");
++            }
++            matches.remove(runtime.matchId);
++        }
++        clearMatch(session);
++        response(session, true, "GAME_LEFT", "Left the match.");
++    }
++
++    private void submitScore(Session session, String[] values) {
++        if (!loggedIn(session) || values.length < 2) {
++            response(session, false, "INVALID_SCORE", "Match id and score are required.");
++            return;
++        }
++        MatchRuntime runtime = matchFor(session, values[0]);
++        if (runtime == null || runtime.match.snapshot().phase() == IZombieNetworkState.Phase.PLAYING
++            || runtime.match.snapshot().phase() == IZombieNetworkState.Phase.WAITING) {
++            response(session, false, "SCORE_NOT_READY", "Scores can only be submitted after a match ends.");
++            return;
++        }
++        Integer score = parseCoordinate(values[1]);
++        if (score == null || score < 0 || score > 1000000) {
++            response(session, false, "INVALID_SCORE", "Score is invalid.");
++            return;
++        }
++        IZombieNetworkState finished = runtime.match.snapshot();
++        int authoritativeScore = session.role == IZombieNetworkState.Role.PLANTS
++            ? finished.plantScore() : finished.zombieScore();
++        if (score > authoritativeScore) {
++            response(session, false, "INVALID_SCORE", "Submitted score exceeds the server score.");
++            return;
++        }
++        updateHighestScore(session.username, score);
++        response(session, true, "SCORE_UPDATED", "Score saved on the server.", Integer.toString(score));
++    }
++
++    private void sendLeaderboard(Session session) {
++        if (!loggedIn(session)) {
++            response(session, false, "NOT_LOGGED_IN", "Log in before requesting the leaderboard.");
++            return;
++        }
++        List<Account> sorted = new ArrayList<>(accounts.values());
++        sorted.sort(Comparator.comparingInt(Account::highestScore).reversed()
++            .thenComparing(Account::username, String.CASE_INSENSITIVE_ORDER));
++        List<String> data = new ArrayList<>();
++        data.add(Integer.toString(sorted.size()));
++        for (Account account : sorted) {
++            data.add(account.username());
++            data.add(account.nickname());
++            data.add(Integer.toString(account.highestScore()));
++        }
++        response(session, true, "LEADERBOARD", "Leaderboard loaded.", data.toArray(String[]::new));
++    }
++
++    private void tickMatches() {
++        if (!running) {
++            return;
++        }
++        for (MatchRuntime runtime : matches.values()) {
++            IZombieNetworkState before = runtime.match.snapshot();
++            runtime.match.tick(0.05f);
++            IZombieNetworkState after = runtime.match.snapshot();
++            if (after.revision() != before.revision()) {
++                broadcastState(runtime);
++            }
++            if (before.phase() == IZombieNetworkState.Phase.PLAYING
++                && after.phase() != IZombieNetworkState.Phase.PLAYING) {
++                event(runtime.first, "GAME_OVER", after.winner() == null ? "" : after.winner().name(),
++                    Integer.toString(after.plantScore()), Integer.toString(after.zombieScore()));
++                event(runtime.second, "GAME_OVER", after.winner() == null ? "" : after.winner().name(),
++                    Integer.toString(after.plantScore()), Integer.toString(after.zombieScore()));
++                updateHighestScore(runtime.first.username,
++                    after.plantScore());
++                updateHighestScore(runtime.second.username,
++                    after.zombieScore());
++            }
++        }
++    }
++
++    private void broadcastState(MatchRuntime runtime) {
++        String[] fields = IZombieNetworkStateCodec.encode(runtime.match.snapshot());
++        event(runtime.first, "GAME_STATE", fields);
++        event(runtime.second, "GAME_STATE", fields);
++    }
++
++    private MatchRuntime matchFor(Session session, String matchId) {
++        if (session == null || session.matchId == null || session.role == null
++            || matchId == null || !session.matchId.equals(matchId)) {
++            return null;
++        }
++        MatchRuntime runtime = matches.get(matchId);
++        return runtime != null && runtime.has(session) ? runtime : null;
++    }
++
++    private static Integer parseCoordinate(String value) {
++        try {
++            return Integer.parseInt(value);
++        } catch (NumberFormatException exception) {
++            return null;
++        }
++    }
++
++    private void respondAction(Session session, IZombieNetworkMatch.ActionResult result) {
++        response(session, result.success(), result.success() ? "ACTION_ACCEPTED" : result.code(),
++            result.message());
++    }
++
++    private void updateHighestScore(String username, int score) {
++        if (username == null) {
++            return;
++        }
++        String key = username.toLowerCase(Locale.ROOT);
++        accounts.computeIfPresent(key, (ignored, account) -> account.withHighestScore(score));
++        saveAccounts();
++    }
++
+     private void cancelMatch(Session session) {
+         synchronized (queueLock) {
+             removeFromQueue(session);
+         }
++        String assignedId = session.assignedMatchId;
++        if (assignedId != null) {
++            MatchRuntime runtime = matches.remove(assignedId);
++            if (runtime != null) {
++                Session opponent = runtime.opponent(session);
++                if (opponent != null) {
++                    event(opponent, "MATCH_ABORTED", "The other player cancelled matchmaking.");
++                    clearMatch(opponent);
++                }
++            }
++            clearMatch(session);
++        }
+         response(session, true, "MATCH_CANCELLED", "Matchmaking cancelled.");
+     }
+ 
+@@ -305,9 +582,28 @@ public final class NetworkServer implements Closeable {
+         synchronized (queueLock) {
+             removeFromQueue(session);
+         }
++        String activeMatchId = session.matchId == null ? session.assignedMatchId : session.matchId;
++        MatchRuntime runtime = activeMatchId == null ? null : matches.get(activeMatchId);
++        if (runtime != null && session.role != null) {
++            runtime.match.leave(session.role);
++            Session opponent = runtime.opponent(session);
++            if (opponent != null) {
++                event(opponent, "MATCH_ABORTED", "The other player disconnected.");
++                clearMatch(opponent);
++            }
++            matches.remove(runtime.matchId);
++        }
++        clearMatch(session);
+         disconnectUser(session);
+     }
+ 
++    private void clearMatch(Session session) {
++        session.matchId = null;
++        session.assignedMatchId = null;
++        session.role = null;
++        session.assignedRole = null;
++    }
++
+     private void disconnectUser(Session session) {
+         if (session.username != null) {
+             online.remove(session.key(), session);
+@@ -349,9 +645,11 @@ public final class NetworkServer implements Closeable {
+             for (String key : properties.stringPropertyNames()) {
+                 String[] fields = properties.getProperty(key, "").split("\\t", -1);
+                 if (fields.length >= 7) {
++                    int score = fields.length >= 8
++                        ? Integer.parseInt(Protocol.decode(fields[7])) : 0;
+                     accounts.put(key, new Account(Protocol.decode(fields[0]), Protocol.decode(fields[1]),
+                         Protocol.decode(fields[2]), Protocol.decode(fields[3]), Protocol.decode(fields[4]),
+-                        Integer.parseInt(Protocol.decode(fields[5])), Protocol.decode(fields[6])));
++                        Integer.parseInt(Protocol.decode(fields[5])), Protocol.decode(fields[6]), score));
+                 }
+             }
+         } catch (Exception ignored) {
+@@ -370,7 +668,8 @@ public final class NetworkServer implements Closeable {
+                 String value = String.join("\t", Protocol.encode(account.username),
+                     Protocol.encode(account.passwordHash), Protocol.encode(account.nickname),
+                     Protocol.encode(account.email), Protocol.encode(account.gender),
+-                    Protocol.encode(Integer.toString(account.question)), Protocol.encode(account.answerHash));
++                    Protocol.encode(Integer.toString(account.question)), Protocol.encode(account.answerHash),
++                    Protocol.encode(Integer.toString(account.highestScore)));
+                 properties.setProperty(account.key(), value);
+             }
+             Path temporary = storageFile.resolveSibling(storageFile.getFileName() + ".tmp");
+@@ -394,15 +693,21 @@ public final class NetworkServer implements Closeable {
+             // Closing an already closed socket is harmless.
+         }
+         online.clear();
++        matches.clear();
+         synchronized (queueLock) {
+             randomQueue.clear();
+         }
++        gameTicker.shutdownNow();
+     }
+ 
+     private static final class Session {
+         private final Socket socket;
+         private BufferedWriter output;
+         private String username;
++        private String assignedMatchId;
++        private IZombieNetworkState.Role assignedRole;
++        private String matchId;
++        private IZombieNetworkState.Role role;
+ 
+         private Session(Socket socket) {
+             this.socket = socket;
+@@ -433,6 +738,28 @@ public final class NetworkServer implements Closeable {
+     private record Challenge(Session source, Session target) {
+     }
+ 
++    private static final class MatchRuntime {
++        private final String matchId;
++        private final Session first;
++        private final Session second;
++        private final IZombieNetworkMatch match;
++
++        private MatchRuntime(String matchId, Session first, Session second) {
++            this.matchId = matchId;
++            this.first = first;
++            this.second = second;
++            this.match = new IZombieNetworkMatch(matchId);
++        }
++
++        private boolean has(Session session) {
++            return first == session || second == session;
++        }
++
++        private Session opponent(Session session) {
++            return first == session ? second : second == session ? first : null;
++        }
++    }
++
+     private record Account(String username, String passwordHash, String nickname, String email,
+                            String gender, int question, String answerHash, int highestScore) {
+         private Account(String username, String passwordHash, String nickname, String email,
+@@ -443,5 +770,11 @@ public final class NetworkServer implements Closeable {
+         private String key() {
+             return username.toLowerCase(Locale.ROOT);
+         }
++
++        private Account withHighestScore(int score) {
++            return score <= highestScore
++                ? this
++                : new Account(username, passwordHash, nickname, email, gender, question, answerHash, score);
++        }
+     }
+ }
+diff --git a/pvz2/core/src/main/java/network/Protocol.java b/pvz2/core/src/main/java/network/Protocol.java
+index d202a1d..4a88d9b 100644
+--- a/pvz2/core/src/main/java/network/Protocol.java
++++ b/pvz2/core/src/main/java/network/Protocol.java
+@@ -7,6 +7,8 @@ import java.util.Base64;
+ public final class Protocol {
+     public static final String RESPONSE = "RESP";
+     public static final String EVENT = "EVENT";
++    public static final String GAME_STATE_EVENT = "GAME_STATE";
++    public static final String REACTION_EVENT = "REACTION";
+ 
+     private Protocol() {
+     }
+diff --git a/pvz2/core/src/main/java/view/HomeView.java b/pvz2/core/src/main/java/view/HomeView.java
+index 7179ef2..88d7ad0 100644
+--- a/pvz2/core/src/main/java/view/HomeView.java
++++ b/pvz2/core/src/main/java/view/HomeView.java
+@@ -115,9 +115,8 @@ public class HomeView extends View {
+         navigation.add(homeTile("pot", null, "almanac",
+             "PROFILE", "Your garden", () -> openMenu("Profile menu")));
+         navigation.row();
+-        // Keep the final two destinations centered after removing the
+-        // obsolete Events and Boosts tiles from the Home navigation.
+-        navigation.add().width(210f).height(136f).pad(5f);
++        navigation.add(homeTile("almanac", null, "almanac",
++            "NETWORK PLAY", "Two-player I, Zombie", () -> openMenu("Network menu")));
+         navigation.add(homeTile("coin", null, "shop",
+             "WALLET", "Currencies", () -> openMenu("Wallet menu")));
+         navigation.add(homeTile("settings", null, "settings",
+diff --git a/pvz2/core/src/main/java/view/LeaderBoardView.java b/pvz2/core/src/main/java/view/LeaderBoardView.java
+index 8a9b6e9..cae0661 100644
+--- a/pvz2/core/src/main/java/view/LeaderBoardView.java
++++ b/pvz2/core/src/main/java/view/LeaderBoardView.java
+@@ -10,6 +10,7 @@ import com.badlogic.gdx.utils.Scaling;
+ 
+ import controllers.menus.secondarymenus.LeaderBoard;
+ import models.User;
++import network.LeaderboardEntry;
+ 
+ import java.util.List;
+ 
+@@ -89,6 +90,7 @@ public class LeaderBoardView extends View {
+                 sortColumn,
+                 descending
+             );
++        List<LeaderboardEntry> networkUsers = controller.getNetworkLeaderboard();
+ 
+         Table outerPanel =
+             pvzPanel();
+@@ -140,7 +142,19 @@ public class LeaderBoardView extends View {
+ 
+         board.row();
+ 
+-        if (users.isEmpty()) {
++        if (!networkUsers.isEmpty()) {
++            int rank = 1;
++            for (LeaderboardEntry entry : networkUsers) {
++                addCell(board, rank + ". " + entry.username(), 145f);
++                addCell(board, "SERVER SCORE", 185f);
++                addCell(board, "-", 120f);
++                addCell(board, "-", 105f);
++                addCell(board, "-", 105f);
++                addCell(board, String.valueOf(entry.score()), 125f);
++                board.row();
++                rank++;
++            }
++        } else if (users.isEmpty()) {
+ 
+             Label empty =
+                 mediumTitle(
+diff --git a/pvz2/core/src/main/java/view/MiniGamesView.java b/pvz2/core/src/main/java/view/MiniGamesView.java
+index 38d511b..7b1f97a 100644
+--- a/pvz2/core/src/main/java/view/MiniGamesView.java
++++ b/pvz2/core/src/main/java/view/MiniGamesView.java
+@@ -13,6 +13,7 @@ import models.App;
+ import models.User;
+ import view.gameview.BeghouledView;
+ import view.gameview.IZombieView;
++import view.gameview.IZombieCouchView;
+ import view.gameview.VaseBreakerView;
+ import view.gameview.WallnutBowlingView;
+ 
+@@ -69,6 +70,14 @@ public final class MiniGamesView extends View {
+                 + "and eat all five brains."
+         );
+         addLevelButtons(card, MiniGameKind.I_ZOMBIE);
++        TextButton couch = new TextButton("COUCH PLAY  (MOUSE + KEYBOARD)", skin, "green");
++        couch.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ClickListener() {
++            @Override
++            public void clicked(InputEvent event, float x, float y) {
++                App.setScreen(new IZombieCouchView());
++            }
++        });
++        card.add(couch).size(330f, 46f).padTop(8f).center().row();
+         return card;
+     }
+ 
+diff --git a/pvz2/core/src/main/java/view/NetworkView.java b/pvz2/core/src/main/java/view/NetworkView.java
+index 6bc0570..5bd88b9 100644
+--- a/pvz2/core/src/main/java/view/NetworkView.java
++++ b/pvz2/core/src/main/java/view/NetworkView.java
+@@ -6,12 +6,10 @@ import com.badlogic.gdx.scenes.scene2d.ui.Table;
+ import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
+ import com.badlogic.gdx.scenes.scene2d.ui.TextField;
+ import controllers.menus.secondarymenus.Network;
+-import models.utils.RegexHelper;
+ import network.NetworkEvent;
+ import network.NetworkService;
+-
+-import java.util.regex.Matcher;
+-import java.util.regex.Pattern;
++import view.gameview.IZombieNetworkView;
++import models.App;
+ 
+ /** Graphical view for the pre-game network features. */
+ public class NetworkView extends View {
+@@ -57,6 +55,19 @@ public class NetworkView extends View {
+         statusLabel = secondaryLabel(connectionText(lastConnectionState));
+         table.add(statusLabel).padBottom(10f).row();
+ 
++        Table connection = new Table();
++        TextField address = field("Server address (127.0.0.1)");
++        TextField port = field("Port (47856)");
++        connection.add(address).width(265f).height(44f).padRight(6f);
++        connection.add(port).width(135f).height(44f).padRight(6f);
++        connection.add(greenSmallButton("CONNECT", () -> setStatus(
++            controller.connectToServer(address.getText().trim(), parsePort(port.getText(), 47856))))
++            .width(140f).height(44f).padRight(6f);
++        connection.add(brownButton("HOST", () -> setStatus(
++            controller.hostServer(parsePort(port.getText(), 47856))))
++            .width(120f).height(44f);
++        table.add(connection).padBottom(14f).row();
++
+         table.add(greenButton(
+                 "FIND RANDOM OPPONENT",
+                 () -> setStatus(controller.findRandomOpponent())
+@@ -126,6 +137,14 @@ public class NetworkView extends View {
+         }
+     }
+ 
++    private int parsePort(String value, int fallback) {
++        try {
++            return Integer.parseInt(value == null || value.isBlank() ? Integer.toString(fallback) : value.trim());
++        } catch (NumberFormatException exception) {
++            return -1;
++        }
++    }
++
+     private void processEvents() {
+         boolean connected = NetworkService.isConnected();
+         if (connected != lastConnectionState) {
+@@ -148,6 +167,14 @@ public class NetworkView extends View {
+                 requestId = null;
+                 setRequestVisible(false);
+                 setStatus("Match found: " + data[0] + " (" + data[2] + ")");
++                // MATCH_FOUND carries opponent, match id, and the server-assigned
++                // role. Enter the synchronized game immediately so both clients
++                // cannot accidentally start different local simulations.
++                try {
++                    App.setScreen(new IZombieNetworkView(data[1], data[2], data[0]));
++                } catch (RuntimeException exception) {
++                    setStatus("Match found, but the game could not be opened.");
++                }
+             } else if ("GAME_REQUEST_RESULT".equals(type) && data.length >= 2) {
+                 setStatus(data[1].equalsIgnoreCase("true")
+                     ? "Challenge accepted by " + data[0]
+diff --git a/pvz2/core/src/main/java/view/gameview/IZombieCouchView.java b/pvz2/core/src/main/java/view/gameview/IZombieCouchView.java
+new file mode 100644
+index 0000000..1cc2dd2
+--- /dev/null
++++ b/pvz2/core/src/main/java/view/gameview/IZombieCouchView.java
+@@ -0,0 +1,271 @@
++package view.gameview;
++
++import com.badlogic.gdx.Gdx;
++import com.badlogic.gdx.Input;
++import com.badlogic.gdx.InputAdapter;
++import com.badlogic.gdx.graphics.Color;
++import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
++import com.badlogic.gdx.scenes.scene2d.InputEvent;
++import com.badlogic.gdx.scenes.scene2d.ui.Label;
++import com.badlogic.gdx.scenes.scene2d.ui.Table;
++import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
++import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
++import com.badlogic.gdx.utils.Align;
++import com.badlogic.gdx.utils.ScreenUtils;
++import controllers.menus.gamecontroller.CouchIZombieController;
++import models.App;
++import models.entity.Plant;
++import models.entity.Projectile;
++import models.entity.ProjectileType;
++import models.entity.Zombie;
++import models.factory.PlantFactory;
++import models.factory.ZombieFactory;
++import models.factory.builder.PlantType;
++import models.gamepanes.Tile;
++import network.IZombieNetworkMatch;
++import network.IZombieNetworkState;
++import view.MiniGamesView;
++
++import java.util.ArrayList;
++import java.util.List;
++import java.util.Locale;
++
++/** Couch Play: plants use the mouse, zombies use the keyboard. */
++public final class IZombieCouchView extends MinigameBoardView {
++    private final CouchIZombieController controller = new CouchIZombieController();
++    private String selectedPlant;
++    private String selectedZombie;
++    private int zombieColumn = IZombieNetworkMatch.FIRST_ZOMBIE_COLUMN;
++    private int zombieRow;
++    private Label statusLabel;
++    private Label hudLabel;
++    private Label resultLabel;
++
++    @Override
++    public void show() {
++        initialiseScreen();
++        buildUi();
++        installInput(createInput());
++    }
++
++    @Override
++    public void render(float delta) {
++        float safeDelta = safeDelta(delta);
++        controller.playGame(safeDelta);
++        refreshHud();
++        ScreenUtils.clear(0.04f, 0.08f, 0.05f, 1f);
++        renderMap();
++        renderWorld();
++        uiViewport.apply();
++        stage.act(safeDelta);
++        stage.draw();
++    }
++
++    private void renderWorld() {
++        IZombieNetworkState state = controller.getGame().snapshot();
++        worldViewport.apply();
++        shapes.setProjectionMatrix(worldCamera.combined);
++        shapes.begin(ShapeRenderer.ShapeType.Filled);
++        for (int row = 0; row < 5; row++) {
++            if (!state.eatenBrains()[row]) {
++                shapes.setColor(0.95f, 0.30f, 0.55f, 0.85f);
++                shapes.circle(cellCenterX(0), cellCenterY(row), 24f, 20);
++            }
++        }
++        for (IZombieNetworkState.Unit plant : state.plants()) {
++            shapes.setColor(0.25f, 0.85f, 0.35f, 0.95f);
++            shapes.circle(cellCenterX(Math.round(plant.x() - 0.5f)), cellCenterY(plant.row()), 24f, 20);
++        }
++        for (IZombieNetworkState.Unit zombie : state.zombies()) {
++            shapes.setColor(0.50f, 0.25f, 0.18f, 0.98f);
++            float x = lawnBounds.x + zombie.x() / 9f * lawnBounds.width;
++            shapes.rect(x - 18f, cellCenterY(zombie.row()) - 34f, 36f, 58f);
++        }
++        shapes.setColor(0.95f, 0.95f, 0.35f, 1f);
++        for (IZombieNetworkState.Projectile projectile : state.projectiles()) {
++            float x = lawnBounds.x + projectile.x() / 9f * lawnBounds.width;
++            shapes.circle(x, cellCenterY(projectile.row()), 8f, 12);
++        }
++        shapes.setColor(0.95f, 0.08f, 0.06f, 0.95f);
++        float lineX = lawnBounds.x + 5f * lawnBounds.width / 9f;
++        shapes.rect(lineX - 3f, lawnBounds.y, 6f, lawnBounds.height);
++        if (selectedZombie != null) {
++            shapes.setColor(1f, 1f, 0.3f, 0.9f);
++            float x = cellCenterX(zombieColumn);
++            float y = cellCenterY(zombieRow);
++            shapes.rect(x - 35f, y - 45f, 70f, 90f);
++        }
++        shapes.end();
++        renderPamEntities(state);
++    }
++
++    private void renderPamEntities(IZombieNetworkState state) {
++        if (plantRenderer == null && zombieRenderer == null && projectileRenderer == null) {
++            return;
++        }
++        List<Plant> plants = createPlantModels(state);
++        List<Zombie> zombies = createZombieModels(state);
++        List<Projectile> projectiles = createProjectileModels(state);
++        beginWorldBatch();
++        try {
++            for (Plant plant : plants) {
++                if (plantRenderer != null) {
++                    plantRenderer.render(batch, plant, cellCenterX(plant.getTileIndex()),
++                        cellCenterY(plant.getLine()), lawnBounds.width / 9f, lawnBounds.height / 5f);
++                }
++            }
++            if (zombieRenderer != null) {
++                zombieRenderer.render(batch, zombies, lawnBounds, 1f / 60f);
++            }
++            if (projectileRenderer != null) {
++                projectileRenderer.render(batch, projectiles, lawnBounds, 1f / 60f);
++            }
++        } finally {
++            batch.setColor(Color.WHITE);
++            batch.end();
++        }
++    }
++
++    private List<Plant> createPlantModels(IZombieNetworkState state) {
++        List<Plant> result = new ArrayList<>();
++        PlantFactory factory = new PlantFactory();
++        for (IZombieNetworkState.Unit unit : state.plants()) {
++            try {
++                Plant plant = factory.createPlant(PlantType.valueOf(
++                    unit.type().toUpperCase(Locale.ROOT)));
++                plant.setTileIndex(Math.max(0, Math.min(8, Math.round(unit.x() - 0.5f))));
++                plant.setLine(unit.row());
++                plant.setHP(unit.hp());
++                result.add(plant);
++            } catch (RuntimeException ignored) {
++                // Shape fallback remains visible for a missing optional asset.
++            }
++        }
++        return result;
++    }
++
++    private List<Zombie> createZombieModels(IZombieNetworkState state) {
++        List<Zombie> result = new ArrayList<>();
++        for (IZombieNetworkState.Unit unit : state.zombies()) {
++            try {
++                Zombie zombie = ZombieFactory.createZombie(unit.type());
++                zombie.setLine(unit.row());
++                zombie.setTileIndex(Math.max(0, Math.min(8, (int) unit.x())));
++                zombie.setPosition(unit.x() * Tile.getWidth() - zombie.getWidth() * 0.5f,
++                    unit.row() * Tile.getHeight());
++                zombie.setHp(Math.round(unit.hp()));
++                zombie.setAlive(true);
++                result.add(zombie);
++            } catch (RuntimeException ignored) {
++                // Continue rendering entities whose assets are available.
++            }
++        }
++        return result;
++    }
++
++    private List<Projectile> createProjectileModels(IZombieNetworkState state) {
++        List<Projectile> result = new ArrayList<>();
++        for (IZombieNetworkState.Projectile unit : state.projectiles()) {
++            Projectile projectile = new Projectile();
++            projectile.setType(ProjectileType.PEA);
++            projectile.setLine(unit.row());
++            projectile.setPosition(unit.x() * Tile.getWidth(), unit.row() * Tile.getHeight() + 30f);
++            projectile.setDamage(unit.damage());
++            projectile.setActive(true);
++            result.add(projectile);
++        }
++        return result;
++    }
++
++    private void buildUi() {
++        Table hud = new Table();
++        hud.setFillParent(true);
++        hud.top().pad(10f, 14f, 0f, 14f);
++        hud.add(button("LEAVE", "brown", this::goBack)).size(110f, 50f);
++        Label title = new Label("I, ZOMBIE  •  COUCH PLAY", skin, "big_outline");
++        title.setAlignment(Align.center);
++        hud.add(title).expandX().center();
++        hudLabel = new Label("", skin, "medium_outline");
++        hud.add(hudLabel).width(340f).right().row();
++        Table plants = new Table();
++        for (IZombieNetworkMatch.Card card : IZombieNetworkMatch.plantCards()) {
++            plants.add(button("PLANT: " + card.type().replace('_', ' '), "green",
++                () -> selectedPlant = card.type())).size(180f, 48f).pad(3f);
++        }
++        hud.add(plants).colspan(3).center().padTop(7f).row();
++        statusLabel = new Label("Mouse: choose a plant and click the left side.  Keyboard: 1-3, arrows, SPACE.", skin);
++        statusLabel.setAlignment(Align.center);
++        hud.add(statusLabel).colspan(3).expandX().fillX().padTop(4f);
++        stage.addActor(hud);
++        resultLabel = new Label("", skin, "big_outline");
++        resultLabel.setVisible(false);
++        resultLabel.setSize(VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
++        resultLabel.setPosition(0f, 0f);
++        resultLabel.setAlignment(Align.center);
++        stage.addActor(resultLabel);
++    }
++
++    private void refreshHud() {
++        IZombieNetworkState state = controller.getGame().snapshot();
++        hudLabel.setText("PLANT SUN: " + state.plantSun() + "  ZOMBIE SUN: " + state.zombieSun()
++            + "  BRAINS: " + state.brainsEaten() + "/5");
++        if (state.phase() != IZombieNetworkState.Phase.PLAYING) {
++            resultLabel.setVisible(true);
++            resultLabel.setText(state.phase() == IZombieNetworkState.Phase.PLANTS_WON
++                ? "PLANTS WIN!" : "ZOMBIES WIN!");
++        }
++    }
++
++    private InputAdapter createInput() {
++        return new InputAdapter() {
++            @Override
++            public boolean keyDown(int keycode) {
++                if (keycode == Input.Keys.ESCAPE) {
++                    goBack();
++                    return true;
++                }
++                if (keycode >= Input.Keys.NUM_1 && keycode <= Input.Keys.NUM_3) {
++                    selectedZombie = IZombieNetworkMatch.zombieCards()
++                        .get(keycode - Input.Keys.NUM_1).type();
++                    selectedPlant = null;
++                    return true;
++                }
++                if (keycode == Input.Keys.LEFT) zombieColumn = Math.max(5, zombieColumn - 1);
++                if (keycode == Input.Keys.RIGHT) zombieColumn = Math.min(8, zombieColumn + 1);
++                if (keycode == Input.Keys.UP) zombieRow = Math.min(4, zombieRow + 1);
++                if (keycode == Input.Keys.DOWN) zombieRow = Math.max(0, zombieRow - 1);
++                if (keycode == Input.Keys.SPACE && selectedZombie != null) {
++                    statusLabel.setText(controller.placeZombie(selectedZombie, zombieColumn, zombieRow));
++                    return true;
++                }
++                return keycode == Input.Keys.LEFT || keycode == Input.Keys.RIGHT
++                    || keycode == Input.Keys.UP || keycode == Input.Keys.DOWN;
++            }
++
++            @Override
++            public boolean touchDown(int screenX, int screenY, int pointer, int button) {
++                if (button != Input.Buttons.LEFT || selectedPlant == null
++                    || !updatePointer(screenX, screenY)) {
++                    return false;
++                }
++                statusLabel.setText(controller.placePlant(selectedPlant, pointerColumn(), pointerRow()));
++                return true;
++            }
++        };
++    }
++
++    private TextButton button(String text, String style, Runnable action) {
++        TextButton button = new TextButton(text, skin, style);
++        button.addListener(new ClickListener() {
++            @Override
++            public void clicked(InputEvent event, float x, float y) {
++                action.run();
++            }
++        });
++        return button;
++    }
++
++    private void goBack() {
++        App.setScreen(new MiniGamesView());
++    }
++}
+diff --git a/pvz2/core/src/main/java/view/gameview/IZombieNetworkView.java b/pvz2/core/src/main/java/view/gameview/IZombieNetworkView.java
+new file mode 100644
+index 0000000..c109399
+--- /dev/null
++++ b/pvz2/core/src/main/java/view/gameview/IZombieNetworkView.java
+@@ -0,0 +1,413 @@
++package view.gameview;
++
++import com.badlogic.gdx.Gdx;
++import com.badlogic.gdx.Input;
++import com.badlogic.gdx.InputAdapter;
++import com.badlogic.gdx.graphics.Color;
++import com.badlogic.gdx.graphics.GL20;
++import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
++import com.badlogic.gdx.scenes.scene2d.InputEvent;
++import com.badlogic.gdx.scenes.scene2d.ui.Label;
++import com.badlogic.gdx.scenes.scene2d.ui.Table;
++import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
++import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
++import com.badlogic.gdx.utils.Align;
++import com.badlogic.gdx.utils.ScreenUtils;
++import controllers.menus.gamecontroller.IZombieNetworkController;
++import models.App;
++import models.entity.Plant;
++import models.entity.Projectile;
++import models.entity.ProjectileType;
++import models.entity.Zombie;
++import models.factory.PlantFactory;
++import models.factory.ZombieFactory;
++import models.games.minigames.IZombie;
++import models.factory.builder.PlantType;
++import models.gamepanes.Tile;
++import network.IZombieNetworkMatch;
++import network.IZombieNetworkState;
++import network.NetworkClient;
++import network.NetworkService;
++import view.MiniGamesView;
++
++import java.util.Locale;
++import java.util.ArrayList;
++import java.util.List;
++
++/** Graphical client for the authoritative network I, Zombie match. */
++public final class IZombieNetworkView extends MinigameBoardView {
++    private final IZombieNetworkController controller;
++    private String selectedType;
++    private Label statusLabel;
++    private Label resourceLabel;
++    private Label timerLabel;
++    private Label scoreLabel;
++    private Label reactionLabel;
++    private Table resultPanel;
++    private Label resultText;
++    private float reactionTime;
++
++    public IZombieNetworkView(String matchId, String role, String opponent) {
++        this(matchId, parseRole(role), opponent);
++    }
++
++    public IZombieNetworkView(
++        String matchId, IZombieNetworkState.Role role, String opponent
++    ) {
++        NetworkClient client = NetworkService.getClient();
++        if (client == null) {
++            throw new IllegalStateException("Network client is not connected.");
++        }
++        controller = new IZombieNetworkController(client, matchId, role);
++    }
++
++    private static IZombieNetworkState.Role parseRole(String value) {
++        try {
++            return IZombieNetworkState.Role.valueOf(value == null ? "" : value.toUpperCase(Locale.ROOT));
++        } catch (IllegalArgumentException exception) {
++            return IZombieNetworkState.Role.ZOMBIES;
++        }
++    }
++
++    @Override
++    public void show() {
++        initialiseScreen();
++        buildUi();
++        installInput(createInput());
++        statusLabel.setText(controller.join());
++    }
++
++    @Override
++    public void render(float delta) {
++        float safeDelta = safeDelta(delta);
++        updateSharedAssets();
++        reactionTime = Math.max(0f, reactionTime - safeDelta);
++        if (reactionLabel != null && reactionTime > 0f) {
++            reactionLabel.setScale(1f + 0.12f * (float) Math.sin(reactionTime * 12f));
++        } else if (reactionLabel != null) {
++            reactionLabel.setScale(1f);
++        }
++        processReactions();
++        refreshHud();
++
++        ScreenUtils.clear(0.04f, 0.08f, 0.05f, 1f);
++        renderMap();
++        renderBoardGuides();
++        renderState();
++        uiViewport.apply();
++        stage.act(safeDelta);
++        stage.draw();
++    }
++
++    private void renderState() {
++        IZombieNetworkState state = controller.getState();
++        if (state == null) {
++            return;
++        }
++        worldViewport.apply();
++        shapes.setProjectionMatrix(worldCamera.combined);
++        Gdx.gl.glEnable(GL20.GL_BLEND);
++        shapes.begin(ShapeRenderer.ShapeType.Filled);
++        for (int row = 0; row < IZombie.ROW_COUNT; row++) {
++            if (!state.eatenBrains()[row]) {
++                shapes.setColor(0.95f, 0.30f, 0.55f, 0.85f);
++                shapes.circle(cellCenterX(0), cellCenterY(row), 24f, 20);
++            }
++        }
++        for (IZombieNetworkState.Unit plant : state.plants()) {
++            shapes.setColor(0.25f, 0.85f, 0.35f, 0.95f);
++            shapes.circle(cellCenterX(Math.round(plant.x() - 0.5f)), cellCenterY(plant.row()), 24f, 20);
++            drawHealth(plant.x(), plant.row(), plant.hp() / plant.maxHp(), Color.GREEN);
++        }
++        for (IZombieNetworkState.Unit zombie : state.zombies()) {
++            shapes.setColor(0.50f, 0.25f, 0.18f, 0.98f);
++            float x = lawnBounds.x + zombie.x() / IZombieNetworkMatch.COLUMN_COUNT * lawnBounds.width;
++            shapes.rect(x - 18f, cellCenterY(zombie.row()) - 34f, 36f, 58f);
++            drawHealth(zombie.x(), zombie.row(), zombie.hp() / zombie.maxHp(), Color.RED);
++        }
++        shapes.setColor(0.95f, 0.95f, 0.35f, 1f);
++        for (IZombieNetworkState.Projectile projectile : state.projectiles()) {
++            float x = lawnBounds.x + projectile.x() / IZombieNetworkMatch.COLUMN_COUNT * lawnBounds.width;
++            shapes.circle(x, cellCenterY(projectile.row()), 8f, 12);
++        }
++        shapes.end();
++        Gdx.gl.glDisable(GL20.GL_BLEND);
++        renderPamEntities(state);
++    }
++
++    private void renderPamEntities(IZombieNetworkState state) {
++        if (plantRenderer == null && zombieRenderer == null && projectileRenderer == null) {
++            return;
++        }
++        List<Plant> plants = createPlantModels(state);
++        List<Zombie> zombies = createZombieModels(state);
++        List<Projectile> projectiles = createProjectileModels(state);
++        beginWorldBatch();
++        try {
++            for (Plant plant : plants) {
++                if (plantRenderer != null) {
++                    plantRenderer.render(batch, plant, cellCenterX(plant.getTileIndex()),
++                        cellCenterY(plant.getLine()), lawnBounds.width / 9f, lawnBounds.height / 5f);
++                }
++            }
++            if (zombieRenderer != null) {
++                zombieRenderer.render(batch, zombies, lawnBounds, 1f / 60f);
++            }
++            if (projectileRenderer != null) {
++                projectileRenderer.render(batch, projectiles, lawnBounds, 1f / 60f);
++            }
++        } finally {
++            batch.setColor(Color.WHITE);
++            batch.end();
++        }
++    }
++
++    private List<Plant> createPlantModels(IZombieNetworkState state) {
++        List<Plant> result = new ArrayList<>();
++        PlantFactory factory = new PlantFactory();
++        for (IZombieNetworkState.Unit unit : state.plants()) {
++            try {
++                Plant plant = factory.createPlant(PlantType.valueOf(
++                    unit.type().toUpperCase(Locale.ROOT)));
++                plant.setTileIndex(Math.max(0, Math.min(8, Math.round(unit.x() - 0.5f))));
++                plant.setLine(unit.row());
++                plant.setHP(unit.hp());
++                result.add(plant);
++            } catch (RuntimeException ignored) {
++                // The shape fallback remains visible when an optional card asset is absent.
++            }
++        }
++        return result;
++    }
++
++    private List<Zombie> createZombieModels(IZombieNetworkState state) {
++        List<Zombie> result = new ArrayList<>();
++        for (IZombieNetworkState.Unit unit : state.zombies()) {
++            try {
++                Zombie zombie = ZombieFactory.createZombie(unit.type());
++                zombie.setLine(unit.row());
++                zombie.setTileIndex(Math.max(0, Math.min(8, (int) unit.x())));
++                zombie.setPosition(unit.x() * Tile.getWidth() - zombie.getWidth() * 0.5f,
++                    unit.row() * Tile.getHeight());
++                zombie.setHp(Math.round(unit.hp()));
++                zombie.setAlive(true);
++                result.add(zombie);
++            } catch (RuntimeException ignored) {
++                // Keep rendering the remaining synchronized entities.
++            }
++        }
++        return result;
++    }
++
++    private List<Projectile> createProjectileModels(IZombieNetworkState state) {
++        List<Projectile> result = new ArrayList<>();
++        for (IZombieNetworkState.Projectile unit : state.projectiles()) {
++            Projectile projectile = new Projectile();
++            projectile.setType(ProjectileType.PEA);
++            projectile.setLine(unit.row());
++            projectile.setPosition(unit.x() * Tile.getWidth(), unit.row() * Tile.getHeight() + 30f);
++            projectile.setDamage(unit.damage());
++            projectile.setActive(true);
++            result.add(projectile);
++        }
++        return result;
++    }
++
++    private void drawHealth(float x, int row, float ratio, Color color) {
++        float clamped = Math.max(0f, Math.min(1f, ratio));
++        float worldX = lawnBounds.x + x / IZombieNetworkMatch.COLUMN_COUNT * lawnBounds.width;
++        shapes.setColor(0.12f, 0.12f, 0.12f, 1f);
++        shapes.rect(worldX - 22f, cellCenterY(row) + 35f, 44f, 5f);
++        shapes.setColor(color);
++        shapes.rect(worldX - 22f, cellCenterY(row) + 35f, 44f * clamped, 5f);
++    }
++
++    private void renderBoardGuides() {
++        worldViewport.apply();
++        shapes.setProjectionMatrix(worldCamera.combined);
++        shapes.begin(ShapeRenderer.ShapeType.Filled);
++        float lineX = lawnBounds.x + IZombieNetworkMatch.FIRST_ZOMBIE_COLUMN * lawnBounds.width / 9f;
++        shapes.setColor(0.95f, 0.08f, 0.06f, 0.95f);
++        shapes.rect(lineX - 3f, lawnBounds.y, 6f, lawnBounds.height);
++        shapes.end();
++    }
++
++    private void buildUi() {
++        Table hud = new Table();
++        hud.setFillParent(true);
++        hud.top().pad(10f, 14f, 0f, 14f);
++        TextButton back = button("LEAVE", "brown", this::leave);
++        Label title = new Label("NETWORK I, ZOMBIE", skin, "big_outline");
++        title.setAlignment(Align.center);
++        resourceLabel = new Label("", skin, "medium_outline");
++        timerLabel = new Label("", skin, "medium_outline");
++        scoreLabel = new Label("", skin, "medium_outline");
++        reactionLabel = new Label("", skin, "medium_outline");
++        hud.add(back).size(110f, 50f);
++        hud.add(resourceLabel).width(175f).padLeft(8f);
++        hud.add(title).expandX().center();
++        hud.add(timerLabel).width(170f).right();
++        hud.row();
++        hud.add(scoreLabel).colspan(4).center().padTop(4f).row();
++        hud.add(buildCards()).colspan(4).center().padTop(5f).row();
++        hud.add(buildReactionButtons()).colspan(4).center().padTop(4f).row();
++        statusLabel = new Label("Waiting for the opponent...", skin);
++        statusLabel.setAlignment(Align.center);
++        hud.add(statusLabel).colspan(4).expandX().fillX().padTop(4f).row();
++        hud.add(reactionLabel).colspan(4).center().padTop(4f);
++        stage.addActor(hud);
++        buildResultPanel();
++    }
++
++    private Table buildCards() {
++        Table row = new Table();
++        if (controller.getRole() == IZombieNetworkState.Role.PLANTS) {
++            for (IZombieNetworkMatch.Card card : IZombieNetworkMatch.plantCards()) {
++                row.add(button(card.type().replace('_', ' ') + "\n" + card.cost() + " SUN",
++                    "brown", () -> selectedType = toggle(card.type()))).size(160f, 60f).pad(3f);
++            }
++        } else {
++            for (IZombieNetworkMatch.Card card : IZombieNetworkMatch.zombieCards()) {
++                row.add(button(card.type() + "\n" + card.cost() + " SUN",
++                    "brown", () -> selectedType = toggle(card.type()))).size(160f, 60f).pad(3f);
++            }
++        }
++        return row;
++    }
++
++    private Table buildReactionButtons() {
++        Table row = new Table();
++        addReaction(row, "NICE MOVE", "TEXT", "NICE_MOVE");
++        addReaction(row, "HURRY UP", "TEXT", "HURRY_UP");
++        addReaction(row, "GOOD GAME", "TEXT", "GOOD_GAME");
++        addReaction(row, "😀", "EMOJI", "😀");
++        addReaction(row, "😎", "EMOJI", "😎");
++        addReaction(row, "🌻", "EMOJI", "🌻");
++        addReaction(row, "DANCE", "STICKER", "ZOMBIE_DANCE");
++        addReaction(row, "BRAIN", "STICKER", "BRAIN_POP");
++        addReaction(row, "SUN", "STICKER", "SUN_DANCE");
++        return row;
++    }
++
++    private void addReaction(Table row, String text, String category, String value) {
++        row.add(button(text, "brown", () -> statusLabel.setText(
++            controller.sendReaction(category, value)))).size(100f, 35f).pad(2f);
++    }
++
++    private void buildResultPanel() {
++        resultPanel = new Table();
++        resultPanel.setFillParent(true);
++        resultPanel.center();
++        resultPanel.setVisible(false);
++        Table card = new Table();
++        card.pad(24f);
++        resultText = new Label("", skin, "big_outline");
++        card.add(resultText).colspan(2).row();
++        card.add(button("SUBMIT SCORE", "green", () -> statusLabel.setText(controller.submitScore())))
++            .size(180f, 55f).pad(6f);
++        card.add(button("MINIGAMES", "brown", this::leave)).size(180f, 55f).pad(6f);
++        resultPanel.add(card);
++        stage.addActor(resultPanel);
++    }
++
++    private void refreshHud() {
++        IZombieNetworkState state = controller.getState();
++        if (state == null) {
++            return;
++        }
++        int resource = controller.getRole() == IZombieNetworkState.Role.PLANTS
++            ? state.plantSun() : state.zombieSun();
++        String resourceName = controller.getRole() == IZombieNetworkState.Role.PLANTS
++            ? "PLANT SUN: " : "ZOMBIE SUN: ";
++        resourceLabel.setText(resourceName + resource);
++        timerLabel.setText("TIME: " + Math.max(0, state.remainingMillis() / 1000));
++        scoreLabel.setText("BRAINS: " + state.brainsEaten() + "/5   •   SCORE: "
++            + (controller.getRole() == IZombieNetworkState.Role.PLANTS ? state.plantScore() : state.zombieScore()));
++        boolean ended = state.phase() == IZombieNetworkState.Phase.PLANTS_WON
++            || state.phase() == IZombieNetworkState.Phase.ZOMBIES_WON
++            || state.phase() == IZombieNetworkState.Phase.ABORTED;
++        resultPanel.setVisible(ended);
++        if (ended) {
++            if (state.phase() != IZombieNetworkState.Phase.ABORTED
++                && !controller.isScoreSubmitted()) {
++                statusLabel.setText(controller.submitScore());
++            }
++            resultText.setText(state.phase() == IZombieNetworkState.Phase.PLANTS_WON
++                ? "PLANTS WIN!" : state.phase() == IZombieNetworkState.Phase.ZOMBIES_WON
++                ? "ZOMBIES WIN!" : "MATCH ABORTED");
++        }
++    }
++
++    private void processReactions() {
++        IZombieNetworkController.Reaction reaction;
++        while ((reaction = controller.pollReaction()) != null) {
++            reactionLabel.setText(reaction.sender() + ": " + reaction.value());
++            reactionTime = 3f;
++        }
++        if (reactionTime <= 0f) {
++            reactionLabel.setText("");
++        }
++    }
++
++    private InputAdapter createInput() {
++        return new InputAdapter() {
++            @Override
++            public boolean keyDown(int keycode) {
++                if (keycode == Input.Keys.ESCAPE) {
++                    leave();
++                    return true;
++                }
++                if (controller.getRole() == IZombieNetworkState.Role.ZOMBIES
++                    && keycode >= Input.Keys.NUM_1 && keycode <= Input.Keys.NUM_3) {
++                    int index = keycode - Input.Keys.NUM_1;
++                    selectedType = IZombieNetworkMatch.zombieCards().get(index).type();
++                    return true;
++                }
++                return false;
++            }
++
++            @Override
++            public boolean touchDown(int screenX, int screenY, int pointer, int button) {
++                if (button != Input.Buttons.LEFT || !updatePointer(screenX, screenY)
++                    || selectedType == null) {
++                    return false;
++                }
++                String result;
++                if (controller.getRole() == IZombieNetworkState.Role.PLANTS) {
++                    result = controller.placePlant(selectedType, pointerColumn(), pointerRow());
++                } else {
++                    result = controller.placeZombie(selectedType, pointerColumn(), pointerRow());
++                }
++                statusLabel.setText(result);
++                return true;
++            }
++        };
++    }
++
++    private String toggle(String type) {
++        return type.equals(selectedType) ? null : type;
++    }
++
++    private TextButton button(String text, String style, Runnable action) {
++        TextButton button = new TextButton(text, skin, style);
++        button.addListener(new ClickListener() {
++            @Override
++            public void clicked(InputEvent event, float x, float y) {
++                action.run();
++            }
++        });
++        return button;
++    }
++
++    private void leave() {
++        controller.leave();
++        controller.close();
++        App.setScreen(new MiniGamesView());
++    }
++
++    @Override
++    public void dispose() {
++        controller.close();
++        super.dispose();
++    }
++}

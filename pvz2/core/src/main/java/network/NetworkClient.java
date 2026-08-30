@@ -15,6 +15,8 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.Consumer;
+import java.util.ArrayList;
+import java.util.List;
 
 /** TCP client used by menus and future multiplayer game controllers. */
 public final class NetworkClient implements Closeable {
@@ -23,7 +25,7 @@ public final class NetworkClient implements Closeable {
     private final BlockingQueue<NetworkResponse> responses = new LinkedBlockingQueue<>();
     private final CopyOnWriteArrayList<Consumer<NetworkEvent>> listeners = new CopyOnWriteArrayList<>();
     private final Object requestLock = new Object();
-    private Socket socket;
+    private volatile Socket socket;
     private BufferedReader reader;
     private BufferedWriter writer;
     private volatile boolean running;
@@ -85,6 +87,60 @@ public final class NetworkClient implements Closeable {
         return request("CANCEL_MATCH");
     }
 
+    public NetworkResponse joinGame(String matchId) {
+        return request("GAME_JOIN", matchId);
+    }
+
+    public NetworkResponse placePlant(String matchId, String type, int column, int row) {
+        return request("GAME_PLANT", matchId, type, Integer.toString(column), Integer.toString(row));
+    }
+
+    public NetworkResponse placeZombie(String matchId, String type, int column, int row) {
+        return request("GAME_ZOMBIE", matchId, type, Integer.toString(column), Integer.toString(row));
+    }
+
+    public NetworkResponse sendReaction(String matchId, String category, String value) {
+        return request("GAME_REACTION", matchId, category, value);
+    }
+
+    public NetworkResponse leaveGame() {
+        return request("GAME_LEAVE");
+    }
+
+    public NetworkResponse submitScore(String matchId, int score) {
+        return request("SCORE_SUBMIT", matchId, Integer.toString(score));
+    }
+
+    public NetworkResponse requestLeaderboard() {
+        return request("LEADERBOARD");
+    }
+
+    public static IZombieNetworkState stateFrom(NetworkEvent event) {
+        if (event == null || !"GAME_STATE".equals(event.type())) {
+            return null;
+        }
+        return IZombieNetworkStateCodec.decode(event.data());
+    }
+
+    public static List<LeaderboardEntry> leaderboardFrom(NetworkResponse response) {
+        if (response == null || !response.success() || response.data().length == 0) {
+            return List.of();
+        }
+        String[] values = response.data();
+        try {
+            int count = Integer.parseInt(values[0]);
+            List<LeaderboardEntry> result = new ArrayList<>();
+            for (int index = 0; index < count && 1 + index * 3 + 2 < values.length; index++) {
+                int offset = 1 + index * 3;
+                result.add(new LeaderboardEntry(values[offset], values[offset + 1],
+                    Integer.parseInt(values[offset + 2])));
+            }
+            return List.copyOf(result);
+        } catch (NumberFormatException exception) {
+            return List.of();
+        }
+    }
+
     public void addEventListener(Consumer<NetworkEvent> listener) {
         if (listener != null) {
             listeners.add(listener);
@@ -121,6 +177,7 @@ public final class NetworkClient implements Closeable {
     }
 
     private void startReader() {
+        Socket activeSocket = socket;
         Thread readerThread = new Thread(() -> {
             try {
                 String line;
@@ -130,8 +187,10 @@ public final class NetworkClient implements Closeable {
             } catch (IOException ignored) {
                 // The waiting request receives a connection error when the socket closes.
             } finally {
-                running = false;
-                responses.offer(NetworkResponse.error("CONNECTION_LOST", "Connection to server was lost."));
+                if (socket == activeSocket) {
+                    running = false;
+                    responses.offer(NetworkResponse.error("CONNECTION_LOST", "Connection to server was lost."));
+                }
             }
         }, "pvz-network-client-reader");
         readerThread.setDaemon(true);
@@ -176,7 +235,12 @@ public final class NetworkClient implements Closeable {
             || "REQUEST_SENT".equals(code)
             || "REQUEST_ACCEPTED".equals(code)
             || "REQUEST_REJECTED".equals(code)
-            || "MATCH_CANCELLED".equals(code);
+            || "MATCH_CANCELLED".equals(code)
+            || "GAME_JOINED".equals(code)
+            || "ACTION_ACCEPTED".equals(code)
+            || "GAME_LEFT".equals(code)
+            || "SCORE_UPDATED".equals(code)
+            || "LEADERBOARD".equals(code);
     }
 
     public static AccountSnapshot accountFrom(NetworkResponse response) {

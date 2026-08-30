@@ -10,6 +10,7 @@ import com.badlogic.gdx.utils.Scaling;
 
 import controllers.menus.secondarymenus.LeaderBoard;
 import models.User;
+import network.LeaderboardEntry;
 
 import java.util.List;
 
@@ -89,6 +90,7 @@ public class LeaderBoardView extends View {
                 sortColumn,
                 descending
             );
+        List<LeaderboardEntry> networkUsers = controller.getNetworkLeaderboard();
 
         Table outerPanel =
             pvzPanel();
@@ -140,7 +142,19 @@ public class LeaderBoardView extends View {
 
         board.row();
 
-        if (users.isEmpty()) {
+        if (!networkUsers.isEmpty()) {
+            int rank = 1;
+            for (LeaderboardEntry entry : networkUsers) {
+                addCell(board, rank + ". " + entry.username(), 145f);
+                addCell(board, "SERVER SCORE", 185f);
+                addCell(board, "-", 120f);
+                addCell(board, "-", 105f);
+                addCell(board, "-", 105f);
+                addCell(board, String.valueOf(entry.score()), 125f);
+                board.row();
+                rank++;
+            }
+        } else if (users.isEmpty()) {
 
             Label empty =
                 mediumTitle(

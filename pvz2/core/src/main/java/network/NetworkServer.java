@@ -17,11 +17,17 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /** Authoritative TCP server for accounts and pre-game matchmaking. */
 public final class NetworkServer implements Closeable {
@@ -33,10 +39,18 @@ public final class NetworkServer implements Closeable {
     private final Map<String, Account> accounts = new ConcurrentHashMap<>();
     private final Map<String, Session> online = new ConcurrentHashMap<>();
     private final Map<String, Challenge> challenges = new ConcurrentHashMap<>();
+    private final Map<String, MatchRuntime> matches = new ConcurrentHashMap<>();
     private final ArrayDeque<Session> randomQueue = new ArrayDeque<>();
     private final Object queueLock = new Object();
+    private final ScheduledExecutorService gameTicker =
+        Executors.newSingleThreadScheduledExecutor(runnable -> {
+            Thread thread = new Thread(runnable, "pvz-network-match-ticker");
+            thread.setDaemon(true);
+            return thread;
+        });
     private volatile boolean running;
     private ServerSocket serverSocket;
+    private boolean tickerStarted;
 
     public NetworkServer() {
         this(DEFAULT_PORT, Path.of(System.getProperty("user.home"), DEFAULT_FILE));
@@ -61,6 +75,10 @@ public final class NetworkServer implements Closeable {
         Thread acceptThread = new Thread(this::acceptLoop, "pvz-network-server-acceptor");
         acceptThread.setDaemon(true);
         acceptThread.start();
+        if (!tickerStarted) {
+            tickerStarted = true;
+            gameTicker.scheduleAtFixedRate(this::tickMatches, 50, 50, TimeUnit.MILLISECONDS);
+        }
     }
 
     public boolean isRunning() {
@@ -76,9 +94,15 @@ public final class NetworkServer implements Closeable {
         if (user == null || user.getName() == null || user.getPasswordHash() == null) {
             return;
         }
-        accounts.putIfAbsent(user.getName().toLowerCase(Locale.ROOT),
-            new Account(user.getName(), user.getPasswordHash(), user.getNickname(),
-                user.getEmail(), user.getGender(), 1, CredentialHasher.hash("")));
+        String key = user.getName().toLowerCase(Locale.ROOT);
+        accounts.compute(key, (ignored, existing) -> {
+            if (existing == null) {
+                return new Account(user.getName(), user.getPasswordHash(), user.getNickname(),
+                    user.getEmail(), user.getGender(), 1, CredentialHasher.hash(""),
+                    user.getHighestScore());
+            }
+            return existing.withHighestScore(user.getHighestScore());
+        });
         saveAccounts();
     }
 
@@ -131,6 +155,13 @@ public final class NetworkServer implements Closeable {
             case "CHALLENGE" -> challenge(session, values);
             case "RESPOND" -> respond(session, values);
             case "CANCEL_MATCH" -> cancelMatch(session);
+            case "GAME_JOIN" -> joinGame(session, values);
+            case "GAME_PLANT" -> placeNetworkPlant(session, values);
+            case "GAME_ZOMBIE" -> placeNetworkZombie(session, values);
+            case "GAME_REACTION" -> sendReaction(session, values);
+            case "GAME_LEAVE" -> leaveGame(session);
+            case "SCORE_SUBMIT" -> submitScore(session, values);
+            case "LEADERBOARD" -> sendLeaderboard(session);
             default -> response(session, false, "UNKNOWN_COMMAND", "Unknown network command.");
         }
     }
@@ -211,13 +242,17 @@ public final class NetworkServer implements Closeable {
     }
 
     private void logout(Session session) {
-        disconnectUser(session);
+        disconnect(session);
         response(session, true, "OK", "Logged out successfully.");
     }
 
     private void randomMatch(Session session) {
         if (!loggedIn(session)) {
             response(session, false, "NOT_LOGGED_IN", "Log in before matchmaking.");
+            return;
+        }
+        if (session.matchId != null || session.assignedMatchId != null) {
+            response(session, false, "ALREADY_IN_MATCH", "You are already assigned to a match.");
             return;
         }
         synchronized (queueLock) {
@@ -238,6 +273,10 @@ public final class NetworkServer implements Closeable {
             response(session, false, "INVALID_CHALLENGE", "A logged-in opponent is required.");
             return;
         }
+        if (session.matchId != null || session.assignedMatchId != null) {
+            response(session, false, "ALREADY_IN_MATCH", "You are already assigned to a match.");
+            return;
+        }
         Session target = online.get(values[0].trim().toLowerCase(Locale.ROOT));
         if (target == null) {
             response(session, false, "OPPONENT_UNAVAILABLE", "Opponent is offline or does not exist.");
@@ -245,6 +284,10 @@ public final class NetworkServer implements Closeable {
         }
         if (target == session) {
             response(session, false, "INVALID_CHALLENGE", "You cannot challenge yourself.");
+            return;
+        }
+        if (target.matchId != null || target.assignedMatchId != null) {
+            response(session, false, "OPPONENT_BUSY", "Opponent is already in a match.");
             return;
         }
         synchronized (queueLock) {
@@ -282,13 +325,247 @@ public final class NetworkServer implements Closeable {
 
     private void createMatch(Session first, Session second) {
         String matchId = UUID.randomUUID().toString();
+        MatchRuntime runtime = new MatchRuntime(matchId, first, second);
+        matches.put(matchId, runtime);
+        first.assignedMatchId = matchId;
+        first.assignedRole = IZombieNetworkState.Role.PLANTS;
+        second.assignedMatchId = matchId;
+        second.assignedRole = IZombieNetworkState.Role.ZOMBIES;
         event(first, "MATCH_FOUND", second.username, matchId, "PLANTS");
         event(second, "MATCH_FOUND", first.username, matchId, "ZOMBIES");
+    }
+
+    private void joinGame(Session session, String[] values) {
+        if (!loggedIn(session) || values.length == 0 || values[0].isBlank()) {
+            response(session, false, "INVALID_GAME_JOIN", "A match id is required.");
+            return;
+        }
+        MatchRuntime runtime = matches.get(values[0]);
+        if (runtime == null || !runtime.has(session)) {
+            response(session, false, "MATCH_NOT_FOUND", "The match is no longer available.");
+            return;
+        }
+        if (session.assignedRole == null || !values[0].equals(session.assignedMatchId)) {
+            response(session, false, "INVALID_GAME_JOIN", "This player was not assigned to that match.");
+            return;
+        }
+        IZombieNetworkMatch.ActionResult result = runtime.match.join(session.assignedRole);
+        if (result.success()) {
+            session.matchId = values[0];
+            session.role = session.assignedRole;
+            response(session, true, "GAME_JOINED", result.message(), session.role.name());
+            broadcastState(runtime);
+        } else {
+            response(session, false, result.code(), result.message());
+        }
+    }
+
+    private void placeNetworkPlant(Session session, String[] values) {
+        if (values.length < 4) {
+            response(session, false, "INVALID_ACTION", "Plant type, column and row are required.");
+            return;
+        }
+        MatchRuntime runtime = matchFor(session, values[0]);
+        if (runtime == null) {
+            response(session, false, "MATCH_NOT_FOUND", "Join a match before playing.");
+            return;
+        }
+        Integer column = parseCoordinate(values[1]);
+        Integer row = parseCoordinate(values[2]);
+        if (column == null || row == null) {
+            response(session, false, "INVALID_ACTION", "Column and row must be integers.");
+            return;
+        }
+        IZombieNetworkMatch.ActionResult result = runtime.match.placePlant(
+            session.role, values[0], column, row);
+        respondAction(session, result);
+        if (result.success()) {
+            broadcastState(runtime);
+        }
+    }
+
+    private void placeNetworkZombie(Session session, String[] values) {
+        if (values.length < 4) {
+            response(session, false, "INVALID_ACTION", "Zombie type, column and row are required.");
+            return;
+        }
+        MatchRuntime runtime = matchFor(session, values[0]);
+        if (runtime == null) {
+            response(session, false, "MATCH_NOT_FOUND", "Join a match before playing.");
+            return;
+        }
+        Integer column = parseCoordinate(values[1]);
+        Integer row = parseCoordinate(values[2]);
+        if (column == null || row == null) {
+            response(session, false, "INVALID_ACTION", "Column and row must be integers.");
+            return;
+        }
+        IZombieNetworkMatch.ActionResult result = runtime.match.placeZombie(
+            session.role, values[0], column, row);
+        respondAction(session, result);
+        if (result.success()) {
+            broadcastState(runtime);
+        }
+    }
+
+    private void sendReaction(Session session, String[] values) {
+        if (values.length < 3) {
+            response(session, false, "INVALID_REACTION", "Category, value and match id are required.");
+            return;
+        }
+        MatchRuntime runtime = matchFor(session, values[0]);
+        if (runtime == null) {
+            response(session, false, "MATCH_NOT_FOUND", "Join a match before sending reactions.");
+            return;
+        }
+        IZombieNetworkMatch.ActionResult result = runtime.match.react(session.role, values[1], values[2]);
+        respondAction(session, result);
+        if (result.success()) {
+            Session opponent = runtime.opponent(session);
+            if (opponent != null) {
+                event(opponent, "REACTION", session.username, values[1], values[2]);
+            }
+        }
+    }
+
+    private void leaveGame(Session session) {
+        String activeMatchId = session.matchId == null ? session.assignedMatchId : session.matchId;
+        MatchRuntime runtime = activeMatchId == null ? null : matches.get(activeMatchId);
+        IZombieNetworkState.Role activeRole = session.role == null ? session.assignedRole : session.role;
+        if (runtime != null && activeRole != null) {
+            runtime.match.leave(activeRole);
+            Session opponent = runtime.opponent(session);
+            if (opponent != null) {
+                event(opponent, "MATCH_ABORTED", "The other player left the match.");
+            }
+            matches.remove(runtime.matchId);
+        }
+        clearMatch(session);
+        response(session, true, "GAME_LEFT", "Left the match.");
+    }
+
+    private void submitScore(Session session, String[] values) {
+        if (!loggedIn(session) || values.length < 2) {
+            response(session, false, "INVALID_SCORE", "Match id and score are required.");
+            return;
+        }
+        MatchRuntime runtime = matchFor(session, values[0]);
+        if (runtime == null || runtime.match.snapshot().phase() == IZombieNetworkState.Phase.PLAYING
+            || runtime.match.snapshot().phase() == IZombieNetworkState.Phase.WAITING) {
+            response(session, false, "SCORE_NOT_READY", "Scores can only be submitted after a match ends.");
+            return;
+        }
+        Integer score = parseCoordinate(values[1]);
+        if (score == null || score < 0 || score > 1000000) {
+            response(session, false, "INVALID_SCORE", "Score is invalid.");
+            return;
+        }
+        IZombieNetworkState finished = runtime.match.snapshot();
+        int authoritativeScore = session.role == IZombieNetworkState.Role.PLANTS
+            ? finished.plantScore() : finished.zombieScore();
+        if (score > authoritativeScore) {
+            response(session, false, "INVALID_SCORE", "Submitted score exceeds the server score.");
+            return;
+        }
+        updateHighestScore(session.username, score);
+        response(session, true, "SCORE_UPDATED", "Score saved on the server.", Integer.toString(score));
+    }
+
+    private void sendLeaderboard(Session session) {
+        if (!loggedIn(session)) {
+            response(session, false, "NOT_LOGGED_IN", "Log in before requesting the leaderboard.");
+            return;
+        }
+        List<Account> sorted = new ArrayList<>(accounts.values());
+        sorted.sort(Comparator.comparingInt(Account::highestScore).reversed()
+            .thenComparing(Account::username, String.CASE_INSENSITIVE_ORDER));
+        List<String> data = new ArrayList<>();
+        data.add(Integer.toString(sorted.size()));
+        for (Account account : sorted) {
+            data.add(account.username());
+            data.add(account.nickname());
+            data.add(Integer.toString(account.highestScore()));
+        }
+        response(session, true, "LEADERBOARD", "Leaderboard loaded.", data.toArray(String[]::new));
+    }
+
+    private void tickMatches() {
+        if (!running) {
+            return;
+        }
+        for (MatchRuntime runtime : matches.values()) {
+            IZombieNetworkState before = runtime.match.snapshot();
+            runtime.match.tick(0.05f);
+            IZombieNetworkState after = runtime.match.snapshot();
+            if (after.revision() != before.revision()) {
+                broadcastState(runtime);
+            }
+            if (before.phase() == IZombieNetworkState.Phase.PLAYING
+                && after.phase() != IZombieNetworkState.Phase.PLAYING) {
+                event(runtime.first, "GAME_OVER", after.winner() == null ? "" : after.winner().name(),
+                    Integer.toString(after.plantScore()), Integer.toString(after.zombieScore()));
+                event(runtime.second, "GAME_OVER", after.winner() == null ? "" : after.winner().name(),
+                    Integer.toString(after.plantScore()), Integer.toString(after.zombieScore()));
+                updateHighestScore(runtime.first.username,
+                    after.plantScore());
+                updateHighestScore(runtime.second.username,
+                    after.zombieScore());
+            }
+        }
+    }
+
+    private void broadcastState(MatchRuntime runtime) {
+        String[] fields = IZombieNetworkStateCodec.encode(runtime.match.snapshot());
+        event(runtime.first, "GAME_STATE", fields);
+        event(runtime.second, "GAME_STATE", fields);
+    }
+
+    private MatchRuntime matchFor(Session session, String matchId) {
+        if (session == null || session.matchId == null || session.role == null
+            || matchId == null || !session.matchId.equals(matchId)) {
+            return null;
+        }
+        MatchRuntime runtime = matches.get(matchId);
+        return runtime != null && runtime.has(session) ? runtime : null;
+    }
+
+    private static Integer parseCoordinate(String value) {
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException exception) {
+            return null;
+        }
+    }
+
+    private void respondAction(Session session, IZombieNetworkMatch.ActionResult result) {
+        response(session, result.success(), result.success() ? "ACTION_ACCEPTED" : result.code(),
+            result.message());
+    }
+
+    private void updateHighestScore(String username, int score) {
+        if (username == null) {
+            return;
+        }
+        String key = username.toLowerCase(Locale.ROOT);
+        accounts.computeIfPresent(key, (ignored, account) -> account.withHighestScore(score));
+        saveAccounts();
     }
 
     private void cancelMatch(Session session) {
         synchronized (queueLock) {
             removeFromQueue(session);
+        }
+        String assignedId = session.assignedMatchId;
+        if (assignedId != null) {
+            MatchRuntime runtime = matches.remove(assignedId);
+            if (runtime != null) {
+                Session opponent = runtime.opponent(session);
+                if (opponent != null) {
+                    event(opponent, "MATCH_ABORTED", "The other player cancelled matchmaking.");
+                    clearMatch(opponent);
+                }
+            }
+            clearMatch(session);
         }
         response(session, true, "MATCH_CANCELLED", "Matchmaking cancelled.");
     }
@@ -305,7 +582,26 @@ public final class NetworkServer implements Closeable {
         synchronized (queueLock) {
             removeFromQueue(session);
         }
+        String activeMatchId = session.matchId == null ? session.assignedMatchId : session.matchId;
+        MatchRuntime runtime = activeMatchId == null ? null : matches.get(activeMatchId);
+        if (runtime != null && session.role != null) {
+            runtime.match.leave(session.role);
+            Session opponent = runtime.opponent(session);
+            if (opponent != null) {
+                event(opponent, "MATCH_ABORTED", "The other player disconnected.");
+                clearMatch(opponent);
+            }
+            matches.remove(runtime.matchId);
+        }
+        clearMatch(session);
         disconnectUser(session);
+    }
+
+    private void clearMatch(Session session) {
+        session.matchId = null;
+        session.assignedMatchId = null;
+        session.role = null;
+        session.assignedRole = null;
     }
 
     private void disconnectUser(Session session) {
@@ -349,9 +645,11 @@ public final class NetworkServer implements Closeable {
             for (String key : properties.stringPropertyNames()) {
                 String[] fields = properties.getProperty(key, "").split("\\t", -1);
                 if (fields.length >= 7) {
+                    int score = fields.length >= 8
+                        ? Integer.parseInt(Protocol.decode(fields[7])) : 0;
                     accounts.put(key, new Account(Protocol.decode(fields[0]), Protocol.decode(fields[1]),
                         Protocol.decode(fields[2]), Protocol.decode(fields[3]), Protocol.decode(fields[4]),
-                        Integer.parseInt(Protocol.decode(fields[5])), Protocol.decode(fields[6])));
+                        Integer.parseInt(Protocol.decode(fields[5])), Protocol.decode(fields[6]), score));
                 }
             }
         } catch (Exception ignored) {
@@ -370,7 +668,8 @@ public final class NetworkServer implements Closeable {
                 String value = String.join("\t", Protocol.encode(account.username),
                     Protocol.encode(account.passwordHash), Protocol.encode(account.nickname),
                     Protocol.encode(account.email), Protocol.encode(account.gender),
-                    Protocol.encode(Integer.toString(account.question)), Protocol.encode(account.answerHash));
+                    Protocol.encode(Integer.toString(account.question)), Protocol.encode(account.answerHash),
+                    Protocol.encode(Integer.toString(account.highestScore)));
                 properties.setProperty(account.key(), value);
             }
             Path temporary = storageFile.resolveSibling(storageFile.getFileName() + ".tmp");
@@ -394,15 +693,21 @@ public final class NetworkServer implements Closeable {
             // Closing an already closed socket is harmless.
         }
         online.clear();
+        matches.clear();
         synchronized (queueLock) {
             randomQueue.clear();
         }
+        gameTicker.shutdownNow();
     }
 
     private static final class Session {
         private final Socket socket;
         private BufferedWriter output;
         private String username;
+        private String assignedMatchId;
+        private IZombieNetworkState.Role assignedRole;
+        private String matchId;
+        private IZombieNetworkState.Role role;
 
         private Session(Socket socket) {
             this.socket = socket;
@@ -433,6 +738,28 @@ public final class NetworkServer implements Closeable {
     private record Challenge(Session source, Session target) {
     }
 
+    private static final class MatchRuntime {
+        private final String matchId;
+        private final Session first;
+        private final Session second;
+        private final IZombieNetworkMatch match;
+
+        private MatchRuntime(String matchId, Session first, Session second) {
+            this.matchId = matchId;
+            this.first = first;
+            this.second = second;
+            this.match = new IZombieNetworkMatch(matchId);
+        }
+
+        private boolean has(Session session) {
+            return first == session || second == session;
+        }
+
+        private Session opponent(Session session) {
+            return first == session ? second : second == session ? first : null;
+        }
+    }
+
     private record Account(String username, String passwordHash, String nickname, String email,
                            String gender, int question, String answerHash, int highestScore) {
         private Account(String username, String passwordHash, String nickname, String email,
@@ -442,6 +769,12 @@ public final class NetworkServer implements Closeable {
 
         private String key() {
             return username.toLowerCase(Locale.ROOT);
+        }
+
+        private Account withHighestScore(int score) {
+            return score <= highestScore
+                ? this
+                : new Account(username, passwordHash, nickname, email, gender, question, answerHash, score);
         }
     }
 }

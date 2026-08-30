@@ -7,6 +7,8 @@ import java.util.Base64;
 public final class Protocol {
     public static final String RESPONSE = "RESP";
     public static final String EVENT = "EVENT";
+    public static final String GAME_STATE_EVENT = "GAME_STATE";
+    public static final String REACTION_EVENT = "REACTION";
 
     private Protocol() {
     }

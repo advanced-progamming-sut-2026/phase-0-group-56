@@ -6,12 +6,10 @@ import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.ui.TextField;
 import controllers.menus.secondarymenus.Network;
-import models.utils.RegexHelper;
 import network.NetworkEvent;
 import network.NetworkService;
-
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import view.gameview.IZombieNetworkView;
+import models.App;
 
 /** Graphical view for the pre-game network features. */
 public class NetworkView extends View {
@@ -56,6 +54,19 @@ public class NetworkView extends View {
         lastConnectionState = NetworkService.isConnected();
         statusLabel = secondaryLabel(connectionText(lastConnectionState));
         table.add(statusLabel).padBottom(10f).row();
+
+        Table connection = new Table();
+        TextField address = field("Server address (127.0.0.1)");
+        TextField port = field("Port (47856)");
+        connection.add(address).width(265f).height(44f).padRight(6f);
+        connection.add(port).width(135f).height(44f).padRight(6f);
+        connection.add(greenSmallButton("CONNECT", () -> setStatus(
+            controller.connectToServer(address.getText().trim(), parsePort(port.getText(), 47856))))
+            .width(140f).height(44f).padRight(6f);
+        connection.add(brownButton("HOST", () -> setStatus(
+            controller.hostServer(parsePort(port.getText(), 47856))))
+            .width(120f).height(44f);
+        table.add(connection).padBottom(14f).row();
 
         table.add(greenButton(
                 "FIND RANDOM OPPONENT",
@@ -126,6 +137,14 @@ public class NetworkView extends View {
         }
     }
 
+    private int parsePort(String value, int fallback) {
+        try {
+            return Integer.parseInt(value == null || value.isBlank() ? Integer.toString(fallback) : value.trim());
+        } catch (NumberFormatException exception) {
+            return -1;
+        }
+    }
+
     private void processEvents() {
         boolean connected = NetworkService.isConnected();
         if (connected != lastConnectionState) {
@@ -148,6 +167,14 @@ public class NetworkView extends View {
                 requestId = null;
                 setRequestVisible(false);
                 setStatus("Match found: " + data[0] + " (" + data[2] + ")");
+                // MATCH_FOUND carries opponent, match id, and the server-assigned
+                // role. Enter the synchronized game immediately so both clients
+                // cannot accidentally start different local simulations.
+                try {
+                    App.setScreen(new IZombieNetworkView(data[1], data[2], data[0]));
+                } catch (RuntimeException exception) {
+                    setStatus("Match found, but the game could not be opened.");
+                }
             } else if ("GAME_REQUEST_RESULT".equals(type) && data.length >= 2) {
                 setStatus(data[1].equalsIgnoreCase("true")
                     ? "Challenge accepted by " + data[0]

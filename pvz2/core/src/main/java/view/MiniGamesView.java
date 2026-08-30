@@ -13,6 +13,7 @@ import models.App;
 import models.User;
 import view.gameview.BeghouledView;
 import view.gameview.IZombieView;
+import view.gameview.IZombieCouchView;
 import view.gameview.VaseBreakerView;
 import view.gameview.WallnutBowlingView;
 
@@ -69,6 +70,14 @@ public final class MiniGamesView extends View {
                 + "and eat all five brains."
         );
         addLevelButtons(card, MiniGameKind.I_ZOMBIE);
+        TextButton couch = new TextButton("COUCH PLAY  (MOUSE + KEYBOARD)", skin, "green");
+        couch.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                App.setScreen(new IZombieCouchView());
+            }
+        });
+        card.add(couch).size(330f, 46f).padTop(8f).center().row();
         return card;
     }
 
