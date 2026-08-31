@@ -6,6 +6,7 @@ import com.badlogic.gdx.graphics.g2d.Batch;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.utils.Disposable;
 import models.entity.Zombie;
+import models.entity.ZombieState;
 import models.gamepanes.Tile;
 import pvz.libpvz.pam.ClipRef;
 import pvz.libpvz.pam.PamPlayer;
@@ -25,8 +26,8 @@ import java.util.Set;
  * Draws Zombie model objects without putting LibGDX rendering code in the model.
  *
  * <p>The renderer shares GameView's TextureBank, owns one PamPlayer, loads PAMs
- * asynchronously, converts model coordinates to the real TMX pitch and keeps
- * presentation-only animation clocks for each live Zombie instance.</p>
+ * asynchronously, converts model coordinates to the real TMX pitch and draws
+ * the state/part-visibility selected by each live Zombie instance.</p>
  */
 public final class ZombieRenderer implements Disposable {
     private static final String TAG = "ZombieRenderer";
@@ -108,8 +109,6 @@ public final class ZombieRenderer implements Disposable {
     private final Map<VisualSpec, ZombieVisual> loaded = new HashMap<>();
     private final Set<VisualSpec> loading = new HashSet<>();
     private final Set<VisualSpec> missing = new HashSet<>();
-    private final IdentityHashMap<Zombie, Float> animationTimes = new IdentityHashMap<>();
-
     private boolean disposed;
 
     public ZombieRenderer(
@@ -147,8 +146,6 @@ public final class ZombieRenderer implements Disposable {
         }
 
         List<Zombie> drawOrder = new ArrayList<>();
-        IdentityHashMap<Zombie, Boolean> present = new IdentityHashMap<>();
-
         for (Zombie zombie : zombies) {
             if (zombie == null || zombie.isDead()) {
                 continue;
@@ -160,8 +157,7 @@ public final class ZombieRenderer implements Disposable {
             }
 
             drawOrder.add(zombie);
-            present.put(zombie, Boolean.TRUE);
-            animationTimes.merge(zombie, Math.max(0f, delta), Float::sum);
+            zombie.updateAnimation(Math.max(0f, delta));
         }
 
         // Back/high lanes first, front/low lanes last.
@@ -184,7 +180,6 @@ public final class ZombieRenderer implements Disposable {
             );
         }
 
-        animationTimes.keySet().removeIf(zombie -> !present.containsKey(zombie));
     }
 
     private void drawZombie(
@@ -195,10 +190,21 @@ public final class ZombieRenderer implements Disposable {
         float rowHeight,
         float logicalBoardWidth
     ) {
-        VisualSpec spec = VISUALS.getOrDefault(
+        VisualSpec mappedSpec = VISUALS.getOrDefault(
             normalize(zombie.getType()),
             new VisualSpec(DEFAULT_PAM, "walk", 1.05f, 1.50f)
         );
+        // Factory-created zombies carry the authoritative PAM path.  Keep the
+        // map for legacy/network instances that do not set one, while using
+        // the model path when available (notably the brickhead asset).
+        VisualSpec spec = zombie.getPamPath() == null || zombie.getPamPath().isBlank()
+            ? mappedSpec
+            : new VisualSpec(
+                zombie.getPamPath(),
+                mappedSpec.preferredClip,
+                mappedSpec.widthInCells,
+                mappedSpec.heightInRows
+            );
 
         ZombieVisual visual = loaded.get(spec);
         if (visual == null) {
@@ -234,15 +240,21 @@ public final class ZombieRenderer implements Disposable {
             drawY += boundsCenterY * scale;
         }
 
+        ClipRef clip = visual.clipFor(zombie);
+        if (clip == null) {
+            return;
+        }
+
         pamPlayer.draw(
             batch,
-            visual.clip,
-            animationTimes.getOrDefault(zombie, 0f),
+            clip,
+            zombie.getStateTime(),
             drawX,
             drawY,
             scale,
             scale,
-            true
+            zombie.getCurrentState() != ZombieState.DYING,
+            zombie.getVisibilityMap()
         );
     }
 
@@ -278,11 +290,22 @@ public final class ZombieRenderer implements Disposable {
                 return;
             }
 
-            ClipRef clip = pamPlayer.getClip(spec.pamPath, clipName);
-            if (clip == null) {
+            ClipRef preferredClip = pamPlayer.getClip(spec.pamPath, clipName);
+            if (preferredClip == null) {
                 missing.add(spec);
                 Gdx.app.error(TAG, "Could not resolve clip " + clipName + " in " + spec.pamPath);
                 return;
+            }
+
+            Map<String, ClipRef> clipsByName = new HashMap<>();
+            for (String availableClip : clips) {
+                if (availableClip == null || availableClip.isBlank()) {
+                    continue;
+                }
+                ClipRef ref = pamPlayer.getClip(spec.pamPath, availableClip);
+                if (ref != null) {
+                    clipsByName.put(availableClip.toLowerCase(Locale.ROOT), ref);
+                }
             }
 
             Rectangle bounds = null;
@@ -292,7 +315,7 @@ public final class ZombieRenderer implements Disposable {
                 Gdx.app.error(TAG, "Could not read bounds for " + spec.pamPath, exception);
             }
 
-            loaded.put(spec, new ZombieVisual(clip, bounds));
+            loaded.put(spec, new ZombieVisual(clipsByName, preferredClip, bounds));
             Gdx.app.log(TAG, spec.pamPath + " [" + clipName + "]");
         } catch (RuntimeException exception) {
             missing.add(spec);
@@ -395,7 +418,6 @@ public final class ZombieRenderer implements Disposable {
         loaded.clear();
         loading.clear();
         missing.clear();
-        animationTimes.clear();
         // PamPlayer does not own the TextureBank shared by GameView.
     }
 
@@ -408,8 +430,32 @@ public final class ZombieRenderer implements Disposable {
     }
 
     private record ZombieVisual(
-        ClipRef clip,
+        Map<String, ClipRef> clips,
+        ClipRef fallback,
         Rectangle bounds
     ) {
+        private ClipRef clipFor(Zombie zombie) {
+            if (zombie == null) {
+                return fallback;
+            }
+
+            String requested = switch (zombie.getCurrentState()) {
+                case IDLE -> zombie.getIdle();
+                case WALKING -> zombie.getWalk();
+                case EATING -> zombie.getEat();
+                case DYING -> zombie.getDie();
+                case FIRING -> zombie.getFire();
+                case EXTRA -> zombie.getExtra();
+            };
+            if (requested != null) {
+                ClipRef exact = clips.get(requested.toLowerCase(Locale.ROOT));
+                if (exact != null) {
+                    return exact;
+                }
+            }
+
+            ClipRef walk = clips.get("walk");
+            return walk != null ? walk : fallback;
+        }
     }
 }

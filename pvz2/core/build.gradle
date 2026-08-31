@@ -5,7 +5,9 @@ dependencies {
   api "com.badlogicgames.gdx:gdx:$gdxVersion"
   api "com.badlogicgames.gdx:gdx-freetype:$gdxVersion"
 
-  implementation 'com.github.pizpizi:libPVZ:v0.1.5' // Replace v0.1.0 with desired release tag or commit hash
+  // Use the checked-in library source so gameplay renderers can use the
+  // visibility-aware scaled PAM overload.
+  implementation project(':libPVZ-0.1.5')
   implementation 'com.github.pizpizi:pvz-skin:v0.1.1'
   implementation 'com.github.raeleus.TenPatch:tenpatch:5.2.3'
   if(enableGraalNative == 'true') {

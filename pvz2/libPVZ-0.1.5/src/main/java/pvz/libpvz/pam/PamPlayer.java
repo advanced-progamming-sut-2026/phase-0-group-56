@@ -199,6 +199,20 @@ public final class PamPlayer {
         }
     }
 
+    /**
+     * Renders an optimized clip with both custom part visibility and scaling.
+     * This is useful for callers that map PAM canvas coordinates into a
+     * different world coordinate system (for example the gameplay pitch).
+     */
+    public void draw(Batch batch, ClipRef clip, float time, float x, float y,
+                     float scaleX, float scaleY, boolean loop,
+                     Map<String, Boolean> partsVisibility) {
+        if (clip != null) {
+            drawInternal(batch, clip.ba, clip.range, time, loop, x, y,
+                    scaleX, scaleY, partsVisibility, null);
+        }
+    }
+
     // clip info
 
     /** Retrieves the physical bounds (width and height) of a specific animation clip. as these

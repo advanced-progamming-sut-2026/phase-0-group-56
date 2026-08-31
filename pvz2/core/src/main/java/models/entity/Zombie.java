@@ -69,6 +69,8 @@ public class Zombie extends Entity{
 
     private boolean isFiringRequested = false;
     private boolean isExtraRequested = false;
+    /** Presentation timer that keeps one-shot ability clips visible. */
+    private float actionTimeRemaining = 0f;
     private Plant targetPlant = null;
 
     private final Map<String, Boolean> visibilityMap = new HashMap<>();
@@ -166,6 +168,7 @@ public class Zombie extends Entity{
 
         eatTimer += deltaTime;
         Plant plant = game.findTargetPlant(this, Tile.getWidth() * 0.72f);
+        targetPlant = plant;
         if (plant != null) {
             if (eatTimer >= eatCooldown) {
                 eatTimer = 0;
@@ -174,6 +177,7 @@ public class Zombie extends Entity{
             move(deltaTime, game, plant);
             return;
         }
+        targetPlant = null;
         move(deltaTime, game, null);
     }
 
@@ -244,6 +248,8 @@ public class Zombie extends Entity{
     public void fire() {
         if (fireClip != null) {
             isFiringRequested = true;
+            isExtraRequested = false;
+            actionTimeRemaining = Math.max(actionTimeRemaining, 1.0f);
             setState(ZombieState.FIRING);
         }
     }
@@ -251,6 +257,8 @@ public class Zombie extends Entity{
     public void extra() {
         if (extraClip != null) {
             isExtraRequested = true;
+            isFiringRequested = false;
+            actionTimeRemaining = Math.max(actionTimeRemaining, 1.0f);
             setState(ZombieState.EXTRA);
         }
     }
@@ -299,6 +307,7 @@ public class Zombie extends Entity{
         for (Armor armor : armors) {
             if (armor.isActive()) {
                 armor.takeDamage(damage);
+                armor.updateVisibility();
                 if (armor.isBroken() && "newspaper".equals(armor.getType())) {
                     if (newspaperObserver != null) {
                         newspaperObserver.onArmorBroken(this);
@@ -390,6 +399,7 @@ public class Zombie extends Entity{
     // ====== ARMOR ======
     public void addArmor(Armor armor) {
         armors.add(armor);
+        armor.attachTo(this);
     }
 
     public List<Armor> getArmors() {
@@ -547,16 +557,13 @@ public class Zombie extends Entity{
     }
 
     public void updateAnimation(float delta) {
-        updateAnimationState();
-        updateStateTime(delta);
-
-        if (isFiringRequested && currentState == ZombieState.FIRING) {
+        actionTimeRemaining = Math.max(0f, actionTimeRemaining - Math.max(0f, delta));
+        if (actionTimeRemaining <= 0f) {
             isFiringRequested = false;
-        }
-
-        if (isExtraRequested && currentState == ZombieState.EXTRA) {
             isExtraRequested = false;
         }
+        updateAnimationState();
+        updateStateTime(delta);
     }
 
     public String getCurrentClipName() {

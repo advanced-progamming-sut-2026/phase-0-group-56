@@ -11,7 +11,6 @@ import pvz.libpvz.textures.TextureBank;
 
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -22,9 +21,8 @@ import java.util.Set;
  *
  * The current project branch has no shared ZombieRenderer, so this class maps
  * the zombie names produced by ZombieFactory to PAMs that actually exist in
- * Assets/animations.json. Cone and bucket currently share the basic Egyptian
- * body animation; their model armor/durability still works even though the
- * separate headgear visual is not composed here.
+ * Assets/animations.json. Cone and bucket share the basic Egyptian body
+ * animation, with model-driven armor visibility and animation state.
  */
 public final class VaseBreakerZombieRenderer {
     private static final Map<String, String> PAM_BY_TYPE = Map.ofEntries(
@@ -51,7 +49,6 @@ public final class VaseBreakerZombieRenderer {
     private final Map<String, Visual> visuals = new HashMap<>();
     private final Set<String> loading = new HashSet<>();
     private final Set<String> missing = new HashSet<>();
-    private final IdentityHashMap<Zombie, Float> times = new IdentityHashMap<>();
 
     public VaseBreakerZombieRenderer(FileHandle assetsRoot, TextureBank textureBank) {
         if (assetsRoot == null || textureBank == null) {
@@ -93,8 +90,7 @@ public final class VaseBreakerZombieRenderer {
                 continue;
             }
 
-            float time = times.getOrDefault(zombie, 0f) + Math.max(0f, delta);
-            times.put(zombie, time);
+            zombie.updateAnimation(Math.max(0f, delta));
 
             float normalizedX = modelBoardWidth <= 0f ? 0f : zombie.getX() / modelBoardWidth;
             float centerX = lawnBounds.x + normalizedX * lawnBounds.width;
@@ -115,19 +111,22 @@ public final class VaseBreakerZombieRenderer {
                 drawY = centerY - (visual.bounds.y + visual.bounds.height * 0.5f) * scale;
             }
 
+            ClipRef clip = visual.clipFor(zombie);
+            if (clip == null) {
+                continue;
+            }
             pamPlayer.draw(
                 batch,
-                visual.clip,
-                time,
+                clip,
+                zombie.getStateTime(),
                 drawX,
                 drawY,
                 scale,
                 scale,
-                true
+                true,
+                zombie.getVisibilityMap()
             );
         }
-
-        times.keySet().removeIf(zombie -> !containsIdentity(zombies, zombie));
     }
 
     private String resolvePamPath(String key) {
@@ -155,17 +154,28 @@ public final class VaseBreakerZombieRenderer {
         loading.add(pamPath);
         pamPlayer.loadAsync(pamPath, () -> {
             try {
-                List<String> clips = pamPlayer.clips(pamPath);
-                if (clips == null || clips.isEmpty()) {
+                List<String> availableClips = pamPlayer.clips(pamPath);
+                if (availableClips == null || availableClips.isEmpty()) {
                     missing.add(pamPath);
                     return;
                 }
 
-                String clipName = chooseWalkClip(clips);
-                ClipRef clip = pamPlayer.getClip(pamPath, clipName);
-                if (clip == null) {
+                String clipName = chooseWalkClip(availableClips);
+                ClipRef fallback = pamPlayer.getClip(pamPath, clipName);
+                if (fallback == null) {
                     missing.add(pamPath);
                     return;
+                }
+
+                Map<String, ClipRef> clipsByName = new HashMap<>();
+                for (String available : availableClips) {
+                    if (available == null || available.isBlank()) {
+                        continue;
+                    }
+                    ClipRef ref = pamPlayer.getClip(pamPath, available);
+                    if (ref != null) {
+                        clipsByName.put(available.toLowerCase(Locale.ROOT), ref);
+                    }
                 }
 
                 Rectangle bounds = null;
@@ -173,7 +183,7 @@ public final class VaseBreakerZombieRenderer {
                     bounds = pamPlayer.bounds(pamPath, clipName);
                 } catch (RuntimeException ignored) {
                 }
-                visuals.put(pamPath, new Visual(clip, bounds));
+                visuals.put(pamPath, new Visual(clipsByName, fallback, bounds));
             } finally {
                 loading.remove(pamPath);
             }
@@ -209,22 +219,33 @@ public final class VaseBreakerZombieRenderer {
             : value.toLowerCase(Locale.ROOT).replace("-", "_").trim();
     }
 
-    private static boolean containsIdentity(Iterable<Zombie> zombies, Zombie wanted) {
-        for (Zombie zombie : zombies) {
-            if (zombie == wanted) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     private static final class Visual {
-        private final ClipRef clip;
+        private final Map<String, ClipRef> clips;
+        private final ClipRef fallback;
         private final Rectangle bounds;
 
-        private Visual(ClipRef clip, Rectangle bounds) {
-            this.clip = clip;
+        private Visual(Map<String, ClipRef> clips, ClipRef fallback, Rectangle bounds) {
+            this.clips = clips;
+            this.fallback = fallback;
             this.bounds = bounds;
+        }
+
+        private ClipRef clipFor(Zombie zombie) {
+            if (zombie == null) return fallback;
+            String requested = switch (zombie.getCurrentState()) {
+                case IDLE -> zombie.getIdle();
+                case WALKING -> zombie.getWalk();
+                case EATING -> zombie.getEat();
+                case DYING -> zombie.getDie();
+                case FIRING -> zombie.getFire();
+                case EXTRA -> zombie.getExtra();
+            };
+            if (requested != null) {
+                ClipRef exact = clips.get(requested.toLowerCase(Locale.ROOT));
+                if (exact != null) return exact;
+            }
+            ClipRef walk = clips.get("walk");
+            return walk != null ? walk : fallback;
         }
     }
 }
