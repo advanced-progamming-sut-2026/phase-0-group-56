@@ -50,6 +50,10 @@ public final class IZombieNetworkMatch {
         this.matchId = matchId == null ? "" : matchId;
     }
 
+    private final List<GameMessage> chatHistory = new ArrayList<>();
+
+    public static final int MAX_CHAT_HISTORY = 50;
+
     public static List<Card> plantCards() {
         return PLANT_CARDS;
     }
@@ -389,6 +393,36 @@ public final class IZombieNetworkMatch {
         public static ActionResult error(String code, String message) {
             return new ActionResult(false, code, message);
         }
+    }
+
+    public synchronized ActionResult sendMessage(
+        IZombieNetworkState.Role role,
+        String receiver,
+        String type,
+        String contentId,
+        String soundId
+    ) {
+        if (!canAct(role, IZombieNetworkState.Phase.PLAYING)) {
+            return ActionResult.error("NOT_ALLOWED", "Messages are available while the match is running.");
+        }
+
+        String sender = role == IZombieNetworkState.Role.PLANTS ? "PLANTS" : "ZOMBIES";
+
+        GameMessage msg = new GameMessage(
+            sender,
+            receiver,
+            MessageType.valueOf(type),
+            contentId,
+            soundId
+        );
+
+        chatHistory.add(msg);
+        if (chatHistory.size() > MAX_CHAT_HISTORY) {
+            chatHistory.remove(0);
+        }
+
+        revision++;
+        return ActionResult.ok("Message sent.");
     }
 
     private static final class MutableUnit {

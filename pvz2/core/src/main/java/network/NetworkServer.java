@@ -158,7 +158,7 @@ public final class NetworkServer implements Closeable {
             case "GAME_JOIN" -> joinGame(session, values);
             case "GAME_PLANT" -> placeNetworkPlant(session, values);
             case "GAME_ZOMBIE" -> placeNetworkZombie(session, values);
-            case "GAME_REACTION" -> sendReaction(session, values);
+            case "GAME_MESSAGE" -> sendMessage(session, values);
             case "GAME_LEAVE" -> leaveGame(session);
             case "SCORE_SUBMIT" -> submitScore(session, values);
             case "LEADERBOARD" -> sendLeaderboard(session);
@@ -408,22 +408,24 @@ public final class NetworkServer implements Closeable {
         }
     }
 
-    private void sendReaction(Session session, String[] values) {
-        if (values.length < 3) {
-            response(session, false, "INVALID_REACTION", "Category, value and match id are required.");
+    private void sendMessage(Session session, String[] values) {
+        // values: matchId, receiver, type, contentId, soundId
+        if (values.length < 5) {
+            response(session, false, "INVALID_MESSAGE", "Match id, receiver, type, content id and sound id are required.");
             return;
         }
         MatchRuntime runtime = matchFor(session, values[0]);
         if (runtime == null) {
-            response(session, false, "MATCH_NOT_FOUND", "Join a match before sending reactions.");
+            response(session, false, "MATCH_NOT_FOUND", "Join a match before sending messages.");
             return;
         }
-        IZombieNetworkMatch.ActionResult result = runtime.match.react(session.role, values[1], values[2]);
+        IZombieNetworkMatch.ActionResult result = runtime.match.sendMessage(
+            session.role, values[1], values[2], values[3], values[4]);
         respondAction(session, result);
         if (result.success()) {
             Session opponent = runtime.opponent(session);
             if (opponent != null) {
-                event(opponent, "REACTION", session.username, values[1], values[2]);
+                event(opponent, "MESSAGE", session.username, values[1], values[2], values[3], values[4]);
             }
         }
     }

@@ -46,6 +46,10 @@ public final class IZombieNetworkView extends MinigameBoardView {
     private Table resultPanel;
     private Label resultText;
     private float reactionTime;
+    private MessageWidget messageWidget;
+    private ChatPanel chatPanel;
+    private MessageSelector messageSelector;
+    private Table messageRoot;
 
     public IZombieNetworkView(String matchId, String role, String opponent) {
         this(matchId, parseRole(role), opponent);
@@ -73,6 +77,8 @@ public final class IZombieNetworkView extends MinigameBoardView {
     public void show() {
         initialiseScreen();
         buildUi();
+        buildMessageUI();
+
         installInput(createInput());
         statusLabel.setText(controller.join());
     }
@@ -96,6 +102,10 @@ public final class IZombieNetworkView extends MinigameBoardView {
         renderState();
         uiViewport.apply();
         stage.act(safeDelta);
+        if (messageWidget != null) {
+            messageWidget.update(safeDelta);
+            messageWidget.renderSticker(batch);
+        }
         stage.draw();
     }
 
@@ -344,6 +354,21 @@ public final class IZombieNetworkView extends MinigameBoardView {
             reactionLabel.setText(reaction.sender() + ": " + reaction.value());
             reactionTime = 3f;
         }
+        if ("MESSAGE".equals(event.type()) && event.data().length >= 5) {
+            String sender = event.data()[0];
+            String receiver = event.data()[1];
+            String typeStr = event.data()[2];
+            String content = event.data()[3];
+            String sound = event.data()[4];
+
+            GameMessage msg = new GameMessage(
+                sender, receiver,
+                GameMessage.MessageType.valueOf(typeStr),
+                content, sound
+            );
+            if (messageWidget != null) messageWidget.display(msg);
+            if (chatPanel != null) chatPanel.addMessage(msg);
+        }
         if (reactionTime <= 0f) {
             reactionLabel.setText("");
         }
@@ -408,6 +433,40 @@ public final class IZombieNetworkView extends MinigameBoardView {
     @Override
     public void dispose() {
         controller.close();
+        if (messageWidget != null) messageWidget = null;
+        if (chatPanel != null) chatPanel = null;
+        if (messageSelector != null) messageSelector = null;
+        if (messageRoot != null) { messageRoot.remove(); messageRoot = null; }
+        AudioManager.getInstance().dispose();
+        MessageAssetManager.getInstance().dispose();
         super.dispose();
+    }
+
+    private void buildMessageUI() {
+        if (pvzAssetsRoot == null || textureBank == null || pamPlayer == null) return;
+
+        MessageAssetManager.getInstance().loadEmojis(textureBank);
+        MessageAssetManager.getInstance().loadStickers(textureBank, pamPlayer);
+        AudioManager.getInstance().loadSounds();
+
+        messageRoot = new Table();
+        messageRoot.setFillParent(true);
+        messageRoot.bottom().right().pad(10);
+
+        messageWidget = new MessageWidget(skin, pamPlayer);
+        chatPanel = new ChatPanel(skin);
+        messageSelector = new MessageSelector(skin);
+
+        String myName = controller.getRole().name();
+        String oppName = "OPPONENT";
+        messageSelector.setContext(NetworkService.getClient(), controller.getMatchId(), myName, oppName);
+
+        Table rightPanel = new Table();
+        rightPanel.add(messageWidget.getRoot()).pad(4).row();
+        rightPanel.add(chatPanel.getRoot()).pad(4).row();
+        rightPanel.add(messageSelector.getRoot()).pad(4);
+
+        messageRoot.add(rightPanel).bottom().right();
+        stage.addActor(messageRoot);
     }
 }

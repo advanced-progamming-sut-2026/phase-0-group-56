@@ -25,7 +25,6 @@ public class GameMessage {
         this.timestamp = System.currentTimeMillis();
     }
 
-    // ====== GETTERS ======
     public String getSender() { return sender; }
     public String getReceiver() { return receiver; }
     public MessageType getType() { return type; }
@@ -33,7 +32,6 @@ public class GameMessage {
     public String getSoundId() { return soundId; }
     public long getTimestamp() { return timestamp; }
 
-    // ====== SETTERS ======
     public void setSender(String sender) { this.sender = sender; }
     public void setReceiver(String receiver) { this.receiver = receiver; }
     public void setType(MessageType type) { this.type = type; }

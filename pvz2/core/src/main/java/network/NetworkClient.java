@@ -117,8 +117,8 @@ public final class NetworkClient implements Closeable {
         return request("GAME_ZOMBIE", matchId, type, Integer.toString(column), Integer.toString(row));
     }
 
-    public NetworkResponse sendReaction(String matchId, String category, String value) {
-        return request("GAME_REACTION", matchId, category, value);
+    public NetworkResponse sendMessage(String matchId, String receiver, String type, String contentId, String soundId) {
+        return request("GAME_MESSAGE", matchId, receiver, type, contentId, soundId);
     }
 
     public NetworkResponse leaveGame() {
