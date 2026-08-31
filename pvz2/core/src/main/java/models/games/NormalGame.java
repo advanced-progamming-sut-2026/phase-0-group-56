@@ -25,6 +25,14 @@ public NormalGame(Chapters chapters, Level level){
 }
     @Override
     public void initGame(Chapters chapter , Level level) {
+        plantsInField.clear();
+        zombies.clear();
+        projectiles.clear();
+        suns.clear();
+        rewardDrops.clear();
+        waveID = 0;
+        currentWave = null;
+        previousWave = null;
         waves = new  ArrayList<>();
         this.field = new Field().initField(chapter , level.getId());
         for (int i = 0; i < 5; i++) {

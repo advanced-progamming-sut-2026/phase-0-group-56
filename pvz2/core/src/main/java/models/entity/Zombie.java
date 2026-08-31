@@ -25,6 +25,9 @@ public class Zombie extends Entity{
     private int tileIndex;
     private Tile currentTile = null;
     private boolean dead;
+    private RewardDrop.Type rewardDropType;
+    private int rewardDropAmount;
+    private boolean rewardDropCreated;
     private boolean frozen;
     private boolean hypnotized;
     private boolean inWater;
@@ -313,31 +316,42 @@ public class Zombie extends Entity{
     }
 
     public void die() {
+        if (dead) {
+            return;
+        }
         dead = true;
         models.User user = App.getCurrentuser();
         int random = (int)(Math.random() * 100);
-        if (user != null && random <= 10) {
-            int rand = random % 3;
-            if(rand == 0) {
-                user.addCoins(50);
-                System.out.println("mara koshti but this 50 coins for you , be kind");
-            }
-            else if(rand == 1) {
-                user.addDiamonds(1);
-                System.out.println("mara koshti but this diamond for you , be kind");
-            }
-            else {
-                user.addUnlockedPots(1);
-                System.out.println("mara koshti but this pot for you , nahali beneshan be yade man");
-            }
-        }
-        else if (user != null && random <= 15) {
-            user.addPlantFoods(1);
-            System.out.println("mara koshti bedoon sabr, but eat this food patiently ");
+        if (random <= 15) {
+            int kind = random % 4;
+            rewardDropType = switch (kind) {
+                case 0 -> RewardDrop.Type.COIN_GOLD;
+                case 1 -> RewardDrop.Type.COIN_SILVER;
+                case 2 -> RewardDrop.Type.DIAMOND;
+                default -> RewardDrop.Type.PLANT_FOOD;
+            };
+            rewardDropAmount = rewardDropType == RewardDrop.Type.COIN_GOLD ? 50
+                : rewardDropType == RewardDrop.Type.COIN_SILVER ? 25 : 1;
         }
         if (user != null) {
             user.updateQuestProgress("KILL_ZOMBIE", 1);
         }
+    }
+
+    public RewardDrop.Type getRewardDropType() {
+        return rewardDropType;
+    }
+
+    public int getRewardDropAmount() {
+        return rewardDropAmount;
+    }
+
+    public boolean isRewardDropCreated() {
+        return rewardDropCreated;
+    }
+
+    public void markRewardDropCreated() {
+        rewardDropCreated = true;
     }
 
     public void render(SpriteBatch batch, PamPlayer player) {
@@ -415,6 +429,13 @@ public class Zombie extends Entity{
     public String getId() { return id; }
     public String getType() { return type; }
     public float getHp() { return hp; }
+    @Override
+    public void setHp(float hp) {
+        this.hp = Math.max(0f, hp);
+        if (this.hp <= 0f) {
+            die();
+        }
+    }
     public int getMaxHp() { return maxHp; }
     public int getDamage() { return damage; }
     public float getSpeed() { return speed; }
@@ -427,7 +448,7 @@ public class Zombie extends Entity{
     public float getWidth() { return width; }
     public float getHeight() { return height; }
 
-    public void setHp(int hp) { this.hp = hp; }
+    public void setHp(int hp) { setHp((float) hp); }
     public void setSpeed(float speed) { this.speed = speed; }
     public void setPosition(float x, float y) { this.x = x; this.y = y; }
     public void setLine(int line) {

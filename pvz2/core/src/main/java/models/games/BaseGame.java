@@ -53,6 +53,8 @@ public class BaseGame implements Game {
     protected ArrayList<Zombie> zombies = new ArrayList<>(); ///combination of current wave and next wave
     protected ArrayList<Projectile> projectiles =  new ArrayList<>();
     protected ArrayList<Sun> suns =  new ArrayList<>();
+    /** Collectibles dropped by defeated zombies and waiting for player input. */
+    protected ArrayList<RewardDrop> rewardDrops = new ArrayList<>();
     protected GameCommands startGameCommand;
     protected ChapterSpecialEvent event;
     protected PlantFactory plantFactory = new PlantFactory();
@@ -78,6 +80,7 @@ public class BaseGame implements Game {
     public void setSunCount(int sunCount) { this.sunCount = sunCount; }
     public ArrayList<Projectile> getBullets() { return projectiles; }
     public ArrayList<Sun> getSuns() { return suns; }
+    public ArrayList<RewardDrop> getRewardDrops() { return rewardDrops; }
     public Wave getCurrentWave() { return currentWave; }
     public Field getField() { return field; }
     public void setField(Field field) { this.field = field; }
@@ -125,6 +128,7 @@ public class BaseGame implements Game {
 
         updatePendingWaveZombies(delta);
         updateZombies(delta);
+        updateRewardDrops(delta);
         updatePlants(delta);
         updateScene(delta);
         Result result = attack(delta);
@@ -222,6 +226,7 @@ public class BaseGame implements Game {
 
         for (Zombie zombie : zombies) {
             if (zombie.isDead()) {
+                createRewardDrop(zombie);
                 System.out.println("zombie died at (" + zombie.getX() + ", " + zombie.getY() + ")");
                 SunRobbingAbility sun = zombie.getAbility(SunRobbingAbility.class);
                 if (sun != null && sun.getStolenSun() > 0) {
@@ -239,6 +244,31 @@ public class BaseGame implements Game {
         }
 
         zombies.removeIf(Zombie::isDead);
+    }
+
+    private void updateRewardDrops(float delta) {
+        for (RewardDrop drop : rewardDrops) {
+            if (drop != null) {
+                drop.update(delta);
+            }
+        }
+        rewardDrops.removeIf(drop -> drop == null || drop.isExpired());
+    }
+
+    private void createRewardDrop(Zombie zombie) {
+        if (zombie == null || zombie.isRewardDropCreated()
+            || zombie.getRewardDropType() == null) {
+            return;
+        }
+        float x = Math.max(0f, Math.min(8f * Tile.getWidth(), zombie.getX()));
+        float y = Math.max(0f, Math.min(4f * Tile.getHeight(), zombie.getY()));
+        rewardDrops.add(new RewardDrop(
+            zombie.getRewardDropType(),
+            zombie.getRewardDropAmount(),
+            x,
+            y
+        ));
+        zombie.markRewardDropCreated();
     }
 
     @Override

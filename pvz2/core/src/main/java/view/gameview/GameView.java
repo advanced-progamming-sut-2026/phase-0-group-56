@@ -9,6 +9,7 @@ import com.badlogic.gdx.graphics.Cursor;
 import com.badlogic.gdx.graphics.GL20;
 import models.entity.Plant;
 import models.entity.Sun;
+import models.entity.RewardDrop;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.InputAdapter;
@@ -1064,6 +1065,19 @@ public final class GameView extends View {
 
                     if (clickedSun != null) {
                         String result = controller.collectSun(clickedSun);
+                        if (result != null && !result.isBlank()) {
+                            toolsStack.setStatus(result);
+                        }
+                        toolsStack.refresh();
+                        return true;
+                    }
+
+                    RewardDrop clickedDrop = worldEntities.hitTestRewardDrop(
+                        pointerWorld.x,
+                        pointerWorld.y
+                    );
+                    if (clickedDrop != null) {
+                        String result = controller.collectRewardDrop(clickedDrop);
                         if (result != null && !result.isBlank()) {
                             toolsStack.setStatus(result);
                         }

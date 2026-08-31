@@ -10,6 +10,7 @@ import com.badlogic.gdx.utils.viewport.Viewport;
 
 import controllers.menus.gamecontroller.GameController;
 import models.entity.Sun;
+import models.entity.RewardDrop;
 import models.factory.builder.PlantType;
 import models.games.BaseGame;
 import pvz.libpvz.textures.TextureBank;
@@ -30,6 +31,7 @@ public final class WorldEntityRenderer implements Disposable {
 
     private PlantRenderer plantRenderer;
     private SunRenderer sunRenderer;
+    private RewardDropRenderer rewardDropRenderer;
     private MowerRenderer mowerRenderer;
     private ZombieRenderer zombieRenderer;
     private ChapterElementRenderer chapterElementRenderer;
@@ -74,6 +76,7 @@ public final class WorldEntityRenderer implements Disposable {
         initialiseMowers(pvzAssetsRoot, sharedTextureBank);
         initialiseChapterForeground();
         initialiseSuns(pvzAssetsRoot, sharedTextureBank, sunFallback);
+        initialiseRewardDrops(pvzAssetsRoot, sharedTextureBank);
     }
 
     private void initialiseZombies(
@@ -329,6 +332,13 @@ public final class WorldEntityRenderer implements Disposable {
         stage.addActor(sunLayer);
     }
 
+    private void initialiseRewardDrops(FileHandle pvzAssetsRoot, TextureBank sharedTextureBank) {
+        rewardDropRenderer = new RewardDropRenderer(pvzAssetsRoot, sharedTextureBank);
+        RewardDropLayer dropLayer = new RewardDropLayer(controller, rewardDropRenderer);
+        dropLayer.setBounds(pitchBounds.x, pitchBounds.y, pitchBounds.width, pitchBounds.height);
+        stage.addActor(dropLayer);
+    }
+
     /**
      * The caller must already have applied the world viewport/camera.
      */
@@ -362,6 +372,13 @@ public final class WorldEntityRenderer implements Disposable {
             worldX,
             worldY,
             pitchBounds
+        );
+    }
+
+    public RewardDrop hitTestRewardDrop(float worldX, float worldY) {
+        if (rewardDropRenderer == null) return null;
+        return rewardDropRenderer.hitTest(
+            controller.getGame().getRewardDrops(), worldX, worldY, pitchBounds
         );
     }
 
@@ -408,6 +425,10 @@ public final class WorldEntityRenderer implements Disposable {
         if (sunRenderer != null) {
             sunRenderer.dispose();
             sunRenderer = null;
+        }
+        if (rewardDropRenderer != null) {
+            rewardDropRenderer.dispose();
+            rewardDropRenderer = null;
         }
     }
 }

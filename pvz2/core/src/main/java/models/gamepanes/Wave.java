@@ -34,10 +34,15 @@ public class Wave {
     public boolean isFinished(){
         float totalHp = 0;
         for (Zombie z : zombies) {
-            totalHp += z.getHp();
+            if (z != null && !z.isDead()) {
+                totalHp += Math.max(0f, z.getHp());
+            }
         }
-        return (finalWave && Math.abs(totalHp - 0) <= 0.1) ||
-            (!finalWave && totalHp <= 0.25f * zombiesHP);
+        /* A wave is finished only after every zombie in it has died.  The
+         * previous 25% threshold advanced normal waves while live zombies
+         * were still on the lawn and could consequently announce a win early.
+         */
+        return totalHp <= 0.1f;
     }
 
 

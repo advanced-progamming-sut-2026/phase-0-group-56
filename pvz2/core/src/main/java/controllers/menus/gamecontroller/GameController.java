@@ -177,6 +177,40 @@ public class GameController implements Controller, Menu {
         return null;
     }
 
+    /** Collects a zombie reward drop at the clicked world position/object. */
+    public String collectRewardDrop(RewardDrop target) {
+        if (game.getState() != BaseGame.GameState.PLAYING || target == null) {
+            return null;
+        }
+        Iterator<RewardDrop> iterator = game.getRewardDrops().iterator();
+        while (iterator.hasNext()) {
+            RewardDrop drop = iterator.next();
+            if (drop != target) {
+                continue;
+            }
+            User user = App.getCurrentuser();
+            if (user != null) {
+                switch (drop.getType()) {
+                    case COIN_GOLD, COIN_SILVER -> user.addCoins(drop.getAmount());
+                    case DIAMOND -> user.addDiamonds(drop.getAmount());
+                    case PLANT_FOOD -> {
+                        user.addPlantFoods(drop.getAmount());
+                        game.setPlantFoodsCount(Math.min(3,
+                            game.getPlantFoodsCount() + drop.getAmount()));
+                    }
+                }
+                Data.saveUser();
+            } else if (drop.getType() == RewardDrop.Type.PLANT_FOOD) {
+                game.setPlantFoodsCount(Math.min(3,
+                    game.getPlantFoodsCount() + drop.getAmount()));
+            }
+            iterator.remove();
+            return "Collected " + drop.getType().name().replace('_', ' ').toLowerCase()
+                + " ( +" + drop.getAmount() + " ).";
+        }
+        return null;
+    }
+
     private String collectMatchedSun(Iterator<Sun> iterator, Sun sun) {
         if (sun.isRadioActive()) {
             sun.dispose(game);

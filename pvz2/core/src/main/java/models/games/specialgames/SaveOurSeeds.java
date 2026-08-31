@@ -53,9 +53,15 @@ public class SaveOurSeeds extends NormalGame implements SpecialGame {
         ArrayList<PlantType> candidates = new ArrayList<>(
             App.getCurrentuser().getUnlockedPlants()
         );
-        candidates.removeIf(type ->
-            type == null || type.getCategory() == PlantCategory.Explosive
-        );
+        /*
+         * PlantType.category is not populated by the legacy plants.json
+         * loader, so checking type.getCategory() alone lets zero-HP plants
+         * (Cherry Bomb, mints, Imitater, ...) become protected.  They are
+         * removed by NormalGame on the first update and the challenge loses
+         * immediately.  Build a probe plant and keep only a living,
+         * non-single-use candidate instead.
+         */
+        candidates.removeIf(type -> !isValidProtectedType(type));
 
         if (candidates.isEmpty()) {
             return;
@@ -105,6 +111,22 @@ public class SaveOurSeeds extends NormalGame implements SpecialGame {
         }
     }
 
+    private boolean isValidProtectedType(PlantType type) {
+        if (type == null || type.getCategory() == PlantCategory.Explosive) {
+            return false;
+        }
+        try {
+            Plant probe = plantFactory.createPlant(type);
+            return probe != null
+                && probe.getHp() > 0f
+                && probe.getTags() != null
+                && !probe.getTags().contains(models.entity.PlantTags.ONCE_USAGE)
+                && !probe.getTags().contains(models.entity.PlantTags.EXPLOSIVE);
+        } catch (RuntimeException ignored) {
+            return false;
+        }
+    }
+
     /**
      * Pre-planted challenge plants are not regular seed placements: they do
      * not cost sun and do not need to exist in availablePlants.
@@ -115,9 +137,10 @@ public class SaveOurSeeds extends NormalGame implements SpecialGame {
         Tile tile = field.getTiles().get(row).get(col);
         if ("LILY_PAD".equals(type.name())) {
             tile.setPlantable(true);
-        } else {
-            tile.setEmpty(false);
         }
+        // A protected plant occupies its tile in every case.  Leaving Lily
+        // Pad tiles empty allowed normal planting over a protected seed.
+        tile.setEmpty(false);
 
         plant.setLine(row);
         plant.setTileIndex(col);
