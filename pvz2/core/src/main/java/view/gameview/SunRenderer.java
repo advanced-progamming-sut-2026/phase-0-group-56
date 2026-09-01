@@ -102,6 +102,8 @@ public final class SunRenderer implements Disposable {
         float oldB = oldColor.b;
         float oldA = oldColor.a;
         try {
+            // The bomb animation is tinted while falling. Once it lands,
+            // SUN_BOMB's normalSunIdle clip should look like a regular sun.
             if (type == Sun.AnimationType.RADIOACTIVE) {
                 batch.setColor(1f, 0.42f, 0.42f, 1f);
             }
@@ -210,6 +212,12 @@ public final class SunRenderer implements Disposable {
                 return blue;
             }
         }
+        if (type == Sun.AnimationType.RADIOACTIVE_GROUNDED) {
+            String grounded = findIgnoreCase(clips, "normalSunIdle");
+            if (grounded != null) {
+                return grounded;
+            }
+        }
         for (String preferred : new String[]{"idle", "animation", "loop", "default", "explode"}) {
             String match = findIgnoreCase(clips, preferred);
             if (match != null) {
@@ -229,7 +237,10 @@ public final class SunRenderer implements Disposable {
     }
 
     private static String pathFor(Sun.AnimationType type) {
-        return type == Sun.AnimationType.RADIOACTIVE ? SUN_BOMB_PAM : SUN_PAM;
+        return type == Sun.AnimationType.RADIOACTIVE
+            || type == Sun.AnimationType.RADIOACTIVE_GROUNDED
+            ? SUN_BOMB_PAM
+            : SUN_PAM;
     }
 
     private TextureRegion resolveWorldSunRegion(TextureBank bank) {

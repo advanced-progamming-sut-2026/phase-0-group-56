@@ -8,7 +8,9 @@ public class Sun extends Entity{
     public enum AnimationType {
         NORMAL,
         SPECIAL,
-        RADIOACTIVE
+        RADIOACTIVE,
+        /** Radioactive sun after it has landed on the lawn. */
+        RADIOACTIVE_GROUNDED
     }
 
     Plant producer;
@@ -110,7 +112,7 @@ public class Sun extends Entity{
 
     public AnimationType getAnimationType() {
         if (radioActive || radioactiveVisual) {
-            return AnimationType.RADIOACTIVE;
+            return ground ? AnimationType.RADIOACTIVE_GROUNDED : AnimationType.RADIOACTIVE;
         }
         if (animationType == AnimationType.SPECIAL || price >= 100) {
             return AnimationType.SPECIAL;
@@ -124,7 +126,8 @@ public class Sun extends Entity{
             return;
         }
         this.animationType = animationType;
-        if (animationType == AnimationType.RADIOACTIVE) {
+        if (animationType == AnimationType.RADIOACTIVE
+            || animationType == AnimationType.RADIOACTIVE_GROUNDED) {
             radioactiveVisual = true;
         }
     }

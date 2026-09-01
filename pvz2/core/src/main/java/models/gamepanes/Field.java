@@ -175,6 +175,15 @@ public class Field {
         return WaveLimitColumn;
     }
 
+    /**
+     * Returns the level's configured maximum water reach. This is distinct
+     * from {@link #getWaterCurrentSurface()}, which moves as each wave rolls
+     * in and out during play.
+     */
+    public int getMaximumWaterSurfaceColumn() {
+        return WaveLimitColumn;
+    }
+
     public void setWaveLimitColumn(int waveLimitColumn) {
         WaveLimitColumn = waveLimitColumn;
     }

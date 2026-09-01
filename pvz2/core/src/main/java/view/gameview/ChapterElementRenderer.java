@@ -524,7 +524,7 @@ public final class ChapterElementRenderer implements Disposable {
         }
 
         int maxColumn = Math.max(0, Math.min(COLUMN_COUNT - 1,
-            game.getField().getWaveLimitColumn()));
+            game.getField().getMaximumWaterSurfaceColumn()));
         float boundaryX = lawnX + maxColumn * cellWidth;
         drawPamFit(
             batch,

@@ -158,10 +158,10 @@ public class Zombie extends Entity{
             applyPoisonDamage();
         }
 
-        // The chapter ice-shell flag and the temporary ICE status both stop a
-        // zombie from acting until the projectile/ability that hit it releases
-        // the zombie.
-        if (frozen || hasEffect(EffectType.FROZEN)) {
+        // The boolean/encased flags represent a complete ice shell.  The
+        // temporary FROZEN effect (for example from Snow Pea) is a slow only;
+        // getActualSpeed() applies its reduced speed below.
+        if (frozen) {
             return;
         }
 

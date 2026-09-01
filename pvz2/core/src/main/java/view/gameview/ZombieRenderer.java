@@ -2,10 +2,12 @@ package view.gameview;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.files.FileHandle;
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.g2d.Batch;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.utils.Disposable;
 import controllers.datacontroller.Data;
+import models.entity.EffectType;
 import models.entity.Zombie;
 import models.entity.ZombieRegistry;
 import models.entity.ZombieState;
@@ -286,17 +288,34 @@ public final class ZombieRenderer implements Disposable {
             return;
         }
 
-        pamPlayer.draw(
-            batch,
-            clip,
-            zombie.getStateTime(),
-            drawX,
-            drawY,
-            scale,
-            scale,
-            zombie.getCurrentState() != ZombieState.DYING,
-            zombie.getVisibilityMap()
-        );
+        Color oldColor = batch.getColor();
+        float oldR = oldColor.r;
+        float oldG = oldColor.g;
+        float oldB = oldColor.b;
+        float oldA = oldColor.a;
+        try {
+            // A temporary FROZEN effect slows the zombie but does not encase
+            // it. Tint those zombies blue so the gameplay state is visible;
+            // fully encased zombies use the ice-block overlay instead.
+            if (zombie.hasEffect(EffectType.FROZEN)
+                && !zombie.isFrozen()
+                && !zombie.isEncasedInIce()) {
+                batch.setColor(0.52f, 0.78f, 1f, 1f);
+            }
+            pamPlayer.draw(
+                batch,
+                clip,
+                zombie.getStateTime(),
+                drawX,
+                drawY,
+                scale,
+                scale,
+                zombie.getCurrentState() != ZombieState.DYING,
+                zombie.getVisibilityMap()
+            );
+        } finally {
+            batch.setColor(oldR, oldG, oldB, oldA);
+        }
     }
 
     private static VisualSpec visualSpec(Zombie zombie) {
