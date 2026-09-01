@@ -85,6 +85,25 @@ public final class NetworkClient implements Closeable {
         return request("LOGIN", username, password);
     }
 
+    /** Requests the recovery question without requiring an authenticated session. */
+    public NetworkResponse getSecurityQuestion(String username, String email) {
+        return request("RECOVERY_QUESTION", username, email);
+    }
+
+    /** Resets a password after the server verifies the recovery identity. */
+    public NetworkResponse resetPassword(String username, String email,
+                                         String answer, String newPassword) {
+        return request("RECOVER_PASSWORD", username, email, answer, newPassword);
+    }
+
+    /** Updates the authenticated account and returns its authoritative snapshot. */
+    public NetworkResponse updateAccount(String currentUsername, String newUsername,
+                                         String nickname, String email, String gender,
+                                         String newPassword, String currentPasswordHash) {
+        return request("UPDATE_ACCOUNT", currentUsername, newUsername, nickname, email,
+            gender, newPassword, currentPasswordHash);
+    }
+
     public NetworkResponse logout() {
         return request("LOGOUT");
     }
@@ -258,7 +277,10 @@ public final class NetworkClient implements Closeable {
             || "ACTION_ACCEPTED".equals(code)
             || "GAME_LEFT".equals(code)
             || "SCORE_UPDATED".equals(code)
-            || "LEADERBOARD".equals(code);
+            || "LEADERBOARD".equals(code)
+            || "RECOVERY_QUESTION".equals(code)
+            || "PASSWORD_RESET".equals(code)
+            || "ACCOUNT_UPDATED".equals(code);
     }
 
     public static AccountSnapshot accountFrom(NetworkResponse response) {

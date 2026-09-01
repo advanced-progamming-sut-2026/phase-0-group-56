@@ -6,6 +6,9 @@ import models.App;
 import models.User;
 import models.utils.AccountValidator;
 import models.utils.CredentialHasher;
+import network.NetworkClient;
+import network.NetworkResponse;
+import network.NetworkService;
 import view.HomeView;
 
 public class Profile implements Menu {
@@ -58,6 +61,12 @@ public class Profile implements Menu {
             return "Error: username is already taken.";
         }
 
+        String syncError = syncAccount(user, newUsername, user.getNickname(),
+            user.getEmail(), user.getGender(), "");
+        if (syncError != null) {
+            return syncError;
+        }
+
         user.setName(newUsername);
         Data.saveUser();
         return "Username changed successfully.";
@@ -71,8 +80,14 @@ public class Profile implements Menu {
         if (!AccountValidator.isValidNickname(newNickname)) {
             return "Error: nickname must contain between 3 and 30 characters.";
         }
-        if (user.getNickname().equals(newNickname)) {
+        if (newNickname.equals(user.getNickname())) {
             return "Error: new nickname cannot be the same as the current one.";
+        }
+
+        String syncError = syncAccount(user, user.getName(), newNickname,
+            user.getEmail(), user.getGender(), "");
+        if (syncError != null) {
+            return syncError;
         }
 
         user.setNickname(newNickname);
@@ -88,8 +103,14 @@ public class Profile implements Menu {
         if (!AccountValidator.isValidEmail(newEmail)) {
             return "Error: email format is invalid.";
         }
-        if (user.getEmail().equalsIgnoreCase(newEmail)) {
+        if (user.getEmail() != null && user.getEmail().equalsIgnoreCase(newEmail)) {
             return "Error: new email cannot be the same as the current one.";
+        }
+
+        String syncError = syncAccount(user, user.getName(), user.getNickname(),
+            newEmail, user.getGender(), "");
+        if (syncError != null) {
+            return syncError;
         }
 
         user.setEmail(newEmail);
@@ -125,8 +146,34 @@ public class Profile implements Menu {
             return "Error: new password cannot be the same as the old password.";
         }
 
+        String syncError = syncAccount(user, user.getName(), user.getNickname(),
+            user.getEmail(), user.getGender(), newPassword);
+        if (syncError != null) {
+            return syncError;
+        }
+
         user.setPasswordHash(CredentialHasher.hash(newPassword));
         Data.saveUser();
         return "Password changed successfully.";
+    }
+
+    /** Synchronizes a profile edit with the authoritative server when present. */
+    private String syncAccount(User user, String newUsername, String nickname,
+                               String email, String gender, String newPassword) {
+        if (!NetworkService.isConnected()) {
+            return null;
+        }
+        NetworkClient client = NetworkService.getClient();
+        if (client == null) {
+            return null;
+        }
+        NetworkResponse response = client.updateAccount(
+            user.getName(), newUsername, nickname, email, gender,
+            newPassword, user.getPasswordHash()
+        );
+        if (response.success()) {
+            return null;
+        }
+        return "Error: " + response.message();
     }
 }

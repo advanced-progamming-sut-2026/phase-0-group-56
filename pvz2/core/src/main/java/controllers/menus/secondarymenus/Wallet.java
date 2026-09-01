@@ -11,8 +11,8 @@ public class Wallet implements Menu {
 
     @Override
     public String exitMenu() {
-        App.setScreen(new view.PlayView());
-        return "Returned to Play Menu.";
+        App.setScreen(new view.HomeView());
+        return "Returned to Home Menu.";
     }
 
     @Override

@@ -9,7 +9,7 @@ import models.entity.ZombieRegistry;
 import models.entity.Zombie;
 import models.factory.ZombieFactory;
 import models.factory.builder.PlantType;
-import view.PlayView;
+import view.HomeView;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,8 +29,8 @@ public class Collection implements Menu {
 
     @Override
     public String exitMenu() {
-        App.setScreen(new PlayView());
-        return "Returned to Play Menu.";
+        App.setScreen(new HomeView());
+        return "Returned to Home Menu.";
     }
 
     public List<PlantType> getAllPlants() {

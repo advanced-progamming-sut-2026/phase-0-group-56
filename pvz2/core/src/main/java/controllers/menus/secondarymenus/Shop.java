@@ -5,7 +5,7 @@ import controllers.menus.Menu;
 import models.App;
 import models.User;
 import models.factory.builder.PlantType;
-import view.GreenHouseView;
+import view.HomeView;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -52,8 +52,8 @@ public class Shop implements Menu {
 
     @Override
     public String exitMenu() {
-        App.setScreen(new GreenHouseView());
-        return "Returned to GreenHouse Menu.";
+        App.setScreen(new HomeView());
+        return "Returned to Home Menu.";
     }
 
     @Override

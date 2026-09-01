@@ -189,6 +189,10 @@ public class User implements Serializable, QuestObserver {
         return gender;
     }
 
+    public void setGender(String gender) {
+        this.gender = gender;
+    }
+
     public void setSecurityQuestion(int questionNumber, String answer) {
         this.securityQuestionNumber = questionNumber;
         this.securityAnswer = CredentialHasher.hash(normalizeSecurityAnswer(answer));
@@ -196,6 +200,16 @@ public class User implements Serializable, QuestObserver {
 
     public int getSecurityQuestionNumber() {
         return securityQuestionNumber;
+    }
+
+    /**
+     * Returns the persisted hash used by the account server when a legacy
+     * local account is imported into the embedded network server.
+     *
+     * The value is already hashed and must never be displayed to the user.
+     */
+    public String getSecurityAnswerHash() {
+        return securityAnswer;
     }
 
     public boolean checkSecurityAnswer(String answer) {

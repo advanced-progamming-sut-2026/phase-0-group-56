@@ -8,6 +8,7 @@ import models.utils.CredentialHasher;
 import network.NetworkClient;
 import network.NetworkResponse;
 import network.NetworkService;
+import network.AccountSnapshot;
 import view.LogInView;
 
 public class SignUp implements Menu {
@@ -121,6 +122,7 @@ public class SignUp implements Menu {
 
         if (NetworkService.isConnected() && pendingPassword != null) {
             NetworkClient client = NetworkService.getClient();
+            String registeredPassword = pendingPassword;
             NetworkResponse response = client.register(
                 pendingUsername,
                 pendingPassword,
@@ -130,10 +132,27 @@ public class SignUp implements Menu {
                 questionNumber,
                 normalizedAnswer
             );
-            clearPendingRegistration();
             if (!response.success()) {
+                clearPendingRegistration();
                 return "Error: " + response.message();
             }
+            // Keep a complete local mirror as well.  This makes the account
+            // available when the server is temporarily offline and preserves
+            // the recovery metadata for older local-only flows.
+            AccountSnapshot account = NetworkClient.accountFrom(response);
+            if (account != null) {
+                User localUser = new User(
+                    account.username(),
+                    CredentialHasher.hash(registeredPassword),
+                    account.nickname(),
+                    account.email(),
+                    account.gender()
+                );
+                localUser.setSecurityQuestion(questionNumber, normalizedAnswer);
+                localUser.setHighestScore(account.highestScore());
+                Data.upsertUser(localUser);
+            }
+            clearPendingRegistration();
             return "User created successfully.";
         }
 

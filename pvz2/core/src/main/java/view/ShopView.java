@@ -30,7 +30,7 @@ public class ShopView extends View {
 
     @Override
     protected Screen getBackScreen() {
-        return new GreenHouseView();
+        return new HomeView();
     }
 
     @Override
