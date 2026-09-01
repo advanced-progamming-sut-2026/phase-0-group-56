@@ -344,15 +344,15 @@ public class User implements Serializable, QuestObserver {
     }
 
     public void addUnlockedPots(int amount) {
-        unlockedPots = Math.max(0, Math.min(20, unlockedPots + amount));
+        unlockedPots = Math.max(0, Math.min(12, unlockedPots + amount));
         syncPotUnlocks();
     }
 
     private void syncPotUnlocks() {
         GreenHouse house = getGreenHouse();
         int unlocked = 0;
-        for (int y = 1; y <= 4; y++) {
-            for (int x = 1; x <= 5; x++) {
+        for (int y = 1; y <= 3; y++) {
+            for (int x = 1; x <= 4; x++) {
                 Pot pot = house.getPotByPosition(x, y);
                 if (pot != null) {
                     boolean open = unlocked < unlockedPots;
@@ -561,8 +561,8 @@ public class User implements Serializable, QuestObserver {
             return;
         }
         int index = 0;
-        for (int y = 1; y <= 4; y++) {
-            for (int x = 1; x <= 5; x++) {
+        for (int y = 1; y <= 3; y++) {
+            for (int x = 1; x <= 4; x++) {
                 Pot pot = greenHouse.getPotByPosition(x, y);
                 if (pot != null) {
                     pot.unlock(index < unlockedPots);

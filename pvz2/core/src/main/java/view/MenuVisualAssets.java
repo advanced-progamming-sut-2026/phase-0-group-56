@@ -24,6 +24,7 @@ final class MenuVisualAssets {
 
     private static final String[] INTERNAL_ROOTS = {
         "ui/menu/",
+        "ui/zen garden/",
         "ui/"
     };
 
@@ -43,6 +44,21 @@ final class MenuVisualAssets {
         register(files, "star", "star.png");
         register(files, "pot", "pot.png");
         register(files, "pause", "pause_button.png");
+
+        // Zen Garden artwork. These files are kept in their own asset group
+        // because the garden uses a different background and slot language
+        // from the regular menu chrome.
+        register(files, "zen_background", "zen_garden.png");
+        register(files, "zen_pot", "Zen_Pot_Water_160x97.png");
+        register(files, "zen_pot_small", "Zen_Pot_Water_87x65.png");
+        register(files, "zen_slot", "Growing_Plant_Slot_184x161.png");
+        register(files, "zen_slot_ready", "Growing_Plant_Slot_184x161_2.png");
+        register(files, "zen_lock", "locked_pot_icon.png");
+        register(files, "zen_water", "readytowater.png");
+        register(files, "zen_glow", "boostGlow.png");
+        register(files, "zen_highlight", "highlight_217x217.png");
+        register(files, "zen_drop", "water_droplet_33x85.png");
+        register(files, "zen_sprout", "sprout_23x47.png");
 
         register(files, "quest", "quest_icon_up.png", "quests_button.png");
         register(files, "quest_down", "quest_icon_down.png");

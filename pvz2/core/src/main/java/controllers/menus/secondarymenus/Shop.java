@@ -16,7 +16,7 @@ import java.util.Random;
 
 public class Shop implements Menu {
     public static final int POT_PRICE = 2000;
-    public static final int MAX_POTS = 20;
+    public static final int MAX_POTS = 12;
 
     public static final int PLANT_FOOD_PRICE = 3;
     public static final int MAX_PLANT_FOODS = 3;
@@ -218,7 +218,7 @@ public class Shop implements Menu {
             Math.max(0, MAX_POTS - user.getUnlockedPots());
 
         if (count > remainingCapacity) {
-            return "Error: Maximum of 20 pots reached.";
+            return "Error: Maximum of 12 pots reached.";
         }
 
         long cost = (long) POT_PRICE * count;

@@ -10,8 +10,11 @@ public class GreenHouse implements Serializable {
      */
     private static final long serialVersionUID = 8737255469961946666L;
 
-    private static final int COLUMNS = 5;
-    private static final int ROWS = 4;
+    // The supplied Zen Garden background is a 4 x 3 planting board.
+    // Keeping these dimensions in the model prevents invisible fourth-row /
+    // fifth-column pots from being created in saves or exposed by the UI.
+    private static final int COLUMNS = 4;
+    private static final int ROWS = 3;
     private static final int MAX_POTS = COLUMNS * ROWS;
 
     private User owner;

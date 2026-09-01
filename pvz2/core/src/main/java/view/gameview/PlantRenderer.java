@@ -341,6 +341,11 @@ public final class PlantRenderer implements Disposable {
         requestVisual(type);
     }
 
+    /** Returns true once the idle PAM for a plant has finished loading. */
+    public boolean isReady(PlantType type) {
+        return !disposed && type != null && visuals.containsKey(type);
+    }
+
 
     /**
      * Starts loading the corresponding PAM exactly once.

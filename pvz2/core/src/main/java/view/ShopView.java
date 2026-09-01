@@ -102,7 +102,7 @@ public class ShopView extends View {
             table,
             "POT",
             "2000 COINS",
-            "Unlock one greenhouse pot. Maximum: 20.",
+            "Unlock one greenhouse pot. Maximum: 12 (the Zen Garden board).",
             () ->
                 confirmPurchase(
                     "Pot",
