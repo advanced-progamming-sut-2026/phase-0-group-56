@@ -5,7 +5,9 @@ import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.graphics.g2d.Batch;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.utils.Disposable;
+import controllers.datacontroller.Data;
 import models.entity.Zombie;
+import models.entity.ZombieRegistry;
 import models.entity.ZombieState;
 import models.gamepanes.Tile;
 import pvz.libpvz.pam.ClipRef;
@@ -157,6 +159,7 @@ public final class ZombieRenderer implements Disposable {
             }
 
             drawOrder.add(zombie);
+            discoverForCurrentUser(zombie);
             zombie.updateAnimation(Math.max(0f, delta));
         }
 
@@ -182,6 +185,58 @@ public final class ZombieRenderer implements Disposable {
 
     }
 
+    /**
+     * Synchronously prepares one zombie PAM for a small UI preview. Gameplay
+     * continues to use the non-blocking request path in {@link #render}; the
+     * Collection screen calls this once when a detail card is opened so its
+     * idle animation is available on the first draw.
+     */
+    public boolean preloadSync(Zombie zombie) {
+        if (disposed || zombie == null) {
+            return false;
+        }
+
+        VisualSpec spec = visualSpec(zombie);
+        if (spec == null || loaded.containsKey(spec)) {
+            return spec != null && loaded.containsKey(spec);
+        }
+        if (!pamRoot.child(spec.pamPath).exists()) {
+            missing.add(spec);
+            return false;
+        }
+
+        loading.add(spec);
+        missing.remove(spec);
+        try {
+            pamPlayer.loadSync(spec.pamPath);
+            onLoaded(spec);
+            return loaded.containsKey(spec);
+        } catch (RuntimeException exception) {
+            missing.add(spec);
+            Gdx.app.error(TAG, "Synchronous zombie PAM preload failed: " + spec.pamPath, exception);
+            return false;
+        } finally {
+            loading.remove(spec);
+        }
+    }
+
+    /** A rendered live zombie has been seen by the player. Persist discovery
+     * only on the transition from locked to unlocked, never once per frame. */
+    private static void discoverForCurrentUser(Zombie zombie) {
+        if (zombie == null || zombie.getType() == null) {
+            return;
+        }
+        models.User user = Data.getCurrentUser();
+        if (user == null) {
+            return;
+        }
+        ZombieRegistry registry = user.getZombieRegistry();
+        if (registry.discover(zombie.getType())) {
+            Data.saveUser();
+            Gdx.app.log(TAG, "Zombie discovered: " + zombie.getType());
+        }
+    }
+
     private void drawZombie(
         Batch batch,
         Zombie zombie,
@@ -190,21 +245,7 @@ public final class ZombieRenderer implements Disposable {
         float rowHeight,
         float logicalBoardWidth
     ) {
-        VisualSpec mappedSpec = VISUALS.getOrDefault(
-            normalize(zombie.getType()),
-            new VisualSpec(DEFAULT_PAM, "walk", 1.05f, 1.50f)
-        );
-        // Factory-created zombies carry the authoritative PAM path.  Keep the
-        // map for legacy/network instances that do not set one, while using
-        // the model path when available (notably the brickhead asset).
-        VisualSpec spec = zombie.getPamPath() == null || zombie.getPamPath().isBlank()
-            ? mappedSpec
-            : new VisualSpec(
-                zombie.getPamPath(),
-                mappedSpec.preferredClip,
-                mappedSpec.widthInCells,
-                mappedSpec.heightInRows
-            );
+        VisualSpec spec = visualSpec(zombie);
 
         ZombieVisual visual = loaded.get(spec);
         if (visual == null) {
@@ -255,6 +296,27 @@ public final class ZombieRenderer implements Disposable {
             scale,
             zombie.getCurrentState() != ZombieState.DYING,
             zombie.getVisibilityMap()
+        );
+    }
+
+    private static VisualSpec visualSpec(Zombie zombie) {
+        if (zombie == null) {
+            return null;
+        }
+        VisualSpec mappedSpec = VISUALS.getOrDefault(
+            normalize(zombie.getType()),
+            new VisualSpec(DEFAULT_PAM, "walk", 1.05f, 1.50f)
+        );
+        // Factory-created zombies carry the authoritative PAM path. Keep the
+        // map for legacy/network instances that do not set one, while using
+        // the model path when available (notably the brickhead asset).
+        return zombie.getPamPath() == null || zombie.getPamPath().isBlank()
+            ? mappedSpec
+            : new VisualSpec(
+            zombie.getPamPath(),
+            mappedSpec.preferredClip,
+            mappedSpec.widthInCells,
+            mappedSpec.heightInRows
         );
     }
 
@@ -452,6 +514,16 @@ public final class ZombieRenderer implements Disposable {
                 if (exact != null) {
                     return exact;
                 }
+            }
+
+            // A few PAMs use names such as idle2 or walk_newspaper instead
+            // of the model's generic "idle"/"walk" names.  The loader's
+            // preferred clip is selected from the actual PAM clip list, so
+            // keep that clip for an idle preview instead of silently falling
+            // back to a walking cycle.
+            if (zombie.getCurrentState() == ZombieState.IDLE
+                && fallback != null) {
+                return fallback;
             }
 
             ClipRef walk = clips.get("walk");

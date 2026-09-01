@@ -41,6 +41,14 @@ final class GreenHousePlantLayer extends Group implements Disposable {
             return;
         }
 
+        // A greenhouse slot is rebuilt immediately after planting. Prepare
+        // that plant synchronously so the first rendered frame already has an
+        // idle clip; retain the async request as a safe fallback for slow or
+        // incomplete asset packs.
+        if (!renderer.preloadSync(type)) {
+            renderer.preload(type);
+        }
+
         PreviewPlantActor actor = new PreviewPlantActor(renderer, type);
         actor.setBounds(x, y, width, height);
         actors.add(actor);

@@ -69,7 +69,8 @@ public final class PlantRenderer implements Disposable {
         Map.entry("KERNEL_PULT", "KERNALPULT"),
         Map.entry("FUM_SHROOM", "FUMESHROOM"),
         Map.entry("PHAT_BEET", "PHATBEETS"),
-        Map.entry("CAT_TAIL", "CATTAIL")
+        Map.entry("CAT_TAIL", "CATTAIL"),
+        Map.entry("PIERCE_MINT", "SPEARMINT")
     );
 
     /* The animation sheet explicitly assigns these plants to the two common
@@ -339,6 +340,44 @@ public final class PlantRenderer implements Disposable {
         }
 
         requestVisual(type);
+    }
+
+    /**
+     * Loads a plant's PAM on the render thread and prepares its clips before
+     * the first frame is drawn. This is used by small UI previews (such as
+     * Green House) where waiting for an asynchronous asset round-trip would
+     * otherwise leave the newly planted slot empty. Gameplay continues to use
+     * the asynchronous {@link #preload(PlantType)} path.
+     *
+     * @return true when an idle clip is ready after this call
+     */
+    public boolean preloadSync(PlantType type) {
+        if (disposed || type == null) {
+            return false;
+        }
+        if (visuals.containsKey(type)) {
+            return true;
+        }
+
+        String pamPath = resolvePam(type);
+        if (pamPath == null) {
+            missing.add(type);
+            return false;
+        }
+
+        loading.add(type);
+        missing.remove(type);
+        try {
+            pamPlayer.loadSync(pamPath);
+            onPamLoaded(type, pamPath);
+            return visuals.containsKey(type);
+        } catch (RuntimeException exception) {
+            missing.add(type);
+            Gdx.app.error(TAG, "Synchronous PAM preload failed for " + type.name(), exception);
+            return false;
+        } finally {
+            loading.remove(type);
+        }
     }
 
     /** Returns true once the idle PAM for a plant has finished loading. */

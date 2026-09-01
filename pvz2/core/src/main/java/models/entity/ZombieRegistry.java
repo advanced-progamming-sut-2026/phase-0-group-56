@@ -45,16 +45,13 @@ public class ZombieRegistry implements Serializable {
     }
 
     public void unlock(ZombieType type) {
-        registry.put(type, true);
+        if (type != null) {
+            registry.put(type, true);
+        }
     }
 
     public void unlock(String typeName) {
-        try {
-            ZombieType type = ZombieType.valueOf(typeName.toUpperCase());
-            unlock(type);
-        } catch (IllegalArgumentException e) {
-            // ignore unknown types
-        }
+        unlock(fromFactoryName(typeName));
     }
 
     public boolean isUnlocked(ZombieType type) {
@@ -62,12 +59,83 @@ public class ZombieRegistry implements Serializable {
     }
 
     public boolean isUnlocked(String typeName) {
-        try {
-            ZombieType type = ZombieType.valueOf(typeName.toUpperCase());
-            return isUnlocked(type);
-        } catch (IllegalArgumentException e) {
+        return isUnlocked(fromFactoryName(typeName));
+    }
+
+    /**
+     * Marks a zombie as discovered from the names used by ZombieFactory and
+     * the level JSON. The return value is true only for a newly discovered
+     * entry, allowing renderers to persist the change once rather than every
+     * frame.
+     */
+    public boolean discover(String typeName) {
+        ZombieType type = fromFactoryName(typeName);
+        if (type == null || isUnlocked(type)) {
             return false;
         }
+        unlock(type);
+        return true;
+    }
+
+    /** Converts factory/PAM aliases into the stable Collection enum. */
+    public static ZombieType fromFactoryName(String typeName) {
+        if (typeName == null || typeName.isBlank()) {
+            return null;
+        }
+
+        String key = typeName
+            .trim()
+            .toUpperCase(Locale.ROOT)
+            .replaceAll("[^A-Z0-9]", "");
+
+        return switch (key) {
+            case "NORMAL", "ZOMBIEDEFAULT", "ZOMBIETUTORIAL",
+                 "ZOMBIEDARKBASIC" -> ZombieType.NORMAL;
+            case "CONE", "CONEHEAD", "ZOMBIEARMOR1",
+                 "ZOMBIETUTORIALARMOR1" -> ZombieType.CONEHEAD;
+            case "BUCKET", "BUCKETHEAD", "ZOMBIEARMOR2",
+                 "ZOMBIETUTORIALARMOR2" -> ZombieType.BUCKETHEAD;
+            case "BRICK", "BRICKHEAD", "ZOMBIEARMOR4",
+                 "ZOMBIEFUTUREBASICBRICK" -> ZombieType.BRICKHEAD;
+            case "KNIGHT", "ZOMBIEDARKARMOR3" -> ZombieType.KNIGHT;
+            case "IMP", "ZOMBIEIMP", "ZOMBIETUTORIALIMP" -> ZombieType.IMP;
+            case "GARGANTUAR", "ZOMBIEGARGANTUAR", "TUTORIALGARGANTUAR" -> ZombieType.GARGANTUAR;
+            case "ALLSTAR", "ZOMBIEMODERNALLSTAR" -> ZombieType.ALLSTAR;
+            case "ARCADE", "ZOMBIEARCADE", "ZOMBIE80SARCADE" -> ZombieType.ARCADe;
+            case "PARASOL", "ZOMBIELOSTCITYJANE" -> ZombieType.PARASOL;
+            case "TURQUOISE", "ZOMBIECAMELDEFAULT", "ZOMBIELOSTCITYCRYSTALSKULL" -> ZombieType.TURQUOISE;
+            case "PROSPECTOR", "ZOMBIEPROSPECTOR" -> ZombieType.PROSPECTOR;
+            case "PIANO", "PIANIST", "ZOMBIEPIANO" -> ZombieType.PIANIST;
+            case "NEWSPAPER", "ZOMBIENEWSPAPER", "ZOMBIEMODERNNEWSPAPER" -> ZombieType.NEWSPAPER;
+            case "BARREL", "BARRELROLLER", "BARRELROLL", "ZOMBIEBARREL",
+                 "ZOMBIEPIRATEBARRELPUSHER" -> ZombieType.BARREL_ROLLER;
+            case "RA", "ZOMBIERA", "ZOMBIEEGYPTRA" -> ZombieType.RA;
+            case "EXPLORER", "ZOMBIEEXPLORER" -> ZombieType.EXPLORER;
+            case "TOMBRAISER", "ZOMBIETOMBRAISER",
+                 "ZOMBIEEGYPTTOMBRAISER" -> ZombieType.TOMB_RAISER;
+            case "DODO", "DODORIDER", "ZOMBIEICEAGEDODO", "ZOMBIEICEAGEDODORIDER" -> ZombieType.DODO_RIDER;
+            case "HUNTER", "ZOMBIEICEAGEHUNTER" -> ZombieType.HUNTER;
+            case "TROGLOBITE", "ZOMBIEICEAGETROGLOBITE" -> ZombieType.TROGLOBITE;
+            case "FISHERMAN", "ZOMBIEBEACHFISHERMAN" -> ZombieType.FISHERMAN;
+            case "SNORKEL", "ZOMBIEBEACHSNORKEL", "ZOMBIEBEACHSNORKELER" -> ZombieType.SNORKEL;
+            case "OCTOPUS", "ZOMBIEBEACHOCTOPUS" -> ZombieType.OCTOPUS;
+            case "JUGGLER", "ZOMBIEDARKJUGGLER", "ZOMBIEDARKJESTER" -> ZombieType.JUGGLER;
+            case "WIZARD", "ZOMBIEWIZARD", "ZOMBIEDARKWIZARD" -> ZombieType.WIZARD;
+            case "KING", "ZOMBIEDARKKING" -> ZombieType.KING;
+            case "DRAGONIMP", "IMPDRAGON", "ZOMBIEDARKIMPDRAGON" -> ZombieType.IMP_DRAGON;
+            default -> fromEnumName(key);
+        };
+    }
+
+    private static ZombieType fromEnumName(String key) {
+        for (ZombieType type : ZombieType.values()) {
+            String enumKey = type.name().toUpperCase(Locale.ROOT)
+                .replaceAll("[^A-Z0-9]", "");
+            if (enumKey.equals(key)) {
+                return type;
+            }
+        }
+        return null;
     }
 
     public List<ZombieType> getUnlockedZombies() {
