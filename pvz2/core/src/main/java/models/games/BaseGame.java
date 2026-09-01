@@ -211,7 +211,13 @@ public class BaseGame implements Game {
 
     @Override
     public void updateZombies(float delta) {
-        for (Zombie zombie : zombies) {
+        // Zombie abilities may add/remove entities while they execute (for
+        // example a dead barrel releasing Imps).  A snapshot keeps the
+        // ArrayList iterator stable during that legitimate mutation.
+        for (Zombie zombie : new ArrayList<>(zombies)) {
+            if (zombie == null || !zombies.contains(zombie)) {
+                continue;
+            }
             // Tornado owns the position of carried zombies until it drops them.
             // Running Zombie.update() here as well makes the zombie walk ahead of
             // the sandstorm and lets its abilities act while it is still carried.
@@ -224,8 +230,8 @@ public class BaseGame implements Game {
         gridController.updateItems();
         updateMowers(delta);
 
-        for (Zombie zombie : zombies) {
-            if (zombie.isDead()) {
+        for (Zombie zombie : new ArrayList<>(zombies)) {
+            if (zombie != null && zombie.isDead()) {
                 createRewardDrop(zombie);
                 System.out.println("zombie died at (" + zombie.getX() + ", " + zombie.getY() + ")");
                 SunRobbingAbility sun = zombie.getAbility(SunRobbingAbility.class);
@@ -423,7 +429,7 @@ public class BaseGame implements Game {
             : Math.max(0.65f, 2.0f - waveNumber * 0.05f);
         for (int index = 0; index < total; index++) {
             Zombie zombie = validWaveZombies.get(index);
-            placeWaveZombie(zombie, index);
+            placeWaveZombie(zombie, index, index < initialCount);
             if (index < initialCount) {
                 zombies.add(zombie);
                 spawnedWaveZombies.add(zombie);
@@ -496,15 +502,40 @@ public class BaseGame implements Game {
             .append(".\n");
     }
 
-    private void placeWaveZombie(Zombie zombie, int index) {
+    private void placeWaveZombie(Zombie zombie, int index, boolean initiallyActive) {
         if (zombie == null) {
             return;
         }
         int line = Math.floorMod(index, 5);
         zombie.setLine(line);
+        ArrayList<Tile> frozenTiles = frozenTilesForInitialWave();
+        if (initiallyActive && previousWave == null && index < frozenTiles.size()) {
+            Tile tile = frozenTiles.get(index);
+            zombie.setLine(tile.getLine());
+            zombie.setTileIndex(tile.getCol());
+            zombie.setX(tile.getX() + Tile.getWidth() * 0.5f - zombie.getWidth() * 0.5f);
+            zombie.setY(tile.getY());
+            zombie.setFrozen(true);
+            return;
+        }
         zombie.setTileIndex(8);
         zombie.setX((int) (9 * Tile.getWidth() + 200));
         zombie.setY((int) (line * Tile.getHeight()));
+    }
+
+    private ArrayList<Tile> frozenTilesForInitialWave() {
+        ArrayList<Tile> frozenTiles = new ArrayList<>();
+        if (chapter != Chapters.FrozenCaves || field == null || previousWave != null) {
+            return frozenTiles;
+        }
+        for (ArrayList<Tile> row : field.getTiles()) {
+            for (Tile tile : row) {
+                if (tile != null && tile.getTileType() == TileType.FROZEN) {
+                    frozenTiles.add(tile);
+                }
+            }
+        }
+        return frozenTiles;
     }
 
     protected String setTheWaveZombies(boolean last) {

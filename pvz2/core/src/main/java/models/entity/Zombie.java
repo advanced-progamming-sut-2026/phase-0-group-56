@@ -158,7 +158,10 @@ public class Zombie extends Entity{
             applyPoisonDamage();
         }
 
-        if (hasEffect(EffectType.FROZEN)) {
+        // The chapter ice-shell flag and the temporary ICE status both stop a
+        // zombie from acting until the projectile/ability that hit it releases
+        // the zombie.
+        if (frozen || hasEffect(EffectType.FROZEN)) {
             return;
         }
 

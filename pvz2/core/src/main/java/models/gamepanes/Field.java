@@ -8,6 +8,7 @@ import models.entity.Zombie;
 import models.games.BaseGame;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Random;
 
 public class Field {
@@ -19,6 +20,10 @@ public class Field {
     private int waterCurrentSurface;
 
     public Field initField(Chapters chapter , int level){
+        // Restarting a level may reuse the same Field instance.  Rebuild its
+        // rows and mowers instead of appending a second board on top of it.
+        tiles.clear();
+        lawnMowers.clear();
         for (int i = 0; i < 5; i++) {
             tiles.add(new ArrayList<Tile>(9));
         }
@@ -55,19 +60,31 @@ public class Field {
             }
 
             Random rand = new Random();
-            private void initSpecials(Chapters chapter , int i){
-                    if(i == 0) return;
-                    int row  = rand.nextInt(5);
-                    int col = rand.nextInt(9);
-                    int tile = rand.nextInt(chapter.getSpecialTiles().size());
-                    TileType specialTile = chapter.getSpecialTiles().get(tile) ;
-                //System.out.println("row " + row + " col " + col);
-                    if(col >= 2 && tiles.get(row).get(col).getTileType() == TileType.EGYPTIAN_TILE){
-                        tiles.get(row).get(col).setTileType(specialTile);
-                        i--;
-                    }
-                    initSpecials(chapter, i);
+            private void initSpecials(Chapters chapter , int requested){
+                if (requested <= 0 || chapter == null || chapter.getSpecialTiles().isEmpty()) {
+                    return;
+                }
 
+                // Dark Age levels request up to 48 special tiles while only
+                // 35 cells (columns 2..8) are eligible.  The former recursive
+                // retry loop therefore overflowed the stack once the board
+                // was full.  Select each eligible cell once and cap the count.
+                ArrayList<Tile> candidates = new ArrayList<>();
+                for (int row = 0; row < tiles.size(); row++) {
+                    for (int col = 2; col < tiles.get(row).size(); col++) {
+                        Tile tile = tiles.get(row).get(col);
+                        if (tile.getTileType() == TileType.EGYPTIAN_TILE) {
+                            candidates.add(tile);
+                        }
+                    }
+                }
+                Collections.shuffle(candidates, rand);
+                int count = Math.min(requested, candidates.size());
+                for (int i = 0; i < count; i++) {
+                    TileType specialTile = chapter.getSpecialTiles()
+                        .get(rand.nextInt(chapter.getSpecialTiles().size()));
+                    candidates.get(i).setTileType(specialTile);
+                }
             }
 
 

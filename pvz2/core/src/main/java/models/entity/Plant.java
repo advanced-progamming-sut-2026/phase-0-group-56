@@ -332,6 +332,10 @@ public class Plant extends Entity {
 
     private void heat(BaseGame game , float delta){
         for (Plant x : game.getPlantsInField()){
+            if (x == null || x == this || x.getTags() == null
+                    || !x.getTags().contains(PlantTags.Fire)) {
+                continue;
+            }
             float dx =  Math.abs(x.getX() - this.x);
             float dy = Math.abs(x.getY() - this.y);
             if(dx <= Tile.getWidth() * 1 && dy  <= Tile.getHeight() * 1){

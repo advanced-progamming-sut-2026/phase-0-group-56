@@ -235,7 +235,15 @@ public NormalGame(Chapters chapters, Level level){
     @Override
     public String add(String name) {
         if(availablePlants.size() == 8) return "Impossible. Slots are full";
-        if(name.equalsIgnoreCase("Imitater")) name = availablePlants.lastEntry().getKey().name();
+        if(name.equalsIgnoreCase("Imitater") && !availablePlants.isEmpty()) {
+            PlantType lastPlant = null;
+            for (PlantType plant : availablePlants.keySet()) {
+                lastPlant = plant;
+            }
+            if (lastPlant != null) {
+                name = lastPlant.name();
+            }
+        }
         SeedPackage seedPackage = selection.selectPlant(name);
        if(seedPackage != null){
            availablePlants.put(seedPackage.getPlant(), seedPackage);

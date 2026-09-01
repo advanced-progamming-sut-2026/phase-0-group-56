@@ -2,6 +2,7 @@ package models.games.specialgames;
 
 import models.entity.PlantCategory;
 import models.factory.builder.PlantType;
+import controllers.datacontroller.SeedPackage;
 import models.gameadventure.Chapters;
 import models.gameadventure.levels.Level;
 import models.games.NormalGame;
@@ -30,9 +31,16 @@ public class LockedPlants extends NormalGame implements SpecialGame {
 
         if(!availablePlants.isEmpty() && lockType == LockType.ByCategory) {
             PlantCategory lock;
-            lock = availablePlants.lastEntry().getValue().getPlant().getCategory();
+            SeedPackage lastPackage = null;
+            for (SeedPackage packageItem : availablePlants.values()) {
+                lastPackage = packageItem;
+            }
+            if (lastPackage == null || lastPackage.getPlant() == null) {
+                return false;
+            }
+            lock = lastPackage.getPlant().getCategory();
 
-            selection.getPlantsToChoose().removeIf(plant -> plant.getCategory().equals(lock));
+            selection.getPlantsToChoose().removeIf(plant -> plant != null && plant.getCategory() == lock);
         }
         return super.startGame(plantName);
 
