@@ -5,6 +5,7 @@ import com.badlogic.gdx.scenes.scene2d.Touchable;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.ImageButton;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
+import com.badlogic.gdx.scenes.scene2d.ui.Stack;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.utils.Align;
@@ -108,8 +109,12 @@ public class HomeView extends View {
         navigation.row();
         navigation.add(homeTile("shop", null, "shop",
             "SHOP", "Daily offers", () -> openMenu("Shop menu")));
+        boolean hasUnreadNews = !user.getUnreadNews().isEmpty();
         navigation.add(homeTile("news", null, "news",
-            "NEWS", "Latest updates", () -> openMenu("News menu")));
+            hasUnreadNews ? "NEWS  •  NEW" : "NEWS",
+            hasUnreadNews ? "Unread updates" : "Latest updates",
+            () -> openMenu("News menu"),
+            hasUnreadNews));
         navigation.add(homeTile("star", null, "almanac",
             "LEADERBOARD", "Top players", () -> openMenu("Leaderboard menu")));
         navigation.add(homeTile("pot", null, "almanac",
@@ -167,6 +172,31 @@ public class HomeView extends View {
         String caption,
         Runnable action
     ) {
+        return homeTile(
+            iconKey,
+            pressedKey,
+            fallbackStyle,
+            title,
+            caption,
+            action,
+            false
+        );
+    }
+
+    /**
+     * Builds a home-menu destination card.  The optional notification state
+     * is rendered as a badge over the artwork while keeping the whole card
+     * as the hit target.
+     */
+    private Table homeTile(
+        String iconKey,
+        String pressedKey,
+        String fallbackStyle,
+        String title,
+        String caption,
+        Runnable action,
+        boolean showNotification
+    ) {
         Table tile = pvzInnerPanel();
         tile.pad(8f, 7f, 8f, 7f);
 
@@ -182,7 +212,26 @@ public class HomeView extends View {
         // touch on the child lets Scene2D bubble clicks from the icon and
         // the labels to the card listener below.
         icon.setTouchable(Touchable.disabled);
-        tile.add(icon).size(68f).center().padBottom(3f).row();
+
+        Stack iconStack = new Stack();
+        iconStack.setTouchable(Touchable.disabled);
+        icon.setSize(68f, 68f);
+        iconStack.add(icon);
+
+        if (showNotification) {
+            Image notification = MenuVisualAssets.image("notification");
+            if (notification == null) {
+                notification = MenuVisualAssets.image("red_dot");
+            }
+            if (notification != null) {
+                notification.setScaling(Scaling.fit);
+                notification.setTouchable(Touchable.disabled);
+                notification.setSize(25f, 25f);
+                iconStack.add(notification);
+            }
+        }
+
+        tile.add(iconStack).size(68f).center().padBottom(3f).row();
 
         Label titleLabel = mediumTitle(title);
         titleLabel.setAlignment(Align.center);
