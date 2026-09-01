@@ -40,17 +40,26 @@ public class LogIn implements Menu {
             if (account == null) {
                 return "Error: server returned an invalid account.";
             }
-            User remoteUser = new User(
-                account.username(),
-                CredentialHasher.hash(password),
-                account.nickname(),
-                account.email(),
-                account.gender()
-            );
-            remoteUser.setHighestScore(account.highestScore());
-            remoteUser.setStayLoggedIn(stayLoggedIn);
-            Data.upsertUser(remoteUser);
-            Data.setCurrentUser(remoteUser);
+            User localUser = Data.getUserByUsername(account.username());
+            if (localUser == null) {
+                localUser = new User(
+                    account.username(),
+                    CredentialHasher.hash(password),
+                    account.nickname(),
+                    account.email(),
+                    account.gender()
+                );
+            } else {
+                localUser.setPasswordHash(CredentialHasher.hash(password));
+                localUser.setNickname(account.nickname());
+                localUser.setEmail(account.email());
+                localUser.setGender(account.gender());
+            }
+            localUser.setHighestScore(account.highestScore());
+            clearPersistentSessions();
+            localUser.setStayLoggedIn(stayLoggedIn);
+            Data.upsertUser(localUser);
+            Data.setCurrentUser(localUser);
             App.setScreen(new HomeView());
             return "Logged in successfully.";
         }
@@ -72,6 +81,22 @@ public class LogIn implements Menu {
     }
 
     public String getSecurityQuestion(String username, String email) {
+        if (NetworkService.isConnected()) {
+            NetworkClient client = NetworkService.getClient();
+            NetworkResponse response = client == null
+                ? null
+                : client.getSecurityQuestion(username, email);
+            if (response != null && response.success()) {
+                return response.message();
+            }
+            // If the network account is also mirrored locally, retain the
+            // offline recovery path while the server is unavailable.
+            if (response != null && !"CONNECTION_LOST".equals(response.code())
+                && !"NOT_CONNECTED".equals(response.code())
+                && !"UNKNOWN_COMMAND".equals(response.code())) {
+                return "Error: " + response.message();
+            }
+        }
         User user = Data.getUserByUsername(username);
         if (user == null) {
             return "Error: username does not exist.";
@@ -96,6 +121,27 @@ public class LogIn implements Menu {
         String newPassword,
         String confirmPassword
     ) {
+        if (NetworkService.isConnected()) {
+            NetworkClient client = NetworkService.getClient();
+            NetworkResponse response = client == null
+                ? null
+                : client.resetPassword(username, email, answer, newPassword);
+            if (response != null && response.success()) {
+                // Update a local mirror too, so offline login works after the
+                // next reconnect.
+                User mirrored = Data.getUserByUsername(username);
+                if (mirrored != null) {
+                    mirrored.setPasswordHash(CredentialHasher.hash(newPassword));
+                    Data.saveUser();
+                }
+                return "Password reset successfully. You can now log in.";
+            }
+            if (response != null && !"CONNECTION_LOST".equals(response.code())
+                && !"NOT_CONNECTED".equals(response.code())
+                && !"UNKNOWN_COMMAND".equals(response.code())) {
+                return "Error: " + response.message();
+            }
+        }
         User user = Data.getUserByUsername(username);
         String identityError = validateRecoveryIdentity(user, email);
         if (identityError != null) {

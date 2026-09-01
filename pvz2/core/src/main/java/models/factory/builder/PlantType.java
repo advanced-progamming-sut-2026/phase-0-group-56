@@ -600,8 +600,109 @@ public enum PlantType {
         }
         return plant;
     }
-     PlantCategory category;
-    public PlantCategory getCategory(){
-        return  category;
+    public PlantCategory getCategory() {
+
+        switch (this) {
+
+            // -------- Sun Producers --------
+            case SUNFLOWER:
+            case TWIN_SUNFLOWER:
+            case SUN_SHROOM:
+            case PRIMAL_SUNFLOWER:
+            case GOLD_BLOOM:
+                return PlantCategory.SunProducer;
+
+
+            // -------- Shooters --------
+            case PEASHOOTER:
+            case REPEATER:
+            case THREEPEATER:
+            case SNOW_PEA:
+            case ROTOBAGA:
+            case PEA_POD:
+            case SPLIT_PEA:
+            case CITRON:
+            case BOWLING_BULB:
+            case STARFRUIT:
+            case FIRE_PEASHOOTER:
+            case GOO_PEASHOOTER:
+            case MEGA_GATLING_PEA:
+            case SEA_SHROOM:
+            case PUFF_SHROOM:
+                return PlantCategory.SHOOTER;
+
+
+            // -------- Explosives --------
+            case POTATO_MINE:
+            case PRIMAL_POTATO_MINE:
+            case CHERRY_BOMB:
+            case SQUASH:
+            case GRAPESHOT:
+            case JALAPENO:
+            case DOOM_SHROOM:
+            case TANGLE_KELP:
+            case PHAT_BEET:
+            case CHOMPER:
+            case WASABI_WHIP:
+            case KIWIBEAST:
+                return PlantCategory.Explosive;
+
+
+            // -------- Lobber / Strike Through --------
+            case CACTUS:
+            case FUM_SHROOM:
+                return PlantCategory.StrikeThrough;
+
+
+            // -------- Melee (فعلا نزدیک‌ترین دسته موجود) --------
+            case BONK_CHOY:
+                return PlantCategory.StrikeThrough;
+
+
+            // -------- Modifier --------
+            case TORCHWOOD:
+            case HYPNO_SHROOM:
+            case IMITATER:
+            case LILY_PAD:
+            case MAGNET_SHROOM:
+                return PlantCategory.Mint;
+
+
+            // -------- Homing --------
+            case CAULIPOWER:
+            case ELECTRIC_BLUEBERRY:
+            case CAT_TAIL:
+                return PlantCategory.SHOOTER;
+
+
+            // -------- Wall plants --------
+            case WALL_NUT:
+            case TALL_NUT:
+            case ENDURIAN:
+            case GARLIC:
+            case SWEET_POTATO:
+            case EXPLODE_O_NUT:
+            case PUMPKIN:
+            case SUN_BEAN:
+                return PlantCategory.StrikeThrough;
+
+
+            // -------- Mints --------
+            case ENLIGHTEN_MINT:
+            case APPEASE_MINT:
+            case ARMA_MINT:
+            case BOMBARD_MINT:
+            case ENFORCE_MINT:
+            case REINFORCE_MINT:
+            case ENCHANT_MINT:
+            case PIERCE_MINT:
+            case CATTAIL_MINT:
+            case MARIGOLD:
+                return PlantCategory.Mint;
+
+
+            default:
+                return null;
+        }
     }
 }

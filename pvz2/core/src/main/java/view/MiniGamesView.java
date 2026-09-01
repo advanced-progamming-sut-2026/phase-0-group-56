@@ -33,7 +33,7 @@ public final class MiniGamesView extends View {
 
     @Override
     protected Screen getBackScreen() {
-        return new PlayView();
+        return new TravelLogView();
     }
 
     @Override

@@ -1,8 +1,10 @@
 package view;
 
 import com.badlogic.gdx.Screen;
+import com.badlogic.gdx.graphics.g2d.Batch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.scenes.scene2d.Actor;
+import com.badlogic.gdx.scenes.scene2d.Touchable;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.SelectBox;
@@ -11,14 +13,16 @@ import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.Array;
+import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.utils.Scaling;
 
 import controllers.datacontroller.PlantData;
 import controllers.menus.secondarymenus.Collection;
-import models.entity.PlantCategory;
 import models.entity.Zombie;
 import models.entity.ZombieRegistry;
+import models.entity.ZombieState;
 import models.factory.builder.PlantType;
+import models.gamepanes.Tile;
 import view.components.CollectionAssetCatalog;
 
 public class CollectionView extends View {
@@ -175,7 +179,7 @@ public class CollectionView extends View {
         Collection controller
     ) {
 
-        buildPlantFilters(table);
+        buildPlantFilters(table, controller);
 
         Table mainPanel =
             new Table();
@@ -204,7 +208,8 @@ public class CollectionView extends View {
     }
 
     private void buildPlantFilters(
-        Table table
+        Table table,
+        Collection controller
     ) {
 
         Table filters =
@@ -252,14 +257,22 @@ public class CollectionView extends View {
 
         familyItems.add("ANY");
 
-        for (
-            PlantCategory category :
-            PlantCategory.values()
-        ) {
+        for (String category : controller.getPlantCategories()) {
+            familyItems.add(category);
+        }
 
-            familyItems.add(
-                category.name()
-            );
+        // A save created by an older build may contain a category value that
+        // is no longer present in plants.json. Never leave the SelectBox in a
+        // visually selected-but-empty state in that case.
+        boolean validFamily = false;
+        for (String category : familyItems) {
+            if (category.equalsIgnoreCase(familyFilter)) {
+                validFamily = true;
+                break;
+            }
+        }
+        if (!"ANY".equalsIgnoreCase(familyFilter) && !validFamily) {
+            familyFilter = "ANY";
         }
 
         familyBox.setItems(
@@ -295,7 +308,7 @@ public class CollectionView extends View {
 
         Label familyLabel =
             new Label(
-                "FAMILY",
+                "TYPE",
                 skin,
                 "medium_outline"
             );
@@ -533,14 +546,9 @@ public class CollectionView extends View {
             return true;
         }
 
-        return type.getCategory()
-            != null
-            &&
-            type.getCategory()
-                .name()
-                .equals(
-                    familyFilter
-                );
+        return controller.getPlantCategory(type)
+            .trim()
+            .equalsIgnoreCase(familyFilter.trim());
     }
 
     private Table buildPlantDetail(
@@ -700,17 +708,10 @@ public class CollectionView extends View {
             );
         }
 
-        String category =
-            type.getCategory()
-                == null
-                ? "UNKNOWN"
-                : type.getCategory()
-                .name();
-
         addDetail(
             detail,
-            "FAMILY",
-            category
+            "TYPE",
+            controller.getPlantCategory(type)
         );
 
         if (!unlocked) {
@@ -849,46 +850,18 @@ public class CollectionView extends View {
 
         for (
             ZombieRegistry.ZombieType type :
-            controller.getAllZombies()
+            controller.getUnlockedZombies()
         ) {
 
-            boolean unlocked =
-                controller
-                    .isZombieUnlocked(
-                        type
-                    );
+            String text = type.name().replace('_', ' ');
 
-            String text =
-                unlocked
-                    ? type.name()
-                    .replace(
-                        '_',
-                        ' '
-                    )
-                    : "???\nUNDISCOVERED";
-
-            TextButton actionButton =
-                unlocked
-                    ? purpleButton(
-                    text,
-                    () -> {
-
-                        selectedZombie =
-                            type;
-
-                        rebuild();
-                    }
-                )
-                    : brownButton(
-                    text,
-                    () -> {
-
-                        selectedZombie =
-                            type;
-
-                        rebuild();
-                    }
-                );
+            TextButton actionButton = purpleButton(
+                text,
+                () -> {
+                    selectedZombie = type;
+                    rebuild();
+                }
+            );
 
             list.add(
                     collectionCard(
@@ -909,6 +882,18 @@ public class CollectionView extends View {
             ) {
                 list.row();
             }
+        }
+
+        if (index == 0) {
+            Label empty = wrappedLabel(
+                "No zombies have been discovered yet. Encounter a zombie in a level to unlock it here.",
+                560f
+            );
+            empty.setAlignment(Align.center);
+            list.add(empty)
+                .colspan(3)
+                .width(560f)
+                .pad(30f);
         }
 
         Table detail =
@@ -1018,18 +1003,28 @@ public class CollectionView extends View {
             .padBottom(12f)
             .row();
 
-        addPortrait(
-            detail,
-            assetCatalog == null
-                ? null
-                : assetCatalog.zombiePortrait(selectedZombie)
-        );
-
         Zombie preview =
             controller
                 .createZombiePreview(
                     selectedZombie
                 );
+
+        if (preview != null && assetCatalog != null) {
+            detail.add(new CollectionZombiePreviewActor(assetCatalog, preview))
+                .colspan(2)
+                .width(300f)
+                .height(190f)
+                .center()
+                .padBottom(12f)
+                .row();
+        } else {
+            addPortrait(
+                detail,
+                assetCatalog == null
+                    ? null
+                    : assetCatalog.zombiePortrait(selectedZombie)
+            );
+        }
 
         addDetail(
             detail,
@@ -1042,6 +1037,12 @@ public class CollectionView extends View {
             "TYPE",
             selectedZombie
                 .name()
+        );
+
+        addDetail(
+            detail,
+            "ABOUT",
+            controller.getZombieDescription(selectedZombie)
         );
 
         if (preview != null) {
@@ -1104,6 +1105,50 @@ public class CollectionView extends View {
         }
 
         return detail;
+    }
+
+    /**
+     * A presentation-only Scene2D actor for the selected zombie. The model is
+     * a factory preview with zero speed, so ZombieRenderer selects its idle
+     * clip while the actor advances only the animation clock. No gameplay
+     * collection or combat state is mutated.
+     */
+    private static final class CollectionZombiePreviewActor extends Actor {
+        private final CollectionAssetCatalog catalog;
+        private final Zombie zombie;
+        private final Rectangle bounds = new Rectangle();
+
+        private CollectionZombiePreviewActor(
+            CollectionAssetCatalog catalog,
+            Zombie zombie
+        ) {
+            this.catalog = catalog;
+            this.zombie = zombie;
+            setTouchable(Touchable.disabled);
+
+            zombie.setSpeed(0f);
+            zombie.setLine(2);
+            zombie.setX(4f * Tile.getWidth());
+            zombie.setState(ZombieState.IDLE);
+            catalog.preloadZombie(zombie);
+        }
+
+        @Override
+        public void act(float delta) {
+            super.act(delta);
+            zombie.setSpeed(0f);
+            zombie.setState(ZombieState.IDLE);
+            zombie.updateStateTime(Math.min(Math.max(delta, 0f), 1f / 20f));
+        }
+
+        @Override
+        public void draw(Batch batch, float parentAlpha) {
+            if (catalog == null || zombie == null || batch == null) {
+                return;
+            }
+            bounds.set(getX(), getY(), getWidth(), getHeight());
+            catalog.renderZombie(batch, zombie, bounds);
+        }
     }
 
     private void addPortrait(

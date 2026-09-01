@@ -16,6 +16,16 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import com.badlogic.gdx.graphics.g2d.Batch;
+import com.badlogic.gdx.math.Rectangle;
+
+import models.entity.Zombie;
+import view.gameview.ZombieRenderer;
+
+import view.gameview.ZombieRenderer;
+import pvz.libpvz.textures.TextureBank;
+import com.badlogic.gdx.files.FileHandle;
+
 /**
  * Safe, optional portrait lookup for the Collection menu.
  *
@@ -35,12 +45,20 @@ public final class CollectionAssetCatalog implements AutoCloseable {
     private final ResourceIndex resourceIndex;
     private final List<String> imageIds;
     private final Map<String, String> idCache = new HashMap<>();
+    private final ZombieRenderer zombieRenderer;
 
     private CollectionAssetCatalog(TextureBank textureBank) {
         this.textureBank = textureBank;
         this.resourceIndex = textureBank.resourceIndex();
         this.imageIds = new ArrayList<>(resourceIndex.imageIds());
         Collections.sort(this.imageIds);
+
+        FileHandle assetsRoot = PvzAssetLocator.find();
+
+        this.zombieRenderer = new ZombieRenderer(
+            assetsRoot,
+            textureBank
+        );
     }
 
     public static CollectionAssetCatalog create() {
@@ -300,6 +318,36 @@ public final class CollectionAssetCatalog implements AutoCloseable {
         return value
             .toUpperCase(Locale.ROOT)
             .replaceAll("[^A-Z0-9]", "");
+    }
+
+    public void preloadZombie(Zombie zombie) {
+
+        if (zombie == null) {
+            return;
+        }
+
+        zombieRenderer.preloadSync(zombie);
+    }
+
+    public void renderZombie(
+        Batch batch,
+        Zombie zombie,
+        Rectangle bounds
+    ) {
+
+        if (batch == null || zombie == null || bounds == null) {
+            return;
+        }
+
+        ArrayList<Zombie> list = new ArrayList<>();
+        list.add(zombie);
+
+        zombieRenderer.render(
+            batch,
+            list,
+            bounds,
+            1f / 60f
+        );
     }
 
     @Override

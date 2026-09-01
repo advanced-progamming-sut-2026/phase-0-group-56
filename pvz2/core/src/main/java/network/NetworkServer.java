@@ -33,6 +33,13 @@ import java.util.concurrent.TimeUnit;
 public final class NetworkServer implements Closeable {
     public static final int DEFAULT_PORT = 47856;
     private static final String DEFAULT_FILE = ".pvz2-group-56/server-accounts.properties";
+    private static final String[] SECURITY_QUESTIONS = {
+        "What was the name of your first pet?",
+        "What city were you born in?",
+        "What is the name of your favorite teacher?",
+        "What is your favorite childhood game?",
+        "What is your favorite plant?"
+    };
 
     private final int port;
     private final Path storageFile;
@@ -98,10 +105,23 @@ public final class NetworkServer implements Closeable {
         accounts.compute(key, (ignored, existing) -> {
             if (existing == null) {
                 return new Account(user.getName(), user.getPasswordHash(), user.getNickname(),
-                    user.getEmail(), user.getGender(), 1, CredentialHasher.hash(""),
+                    user.getEmail(), user.getGender(),
+                    user.getSecurityQuestionNumber(),
+                    user.getSecurityAnswerHash() == null
+                        ? CredentialHasher.hash("")
+                        : user.getSecurityAnswerHash(),
                     user.getHighestScore());
             }
-            return existing.withHighestScore(user.getHighestScore());
+            int question = user.getSecurityQuestionNumber() >= 1
+                && user.getSecurityQuestionNumber() <= SECURITY_QUESTIONS.length
+                ? user.getSecurityQuestionNumber()
+                : existing.question();
+            String answerHash = user.getSecurityAnswerHash() == null
+                ? existing.answerHash()
+                : user.getSecurityAnswerHash();
+            return new Account(user.getName(), user.getPasswordHash(), user.getNickname(),
+                user.getEmail(), user.getGender(), question, answerHash,
+                Math.max(existing.highestScore(), user.getHighestScore()));
         });
         saveAccounts();
     }
@@ -150,6 +170,9 @@ public final class NetworkServer implements Closeable {
             case "HELLO" -> response(session, true, "OK", "Connected.");
             case "REGISTER" -> register(session, values);
             case "LOGIN" -> login(session, values);
+            case "RECOVERY_QUESTION" -> recoveryQuestion(session, values);
+            case "RECOVER_PASSWORD" -> recoverPassword(session, values);
+            case "UPDATE_ACCOUNT" -> updateAccount(session, values);
             case "LOGOUT" -> logout(session);
             case "RANDOM_MATCH" -> randomMatch(session);
             case "CHALLENGE" -> challenge(session, values);
@@ -239,6 +262,124 @@ public final class NetworkServer implements Closeable {
         }
         session.username = account.username;
         responseWithAccount(session, "LOGGED_IN", "Logged in successfully.", account);
+    }
+
+    private void recoveryQuestion(Session session, String[] values) {
+        if (values.length < 2 || values[0].isBlank() || values[1].isBlank()) {
+            response(session, false, "INVALID_RECOVERY", "Username and email are required.");
+            return;
+        }
+        Account account = accounts.get(values[0].trim().toLowerCase(Locale.ROOT));
+        if (account == null) {
+            response(session, false, "UNKNOWN_USER", "Username does not exist.");
+            return;
+        }
+        if (!account.email().equalsIgnoreCase(values[1].trim())) {
+            response(session, false, "RECOVERY_MISMATCH", "Email does not match this account.");
+            return;
+        }
+        int question = account.question();
+        if (question < 1 || question > SECURITY_QUESTIONS.length) {
+            response(session, false, "INVALID_RECOVERY", "This account has no valid security question.");
+            return;
+        }
+        response(session, true, "RECOVERY_QUESTION", SECURITY_QUESTIONS[question - 1]);
+    }
+
+    private void recoverPassword(Session session, String[] values) {
+        if (values.length < 4) {
+            response(session, false, "INVALID_RECOVERY", "All recovery fields are required.");
+            return;
+        }
+        Account account = accounts.get(values[0].trim().toLowerCase(Locale.ROOT));
+        if (account == null) {
+            response(session, false, "UNKNOWN_USER", "Username does not exist.");
+            return;
+        }
+        if (!account.email().equalsIgnoreCase(values[1].trim())) {
+            response(session, false, "RECOVERY_MISMATCH", "Email does not match this account.");
+            return;
+        }
+        if (!CredentialHasher.matches(values[2].trim(), account.answerHash())) {
+            response(session, false, "BAD_SECURITY_ANSWER", "Incorrect security answer.");
+            return;
+        }
+        String passwordError = AccountValidator.getPasswordError(values[3]);
+        if (passwordError != null) {
+            response(session, false, "INVALID_ACCOUNT", passwordError);
+            return;
+        }
+        if (CredentialHasher.matches(values[3], account.passwordHash())) {
+            response(session, false, "INVALID_ACCOUNT", "New password must be different from the old password.");
+            return;
+        }
+        accounts.put(account.key(), account.withPasswordHash(CredentialHasher.hash(values[3])));
+        saveAccounts();
+        response(session, true, "PASSWORD_RESET", "Password reset successfully.");
+    }
+
+    private void updateAccount(Session session, String[] values) {
+        if (values.length < 7) {
+            response(session, false, "INVALID_ACCOUNT", "Account update data is incomplete.");
+            return;
+        }
+        String currentUsername = values[0].trim();
+        String currentKey = currentUsername.toLowerCase(Locale.ROOT);
+        Account account = accounts.get(currentKey);
+        if (account == null) {
+            response(session, false, "UNKNOWN_USER", "Username does not exist.");
+            return;
+        }
+        boolean authenticated = loggedIn(session) && currentKey.equals(session.key());
+        if (!authenticated && values.length >= 8) {
+            authenticated = account.passwordHash().equals(values[7]);
+        }
+        if (!authenticated) {
+            response(session, false, "NOT_LOGGED_IN", "Log in before updating the account.");
+            return;
+        }
+
+        String newUsername = values[1].trim();
+        String nickname = values[2].trim();
+        String email = values[3].trim();
+        String gender = values[4].trim();
+        String newPassword = values[5];
+        if (!AccountValidator.isValidUsername(newUsername)
+            || !AccountValidator.isValidNickname(nickname)
+            || !AccountValidator.isValidEmail(email)
+            || !AccountValidator.isValidGender(gender)) {
+            response(session, false, "INVALID_ACCOUNT", "Account data is invalid.");
+            return;
+        }
+        String newKey = newUsername.toLowerCase(Locale.ROOT);
+        if (!newKey.equals(currentKey) && accounts.containsKey(newKey)) {
+            response(session, false, "USERNAME_TAKEN", "Username is already taken.");
+            return;
+        }
+        String passwordHash = account.passwordHash();
+        if (newPassword != null && !newPassword.isEmpty()) {
+            String passwordError = AccountValidator.getPasswordError(newPassword);
+            if (passwordError != null) {
+                response(session, false, "INVALID_ACCOUNT", passwordError);
+                return;
+            }
+            if (CredentialHasher.matches(newPassword, passwordHash)) {
+                response(session, false, "INVALID_ACCOUNT", "New password must be different from the old password.");
+                return;
+            }
+            passwordHash = CredentialHasher.hash(newPassword);
+        }
+
+        Account updated = account.withProfile(newUsername, passwordHash, nickname, email, gender);
+        accounts.remove(currentKey);
+        accounts.put(newKey, updated);
+        if (session.username != null && currentKey.equals(session.key())) {
+            online.remove(currentKey, session);
+            session.username = updated.username();
+            online.put(newKey, session);
+        }
+        saveAccounts();
+        responseWithAccount(session, "ACCOUNT_UPDATED", "Account updated successfully.", updated);
     }
 
     private void logout(Session session) {
@@ -775,6 +916,17 @@ public final class NetworkServer implements Closeable {
             return score <= highestScore
                 ? this
                 : new Account(username, passwordHash, nickname, email, gender, question, answerHash, score);
+        }
+
+        private Account withPasswordHash(String newPasswordHash) {
+            return new Account(username, newPasswordHash, nickname, email, gender,
+                question, answerHash, highestScore);
+        }
+
+        private Account withProfile(String newUsername, String newPasswordHash,
+                                    String newNickname, String newEmail, String newGender) {
+            return new Account(newUsername, newPasswordHash, newNickname, newEmail,
+                newGender, question, answerHash, highestScore);
         }
     }
 }
