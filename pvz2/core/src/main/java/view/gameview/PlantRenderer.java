@@ -372,7 +372,11 @@ public final class PlantRenderer implements Disposable {
             onPamLoaded(type, pamPath);
             return visuals.containsKey(type);
         } catch (RuntimeException exception) {
-            missing.add(type);
+            /* A synchronous preview load can fail transiently (for example
+             * while a desktop GL context is still being initialised).  Do not
+             * blacklist the plant in that case: the normal asynchronous path
+             * must be allowed to retry it on the next render frames. */
+            missing.remove(type);
             Gdx.app.error(TAG, "Synchronous PAM preload failed for " + type.name(), exception);
             return false;
         } finally {

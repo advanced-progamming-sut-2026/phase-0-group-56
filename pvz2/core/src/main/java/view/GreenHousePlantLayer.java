@@ -3,6 +3,7 @@ package view;
 import com.badlogic.gdx.graphics.g2d.Batch;
 import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.Group;
+import com.badlogic.gdx.scenes.scene2d.Touchable;
 import com.badlogic.gdx.utils.Disposable;
 import com.badlogic.gdx.files.FileHandle;
 import models.entity.Plant;
@@ -29,7 +30,9 @@ final class GreenHousePlantLayer extends Group implements Disposable {
         renderer = assetsRoot == null || !assetsRoot.exists()
             ? null
             : new PlantRenderer(assetsRoot);
-        setTouchable(com.badlogic.gdx.scenes.scene2d.Touchable.disabled);
+        // This layer is visual-only; bed hit targets below the layer must
+        // continue receiving input.
+        setTouchable(Touchable.disabled);
     }
 
     boolean isAvailable() {
@@ -89,11 +92,17 @@ final class GreenHousePlantLayer extends Group implements Disposable {
         PreviewPlantActor(PlantRenderer renderer, PlantType type) {
             this.renderer = renderer;
             this.plant = new PreviewPlant(type);
+            setTouchable(Touchable.disabled);
         }
 
         @Override
         public void act(float delta) {
             super.act(delta);
+            // Greenhouse plants are presentation-only previews. Keep the
+            // same idle/alive invariants used by PlantLayer while advancing
+            // only the animation clock.
+            plant.setAlive(true);
+            plant.setHp(1f);
             plant.tick(Math.max(0f, delta));
         }
 
