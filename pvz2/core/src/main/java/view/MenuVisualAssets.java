@@ -67,7 +67,12 @@ final class MenuVisualAssets {
         register(files, "tasks", "tasks_button.png");
         register(files, "news", "news_icon.png");
         register(files, "settings", "settings_icon.png");
-        register(files, "shop", "shop_icon.png");
+        // Prefer the official world-map store cart. Keep the old shirt as a
+        // fallback so older checkouts can still open the menu.
+        register(files, "store_cart", "store_cart.png", "shop_icon.png");
+        register(files, "store_cart_down", "store_cart_down.png");
+        register(files, "store_sale_banner", "store_sale_banner.png");
+        register(files, "shop", "store_cart.png", "shop_icon.png");
 
         register(files, "event_shop", "buttons_hud_event_shop_normal.png");
         register(files, "event_shop_down", "buttons_hud_event_shop_selected.png");

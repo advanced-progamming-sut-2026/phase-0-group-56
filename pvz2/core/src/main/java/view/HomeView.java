@@ -107,7 +107,7 @@ public class HomeView extends View {
         navigation.add(homeTile("greenhouse", null, "hud_zg",
             "GREENHOUSE", "Grow your plants", () -> openMenu("Greenhouse menu")));
         navigation.row();
-        navigation.add(homeTile("shop", null, "shop",
+        navigation.add(homeTile("shop", "store_cart_down", "shop",
             "SHOP", "Daily offers", () -> openMenu("Shop menu")));
         boolean hasUnreadNews = !user.getUnreadNews().isEmpty();
         navigation.add(homeTile("news", null, "news",

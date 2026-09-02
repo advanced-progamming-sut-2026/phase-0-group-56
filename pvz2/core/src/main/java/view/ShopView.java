@@ -4,7 +4,9 @@ import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.SelectBox;
+import com.badlogic.gdx.scenes.scene2d.ui.Stack;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
+import com.badlogic.gdx.scenes.scene2d.Touchable;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.Scaling;
@@ -58,14 +60,8 @@ public class ShopView extends View {
         String daily =
             shop.setDailyOffer();
 
-        table.add(
-                menuSectionHeader(
-                    "shop",
-                    "CRAZY DAVE'S SHOP",
-                    "Spend coins and gems on permanent and daily offers."
-                )
-            )
-            .width(980f)
+        table.add(buildShopHeader())
+            .width(1000f)
             .padTop(4f)
             .padBottom(12f)
             .row();
@@ -184,6 +180,67 @@ public class ShopView extends View {
                         )
                 )
         );
+    }
+
+    /**
+     * Store header built from the extracted PvZ2 world-map artwork.  The
+     * cart is deliberately used instead of the generic shirt icon so the
+     * screen immediately reads as the in-game Shop.
+     */
+    private Table buildShopHeader() {
+        Table header = pvzPanel();
+        header.pad(12f, 22f, 12f, 22f);
+
+        Image cart = MenuVisualAssets.image("store_cart");
+        if (cart != null) {
+            cart.setScaling(Scaling.fit);
+            cart.setTouchable(Touchable.disabled);
+            header.add(cart)
+                .size(112f)
+                .padRight(18f)
+                .center();
+        }
+
+        Table copy = new Table();
+        Label title = titleLabel("CRAZY DAVE'S SHOP");
+        title.setAlignment(Align.left);
+        copy.add(title)
+            .left()
+            .growX()
+            .row();
+
+        Label subtitle = secondaryLabel(
+            "Spend coins and gems on permanent upgrades, seed packets and daily offers."
+        );
+        subtitle.setWrap(true);
+        subtitle.setAlignment(Align.left);
+        copy.add(subtitle)
+            .width(580f)
+            .left()
+            .padTop(5f);
+        header.add(copy)
+            .growX()
+            .left();
+
+        Image saleBanner = MenuVisualAssets.image("store_sale_banner");
+        if (saleBanner != null) {
+            saleBanner.setScaling(Scaling.fit);
+            Stack saleBadge = new Stack();
+            saleBadge.setTouchable(Touchable.disabled);
+            saleBadge.add(saleBanner);
+
+            Label saleLabel = mediumTitle("DAILY\nOFFERS");
+            saleLabel.setAlignment(Align.center);
+            saleLabel.setTouchable(Touchable.disabled);
+            saleBadge.add(saleLabel);
+
+            header.add(saleBadge)
+                .size(170f, 62f)
+                .padLeft(12f)
+                .center();
+        }
+
+        return header;
     }
 
     private void addSpecificSeedItem(
