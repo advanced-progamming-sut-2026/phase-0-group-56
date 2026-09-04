@@ -67,7 +67,23 @@ final class MenuVisualAssets {
         register(files, "tasks", "tasks_button.png");
         register(files, "news", "news_icon.png");
         register(files, "settings", "settings_icon.png");
-        register(files, "shop", "shop_icon.png");
+        // Prefer the official world-map store cart. Keep the old shirt as a
+        // fallback so older checkouts can still open the menu.
+        // Store artwork is exported from the world-map atlas under the
+        // `buttons_hud_store_*`/`hud_store_sale_banner` names. Keep the
+        // shorter aliases as fallbacks for older asset bundles.
+        register(files, "store_cart",
+            "buttons_hud_store_normal.png", "store_cart.png", "shop_icon.png");
+        register(files, "store_cart_down",
+            "buttons_hud_store_selected.png", "store_cart_down.png");
+        register(files, "store_sale_banner",
+            "hud_store_sale_banner.png", "store_sale_banner.png");
+        register(files, "shop",
+            "buttons_hud_store_normal.png", "store_cart.png", "shop_icon.png");
+
+        // Product artwork must not fall back to a currency icon.
+        register(files, "seed_packet",
+            "zombie-seed-pkt.png", "seed_packet.png");
 
         register(files, "event_shop", "buttons_hud_event_shop_normal.png");
         register(files, "event_shop_down", "buttons_hud_event_shop_selected.png");

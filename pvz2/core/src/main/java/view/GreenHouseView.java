@@ -23,10 +23,7 @@ import models.Pot;
 import models.User;
 import models.factory.builder.PlantType;
 import pvz.skin.PvzSkin;
-
-import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
+import view.gameview.PvzAssetLocator;
 
 /** The interactive Zen Garden screen, laid out on the supplied 4 x 3 art. */
 public class GreenHouseView extends View {
@@ -82,8 +79,9 @@ public class GreenHouseView extends View {
             layers.add(fallback);
         }
 
-        pvzAssetsRoot = findPvzAssetsRoot();
+        pvzAssetsRoot = PvzAssetLocator.find();
         plantLayer = new GreenHousePlantLayer(pvzAssetsRoot);
+        plantLayer.setBounds(0f, 0f, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
         rebuildGardenBoard();
         layers.add(gardenBoard);
         layers.add(buildHud());
@@ -128,7 +126,13 @@ public class GreenHouseView extends View {
         Table shopBar = new Table();
         shopBar.add(purpleButton("OPEN SHOP", () -> App.setScreen(new ShopView())))
             .width(220f).height(52f);
-        hud.add(shopBar).colspan(3).expandY().bottom().padBottom(9f).center();
+        // Keep the shop control in its own expanding bottom row.
+        hud.add(shopBar)
+            .colspan(3)
+            .growY()
+            .bottom()
+            .padBottom(9f)
+            .center();
 
         refreshGardenResources();
         return hud;
@@ -282,6 +286,7 @@ public class GreenHouseView extends View {
     private void reloadGreenhouse() {
         if (plantLayer != null) plantLayer.dispose();
         plantLayer = new GreenHousePlantLayer(pvzAssetsRoot);
+        plantLayer.setBounds(0f, 0f, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
         rebuildGardenBoard();
         if (layers != null) layers.addActorAt(1, gardenBoard);
         refreshGardenResources();
@@ -304,36 +309,4 @@ public class GreenHouseView extends View {
         super.dispose();
     }
 
-    private FileHandle findPvzAssetsRoot() {
-        String configured = System.getProperty("pvz.assets");
-        List<FileHandle> candidates = new ArrayList<>();
-        if (configured != null && !configured.isBlank()) candidates.add(new FileHandle(new File(configured)));
-        for (String path : new String[]{"Assets", "../Assets", "../../Assets", "pvz-assets", "../pvz-assets", "../../pvz-assets"}) {
-            candidates.add(new FileHandle(new File(path)));
-        }
-        candidates.add(Gdx.files.internal("pvz-assets"));
-        for (FileHandle candidate : candidates) {
-            FileHandle root = resolveAssetRoot(candidate);
-            if (root != null) return root;
-        }
-        return null;
-    }
-
-    private FileHandle resolveAssetRoot(FileHandle root) {
-        if (isAssetRoot(root)) return root;
-        if (root == null || !root.exists()) return null;
-        for (String child : new String[]{"Base Assets", "base assets", "BaseAssets", "pvz-assets", "assets"}) {
-            if (isAssetRoot(root.child(child))) return root.child(child);
-        }
-        try {
-            for (FileHandle child : root.list()) if (child.isDirectory() && isAssetRoot(child)) return child;
-        } catch (RuntimeException ignored) { }
-        return null;
-    }
-
-    private boolean isAssetRoot(FileHandle root) {
-        if (root == null || !root.exists()) return false;
-        return (root.child("RESOURCES.json").exists() || root.child("resources.json").exists())
-            && (root.child("ATLASES").exists() || root.child("atlases").exists());
-    }
 }

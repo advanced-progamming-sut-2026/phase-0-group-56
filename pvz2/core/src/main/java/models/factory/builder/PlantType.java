@@ -190,9 +190,9 @@ public enum PlantType {
         @Override
         public Plant allocateSkill(Plant plant) {
             ShootingData data = new ShootingData(ProjectileType.BUBBLE ,
-                    ShootingMood.MID_RANGE , 1);
+                ShootingMood.MID_RANGE , 1);
             data.range = PlantLevel.current(plant.getType())
-                    == 4 ? 4 : 3;
+                == 4 ? 4 : 3;
             ShootingData pf = new ShootingData(ProjectileType.BUBBLE , ShootingMood.MID_RANGE , 30);
             ExtraHP hp = new ExtraHP(ExtraHP.Type.LIFE_RESET);
             plant.getPlantfoodSkill().add(new Shoot(pf));
@@ -204,9 +204,9 @@ public enum PlantType {
         @Override
         public Plant allocateSkill(Plant plant) {
             ShootingData data = new ShootingData(ProjectileType.BUBBLE ,
-                    ShootingMood.MID_RANGE , 1);
+                ShootingMood.MID_RANGE , 1);
             data.range = PlantLevel.current(plant.getType())
-                    >= 2 ? 4 : 3;
+                >= 2 ? 4 : 3;
             ShootingData pf = new ShootingData(ProjectileType.BUBBLE , ShootingMood.MID_RANGE , 30);
             ExtraHP hp = new ExtraHP(ExtraHP.Type.LIFE_RESET);
             plant.getPlantfoodSkill().add(new Shoot(pf));
@@ -374,10 +374,10 @@ public enum PlantType {
         @Override
         public Plant allocateSkill(Plant plant) {
             ShootingData data = new ShootingData(ProjectileType.CACTUS , ShootingMood.OneLine,
-                    1);
+                1);
             plant.getBaseSkill().add(new Shoot(data));
             ShootingData pf = new ShootingData(ProjectileType.ELECTRICAL_CACTUS , ShootingMood.OneLine,
-                    1);
+                1);
             plant.getPlantfoodSkill().add(new Shoot(pf));
             return super.allocateSkill(plant);
         }
@@ -595,8 +595,8 @@ public enum PlantType {
     public Plant allocateSkill(Plant plant){
         for (int i = 2; i <= PlantLevel.current(plant.getType()); i++) {
             if(Data.getPlants().get(plant.getType())
-                    .getUpgrades().get(i - 1).getEffect().equals("AoE on Death")) plant
-                    .getTags().add(PlantTags.EXPLOSIVE);
+                .getUpgrades().get(i - 1).getEffect().equals("AoE on Death")) plant
+                .getTags().add(PlantTags.EXPLOSIVE);
         }
         return plant;
     }
@@ -641,6 +641,10 @@ public enum PlantType {
             case JALAPENO:
             case DOOM_SHROOM:
             case TANGLE_KELP:
+            case ICEBERG_LETTUCE:
+            case ICE_SHROOM:
+            case HOT_POTATO:
+            case GRAVE_BUSTER:
             case PHAT_BEET:
             case CHOMPER:
             case WASABI_WHIP:
@@ -651,6 +655,11 @@ public enum PlantType {
             // -------- Lobber / Strike Through --------
             case CACTUS:
             case FUM_SHROOM:
+            case CABBAGE_PULT:
+            case KERNEL_PULT:
+            case MELON_PULT:
+            case WINTER_MELON:
+            case PEPPER_PULT:
                 return PlantCategory.StrikeThrough;
 
 

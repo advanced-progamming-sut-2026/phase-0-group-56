@@ -116,6 +116,9 @@ public final class GameView extends View {
     private float cameraSlideFromY;
 
     private Table preparationRoot;
+    private Table levelStartOverlay;
+    private boolean levelStartNeedsPreparation;
+    private boolean levelStartPausedGame;
     private Table selectedSlotsTable;
     private Label selectionCountLabel;
     private Label preparationStatusLabel;
@@ -196,21 +199,28 @@ public final class GameView extends View {
         buildAnnouncementOverlay();
         buildOutcomeOverlay();
 
-        if (controller.getGame().getState() == BaseGame.GameState.STARTING) {
+        levelStartNeedsPreparation =
+            controller.getGame().getState() == BaseGame.GameState.STARTING;
+
+        if (levelStartNeedsPreparation) {
             buildPreparationUI();
             setWorldCamera(startCameraX, startCameraY);
         } else {
             // Special modes such as ConveyorBelt may already start in PLAYING.
+            levelStartPausedGame =
+                controller.getGame().getState() == BaseGame.GameState.PLAYING;
+            if (levelStartPausedGame) {
+                controller.pauseGame();
+            }
             setWorldCamera(battleCameraX, battleCameraY);
-            toolsStack.setVisible(true);
+            toolsStack.setVisible(false);
 
             if (worldEntities != null) {
                 worldEntities.preloadPlants(controller.getSelectedPlants());
             }
-            if (shouldShowCrazyDaveIntro()) {
-                beginCrazyDaveIntro();
-            }
         }
+
+        buildLevelStartMenu();
 
         worldInput = createWorldInput();
         inputMultiplexer = new InputMultiplexer(stage, worldInput);
@@ -899,6 +909,219 @@ public final class GameView extends View {
         refreshPreparationUI();
     }
 
+    /**
+     * Shows the level objectives before the plant-selection screen.
+     *
+     * <p>The underlying game is still in STARTING state while this panel is
+     * visible. Consequently no wave, timer, or gameplay update can begin
+     * until the player explicitly continues and presses LET'S ROCK.</p>
+     */
+    private void buildLevelStartMenu() {
+        levelStartOverlay = new Table();
+        levelStartOverlay.setFillParent(true);
+        levelStartOverlay.center();
+        levelStartOverlay.setTouchable(Touchable.enabled);
+        levelStartOverlay.setBackground(
+            solidDrawable(new Color(0.015f, 0.035f, 0.045f, 0.78f))
+        );
+
+        // Use a dedicated outer frame so the level briefing remains visibly
+        // boxed even when a skin drawable is unavailable. The inner PvZ
+        // panel keeps the normal dialog artwork and padding.
+        Table frame = new Table();
+        frame.setBackground(
+            solidDrawable(new Color(0.01f, 0.025f, 0.035f, 0.98f))
+        );
+        frame.pad(7f);
+
+        Table card = pvzPanel();
+        card.center();
+
+        Label title = new Label("LEVEL " + level.getId(), skin, "big_outline");
+        title.setAlignment(Align.center);
+
+        Label chapterLabel = new Label(
+            humanizeLevelText(chapter.name()),
+            skin,
+            "medium_outline"
+        );
+        chapterLabel.setAlignment(Align.center);
+
+        Label missionTitle = new Label("MISSION", skin, "medium_outline");
+        missionTitle.setAlignment(Align.left);
+
+        Label missionLabel = new Label(buildLevelMissionText(), skin);
+        missionLabel.setWrap(true);
+        missionLabel.setAlignment(Align.left);
+
+        card.add(title)
+            .width(650f)
+            .center()
+            .padBottom(2f)
+            .row();
+        card.add(chapterLabel)
+            .width(650f)
+            .center()
+            .padBottom(18f)
+            .row();
+        card.add(missionTitle)
+            .width(650f)
+            .left()
+            .padBottom(7f)
+            .row();
+        card.add(missionLabel)
+            .width(650f)
+            .minHeight(150f)
+            .left()
+            .padBottom(18f)
+            .row();
+
+        TextButton backButton = new TextButton("BACK", skin, "brown");
+        backButton.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                App.setScreen(new PlayView());
+            }
+        });
+
+        TextButton continueButton = new TextButton("CONTINUE", skin, "green");
+        continueButton.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                dismissLevelStartMenu();
+            }
+        });
+
+        card.add(backButton)
+            .width(180f)
+            .height(58f)
+            .padRight(10f);
+        card.add(continueButton)
+            .width(220f)
+            .height(58f);
+
+        frame.add(card)
+            .width(760f)
+            .minHeight(420f)
+            .center();
+
+        levelStartOverlay.add(frame)
+            .width(774f)
+            .center();
+
+        if (preparationRoot != null) {
+            preparationRoot.setVisible(false);
+            preparationRoot.setTouchable(Touchable.disabled);
+        }
+
+        stage.addActor(levelStartOverlay);
+    }
+
+    private void dismissLevelStartMenu() {
+        if (levelStartOverlay == null) {
+            return;
+        }
+
+        levelStartOverlay.setVisible(false);
+        levelStartOverlay.setTouchable(Touchable.disabled);
+
+        if (levelStartNeedsPreparation && preparationRoot != null) {
+            preparationRoot.setVisible(true);
+            preparationRoot.setTouchable(Touchable.enabled);
+            preparationRoot.toFront();
+            return;
+        }
+
+        if (levelStartPausedGame
+            && controller.getGame().getState() == BaseGame.GameState.PAUSE) {
+            controller.resumeGame();
+            levelStartPausedGame = false;
+        }
+
+        if (toolsStack != null) {
+            toolsStack.setVisible(true);
+        }
+
+        if (shouldShowCrazyDaveIntro()) {
+            beginCrazyDaveIntro();
+        }
+    }
+
+    private String buildLevelMissionText() {
+        String type = level.getLevelType() == null
+            ? "normal"
+            : level.getLevelType().trim().toLowerCase(Locale.ROOT);
+
+        StringBuilder mission = new StringBuilder();
+        mission.append("• Defeat all zombies and survive ")
+            .append(Math.max(1, level.getWaves()))
+            .append(" waves.\n");
+
+        switch (type) {
+            case "conveyor belt" -> mission.append(
+                "• Use the plants delivered on the conveyor belt.\n"
+            );
+            case "save our seeds" -> mission.append(
+                "• Keep every protected plant alive until the battle ends.\n"
+            );
+            case "locked plants by category" -> mission.append(
+                "• Build your defence using only the permitted plant category.\n"
+            );
+            case "deadline" -> mission.append(
+                "• Finish the battle before the deadline expires.\n"
+            );
+            case "timed war" -> mission.append(
+                "• Keep attacking while the timed battle is running.\n"
+            );
+            case "love your plants" -> mission.append(
+                "• Do not lose any plant during this challenge.\n"
+            );
+            case "night ops" -> mission.append(
+                "• There is no falling sunlight; manage your resources carefully.\n"
+            );
+            case "plant what you get" -> mission.append(
+                "• Adapt your defence to the plants you receive during the level.\n"
+            );
+            default -> mission.append(
+                "• Protect your lawn and stop the zombie invasion.\n"
+            );
+        }
+
+        if (level.getUnlockingPlants() != null
+            && !level.getUnlockingPlants().isEmpty()) {
+            mission.append("\nReward: unlock ");
+            for (int i = 0; i < level.getUnlockingPlants().size(); i++) {
+                if (i > 0) {
+                    mission.append(", ");
+                }
+                mission.append(shortPlantName(level.getUnlockingPlants().get(i)));
+            }
+            mission.append('.');
+        }
+
+        return mission.toString();
+    }
+
+    private static String humanizeLevelText(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+
+        String[] words = value.replace('_', ' ').split("\\s+");
+        StringBuilder result = new StringBuilder();
+        for (String word : words) {
+            if (word.isEmpty()) {
+                continue;
+            }
+            if (!result.isEmpty()) {
+                result.append(' ');
+            }
+            result.append(Character.toUpperCase(word.charAt(0)))
+                .append(word.substring(1).toLowerCase(Locale.ROOT));
+        }
+        return result.toString();
+    }
+
     private void refreshPreparationUI() {
         if (selectedSlotsTable == null) {
             return;
@@ -1027,6 +1250,12 @@ public final class GameView extends View {
 
             @Override
             public boolean keyDown(int keycode) {
+                if (levelStartOverlay != null && levelStartOverlay.isVisible()) {
+                    if (keycode == Input.Keys.ENTER || keycode == Input.Keys.SPACE) {
+                        dismissLevelStartMenu();
+                    }
+                    return true;
+                }
                 if (crazyDaveIntroActive) {
                     if (keycode == Input.Keys.ENTER) {
                         crazyDaveIntro.advance();
@@ -1512,6 +1741,9 @@ public final class GameView extends View {
             stage.dispose();
             stage = null;
         }
+
+        levelStartOverlay = null;
+        preparationRoot = null;
 
         if (mapRenderer != null) {
             mapRenderer.dispose();

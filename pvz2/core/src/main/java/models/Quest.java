@@ -8,6 +8,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 
 public class Quest implements Serializable, QuestObserver {
 
@@ -87,7 +88,7 @@ public class Quest implements Serializable, QuestObserver {
         this.category =
             category == null || category.isBlank()
                 ? "MAIN"
-                : category.trim().toUpperCase();
+                : category.trim().toUpperCase(Locale.ROOT);
 
         this.priority =
             Math.max(1, Math.min(4, priority));
@@ -95,14 +96,16 @@ public class Quest implements Serializable, QuestObserver {
         this.actionType =
             actionType == null
                 ? ""
-                : actionType.trim().toUpperCase();
+                : actionType.trim().toUpperCase(Locale.ROOT);
 
-        this.target = Math.max(1f, target);
+        this.target = Float.isFinite(target)
+            ? Math.max(1f, target)
+            : 1f;
 
         this.rewardType =
             rewardType == null
                 ? ""
-                : rewardType.trim().toUpperCase();
+                : rewardType.trim().toUpperCase(Locale.ROOT);
 
         this.rewardAmount = Math.max(0, rewardAmount);
 
@@ -119,12 +122,12 @@ public class Quest implements Serializable, QuestObserver {
         variableName =
             name == null
                 ? ""
-                : name.trim().toUpperCase();
+                : name.trim().toUpperCase(Locale.ROOT);
 
         variableValue =
             value == null
                 ? ""
-                : value.trim().toUpperCase();
+                : value.trim().toUpperCase(Locale.ROOT);
 
         variableNumber = Math.max(0, number);
         return this;
@@ -169,7 +172,7 @@ public class Quest implements Serializable, QuestObserver {
         int amount
     ) {
         if (
-            isDone
+            isDone()
                 || action == null
                 || action.isBlank()
                 || actionType == null
@@ -213,7 +216,7 @@ public class Quest implements Serializable, QuestObserver {
     }
 
     public void setProgress(float value) {
-        if (rewardClaimed) {
+        if (rewardClaimed || Float.isNaN(value)) {
             return;
         }
 
@@ -236,7 +239,7 @@ public class Quest implements Serializable, QuestObserver {
     }
 
     public String claimReward(User user) {
-        if (!isDone) {
+        if (!isDone()) {
             return "Quest is not completed yet.";
         }
 

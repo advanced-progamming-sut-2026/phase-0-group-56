@@ -235,7 +235,7 @@ public final class QuestCatalog {
                 }
             } else if (!versionChanged && !incomplete) {
                 refreshed.set(i, previous);
-            } else {
+            } else if (sameProgressDefinition(previous, generated)) {
                 generated.copyStateFrom(previous);
             }
         }
@@ -266,6 +266,27 @@ public final class QuestCatalog {
         return actions.containsKey("EXCLUDE_FAMILY_WIN")
             && actions.containsKey("LAWNMOWER_KILL")
             && actions.containsKey("COLLECT_SUN");
+    }
+
+    /**
+     * Progress is meaningful only for the same quest definition.  In
+     * particular, generated chapter/plant/family/number variables must not
+     * carry kills from an older assignment into a new assignment during
+     * migration or after a catalogue version bump.
+     */
+    private static boolean sameProgressDefinition(Quest previous, Quest current) {
+        if (previous == null || current == null
+            || !previous.getActionType().equalsIgnoreCase(current.getActionType())) {
+            return false;
+        }
+
+        return Float.compare(previous.getTarget(), current.getTarget()) == 0
+            && previous.getCategory().equalsIgnoreCase(current.getCategory())
+            && previous.getVariableName().equalsIgnoreCase(current.getVariableName())
+            && previous.getVariableValue().equalsIgnoreCase(current.getVariableValue())
+            && previous.getVariableNumber() == current.getVariableNumber()
+            && previous.getRewardType().equalsIgnoreCase(current.getRewardType())
+            && previous.getRewardAmount() == current.getRewardAmount();
     }
 
     private static Quest q(

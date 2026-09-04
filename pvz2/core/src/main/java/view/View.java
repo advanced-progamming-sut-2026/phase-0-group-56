@@ -625,7 +625,7 @@ public class View implements Screen {
             case "hud_minigames", "minigames" -> "minigames";
             case "hud_task_list", "tasks" -> "tasks";
             case "settings" -> "settings";
-            case "shop" -> "shop";
+            case "shop" -> "store_cart";
             case "news" -> "news";
             default -> null;
         };
@@ -634,6 +634,7 @@ public class View implements Screen {
     private String pressedAssetKey(String assetKey) {
         return switch (assetKey) {
             case "quest" -> "quest_down";
+            case "store_cart" -> "store_cart_down";
             case "event_shop" -> "event_shop_down";
             case "plant_boost" -> "plant_boost_down";
             case "premium" -> "premium_down";
