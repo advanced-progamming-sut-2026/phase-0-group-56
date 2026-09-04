@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.lang.reflect.Method;
 
 /**
  * Responsible only for rendering Plant models.
@@ -143,10 +144,20 @@ public final class PlantRenderer implements Disposable {
     private static final float PAM_REFERENCE_SIZE = 390f;
     private static final float CELL_FILL = 1.5f;
 
+    private static final String FROST_STAGE1_PAM =
+        "768/FULL/EFFECTS/FROSTBITE_CHILL_PLANT/FROSTBITE_CHILL_PLANT.PAM";
+    private static final String FROST_STAGE2_PAM = FROST_STAGE1_PAM;
+    private static final String FROST_STAGE3_PAM =
+        "768/FULL/EFFECTS/FROSTBITE_ICE_BLOCK_PLANT_BEHIND/FROSTBITE_ICE_BLOCK_PLANT_BEHIND.PAM";
+
     private final FileHandle pamRoot;
 
     private final TextureBank textureBank;
     private final PamPlayer pamPlayer;
+
+    private FrostVisual frostStage1;
+    private FrostVisual frostStage2;
+    private FrostVisual frostStage3;
 
     private final EnumMap<PlantType, PlantVisual> visuals =
         new EnumMap<>(PlantType.class);
@@ -316,6 +327,15 @@ public final class PlantRenderer implements Disposable {
         float cellSize = Math.min(cellWidth, cellHeight);
         float scale = (cellSize / PAM_REFERENCE_SIZE) * CELL_FILL;
 
+        int frostLevel = getFrostLevel(plant);
+
+        /* The complete ice block asset is intentionally behind the plant.
+         * Partial frost overlays are drawn on top so the plant remains
+         * visible through the ice. */
+        if (frostLevel >= 3) {
+            drawFrost(batch, 3, centerX, centerY, scale);
+        }
+
         pamPlayer.draw(
             batch,
             active.clip,
@@ -326,6 +346,68 @@ public final class PlantRenderer implements Disposable {
             scale,
             active.loop
         );
+
+        if (frostLevel == 1 || frostLevel == 2) {
+            drawFrost(batch, frostLevel, centerX, centerY, scale);
+        }
+    }
+
+
+    private void drawFrost(
+        Batch batch,
+        int stage,
+        float centerX,
+        float centerY,
+        float scale
+    ) {
+        FrostVisual frost = getFrostVisual(stage);
+        if (frost == null || frost.clip == null) {
+            return;
+        }
+
+        float time = Gdx.graphics.getDeltaTime();
+        pamPlayer.draw(
+            batch,
+            frost.clip,
+            time,
+            centerX,
+            centerY,
+            scale,
+            scale,
+            false
+        );
+    }
+
+    private FrostVisual getFrostVisual(int stage) {
+        if (stage == 1 && frostStage1 == null) {
+            frostStage1 = loadFrost(FROST_STAGE1_PAM, "chill_stage1");
+        } else if (stage == 2 && frostStage2 == null) {
+            frostStage2 = loadFrost(FROST_STAGE2_PAM, "chill_stage2");
+        } else if (stage == 3 && frostStage3 == null) {
+            frostStage3 = loadFrost(FROST_STAGE3_PAM, null);
+        }
+        return stage == 1 ? frostStage1 : stage == 2 ? frostStage2 : frostStage3;
+    }
+
+    private FrostVisual loadFrost(String path, String clipName) {
+        try {
+            pamPlayer.loadSync(path);
+            String selected = clipName;
+            if (selected == null) {
+                selected = pamPlayer.clips(path).get(0);
+            }
+            return new FrostVisual(safeClip(path, selected));
+        } catch (RuntimeException exception) {
+            Gdx.app.error(TAG, "Could not load frost overlay " + path, exception);
+            return null;
+        }
+    }
+
+    private static int getFrostLevel(Plant plant) {
+        if (plant == null) {
+            return 0;
+        }
+        return Math.max(0, Math.min(3, plant.getFreezeLevel()));
     }
 
 
@@ -1352,6 +1434,15 @@ public final class PlantRenderer implements Disposable {
                 && (!Float.isFinite(eventAt)
                 || now < eventAt
                 || now - eventAt >= track.duration);
+        }
+    }
+
+
+    private static final class FrostVisual {
+        private final ClipRef clip;
+
+        private FrostVisual(ClipRef clip) {
+            this.clip = clip;
         }
     }
 
