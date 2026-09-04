@@ -131,4 +131,9 @@ final class GreenHousePlantLayer extends Group implements Disposable {
             stateTime += delta;
         }
     }
+
+    void clearPlants() {
+        actors.clear();
+        clearChildren();
+    }
 }

@@ -221,6 +221,10 @@ public final class GameView extends View {
         }
 
         buildLevelStartMenu();
+        if (levelStartOverlay != null && levelStartOverlay.isVisible()) {
+            pauseOverlay.setVisible(false);
+            pauseOverlay.setTouchable(Touchable.disabled);
+        }
 
         worldInput = createWorldInput();
         inputMultiplexer = new InputMultiplexer(stage, worldInput);
@@ -624,7 +628,9 @@ public final class GameView extends View {
             return;
         }
 
-        boolean paused = state == BaseGame.GameState.PAUSE;
+        boolean paused =
+            state == BaseGame.GameState.PAUSE
+                && (levelStartOverlay == null || !levelStartOverlay.isVisible());
         pauseOverlay.setVisible(paused);
         pauseOverlay.setTouchable(paused ? Touchable.enabled : Touchable.disabled);
     }

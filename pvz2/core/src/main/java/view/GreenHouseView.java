@@ -81,6 +81,7 @@ public class GreenHouseView extends View {
 
         pvzAssetsRoot = PvzAssetLocator.find();
         plantLayer = new GreenHousePlantLayer(pvzAssetsRoot);
+        layers.add(plantLayer);
         plantLayer.setBounds(0f, 0f, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
         rebuildGardenBoard();
         layers.add(gardenBoard);
@@ -162,7 +163,9 @@ public class GreenHouseView extends View {
 
     private void rebuildGardenBoard() {
         if (gardenBoard != null) gardenBoard.remove();
-        if (plantLayer != null) plantLayer.clearChildren();
+        if (plantLayer != null) {
+            plantLayer.clearPlants();
+        }
 
         gardenBoard = new Group();
         gardenBoard.setBounds(0f, 0f, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
@@ -175,7 +178,6 @@ public class GreenHouseView extends View {
                 gardenBoard.addActor(createBed(pot, column, row));
             }
         }
-        if (plantLayer != null && plantLayer.isAvailable()) gardenBoard.addActor(plantLayer);
     }
 
     private Stack createBed(Pot pot, int column, int row) {
@@ -288,7 +290,7 @@ public class GreenHouseView extends View {
         plantLayer = new GreenHousePlantLayer(pvzAssetsRoot);
         plantLayer.setBounds(0f, 0f, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
         rebuildGardenBoard();
-        if (layers != null) layers.addActorAt(1, gardenBoard);
+        if (layers != null) layers.add(gardenBoard);;
         refreshGardenResources();
     }
 

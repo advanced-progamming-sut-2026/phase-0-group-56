@@ -85,7 +85,12 @@ public class User implements Serializable, QuestObserver {
         this.zombieRegistry = new ZombieRegistry();
         this.levels = new HashMap<>();
 
-        this.unlockedPlants = new ArrayList<>(List.of(PlantType.values()));
+        this.unlockedPlants = new ArrayList<>();
+
+        this.unlockedPlants.add(PlantType.PEASHOOTER);
+        this.unlockedPlants.add(PlantType.SUNFLOWER);
+        this.unlockedPlants.add(PlantType.WALL_NUT);
+        this.unlockedPlants.add(PlantType.POTATO_MINE);
 
         for (PlantType plant : this.unlockedPlants) {
             this.levels.put(plant, 1);
