@@ -27,9 +27,10 @@ public class Field {
         for (int i = 0; i < 5; i++) {
             tiles.add(new ArrayList<Tile>(9));
         }
-        System.out.println("rows are initialized , rows count : " + tiles.size());
+
+
             initFirstTwoColumns(chapter);
-            int specialTiles = 3 * level;
+            int specialTiles = 3 * (level % 4 + 1) ;
             initSpecials(chapter ,  specialTiles);
            if(chapter == Chapters.BigWaveBeach) {
                initWater();

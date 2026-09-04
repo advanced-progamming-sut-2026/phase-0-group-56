@@ -13,7 +13,6 @@ import models.factory.*;
 import models.factory.builder.PlantType;
 import models.factory.builder.SunBuilder;
 import models.gamepanes.*;
-import models.utils.AudioManager;
 import models.utils.Result;
 import models.entity.ability.*;
 
@@ -347,7 +346,6 @@ public class BaseGame implements Game {
             if (waves == null || waves.isEmpty()) {
                 won = true;
                 state = GameState.END;
-                AudioManager.getInstance().play("win");
                 return new Result(true, "Won", null);
             }
 
@@ -359,7 +357,7 @@ public class BaseGame implements Game {
             event = switch (chapter){
                 case AncientEgypt -> new Tornado(this);
                 case FrozenCaves -> new IcyWind(this);
-                case BigWaveBeach -> new Water(this);
+                case BigWaveBeach -> new SandyZombieSpawner(this);
                 default -> new GraveSpawner(this);
             };
             lastWaveAnnouncement = setTheWaveZombies(lastWave);

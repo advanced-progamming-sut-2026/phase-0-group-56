@@ -63,6 +63,8 @@ public final class ChapterElementRenderer implements Disposable {
     // Big Wave Beach
     private static final String WATER_SQUARE =
         "768/FULL/BACKGROUNDS/WATER_SQUARE/WATER_SQUARE.PAM";
+    private static final String SAND_TILE =
+        "768/FULL/BACKGROUNDS/GOLDTILE/GOLDTILE.PAM";
     private static final String WATER_FOAM =
         "768/FULL/EFFECTS/WATER_FOAM/WATER_FOAM.PAM";
     private static final String WATER_UNDERLAYER =
@@ -138,6 +140,7 @@ public final class ChapterElementRenderer implements Disposable {
                 request(WATER_UNDERLAYER);
                 request(WATER_UPPERLAYER);
                 request(WATER_TIDE_LINE);
+                request(SAND_TILE);
             }
             case DarkAge -> {
                 request(DARK_GRAVE);
@@ -468,7 +471,27 @@ public final class ChapterElementRenderer implements Disposable {
 
             for (int col = 0; col < Math.min(COLUMN_COUNT, row.size()); col++) {
                 Tile tile = row.get(col);
-                if (tile == null || !tile.isWater()) {
+                if (tile == null) {
+                    continue;
+                }
+
+                if (tile.getTileType() == TileType.SANDY_TILE) {
+                    drawTilePam(
+                        batch,
+                        SAND_TILE,
+                        tile,
+                        lawnX,
+                        lawnY,
+                        cellWidth,
+                        cellHeight,
+                        1.04f,
+                        1.05f,
+                        animationTime,
+                        true
+                    );
+                }
+
+                if (!tile.isWater()) {
                     continue;
                 }
 
