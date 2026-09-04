@@ -20,6 +20,7 @@ public class HomeView extends View {
     public HomeView() {
         menu = new Home();
         App.setCurrentmenu(menu);
+        //Data.getCurrentUser().setLevelsPassed(Data.getCurrentUser().getLevelsPassed() + 4);
     }
 
     @Override

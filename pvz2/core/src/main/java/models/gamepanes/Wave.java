@@ -13,22 +13,48 @@ public class Wave {
     private int id;
     private int hardness;
     private float cost;
+    private float copyCost;
     boolean finalWave;
     public Wave(){}
     public Wave(int id, int hardness, float cost){
         this.id = id;
         this.hardness = hardness;
+        this.cost = cost;
+        this.copyCost = cost;
     }
 
     Random rand = new Random();
     public void initWave(ArrayList<String> available){
-        if(cost <= 0) return;
-        int index = rand.nextInt(available.size());
-        zombies.add(ZombieFactory.createZombie(available.get(index)));
-        zombieCount++;
-        zombiesHP += zombies.getLast().getHp();
-        cost -= zombies.getLast().getCost();
-        initWave(available);
+        zombies.clear();
+        zombieCount = 0;
+        zombiesHP = 0;
+
+        if (available == null || available.isEmpty() || cost <= 0) {
+            return;
+        }
+
+        float remainingBudget = cost;
+        int safetyCounter = 0;
+        int minimumZombies = Math.max(4, (int) Math.ceil(Math.sqrt(remainingBudget)));
+
+        while ((remainingBudget > 0 || zombieCount < minimumZombies) && safetyCounter++ < 200) {
+            int index = rand.nextInt(available.size());
+            Zombie zombie = ZombieFactory.createZombie(available.get(index));
+            if (zombie == null) {
+                continue;
+            }
+            zombies.add(zombie);
+            zombieCount++;
+            zombiesHP += zombie.getHp();
+            remainingBudget -= zombie.getCost();
+
+            // Prevent extremely cheap zombie pools from creating hundreds of
+            // entities while still allowing later waves to scale naturally.
+            if (zombieCount >= 80) {
+                break;
+            }
+        }
+        cost = remainingBudget;
     }
 
     public boolean isFinished(){
@@ -88,11 +114,12 @@ public class Wave {
     }
 
     public float getCost() {
-        return cost;
+        return copyCost;
     }
 
     public void setCost(float cost) {
         this.cost = cost;
+        this.copyCost = cost;
     }
 
     public Random getRand() {

@@ -51,6 +51,7 @@ public NormalGame(Chapters chapters, Level level){
 
     private void initWaves(Level level){
         int wavesCount = level.getWaves();
+        System.out.println("wavesCount: " + wavesCount);
         float baseCost = level.getBaseHardness();
         ArrayList<String>  zombies = level.getAllowedZombies();///filtered zombies for this level
         for (int i = 0; i < wavesCount - 1; i++) {
@@ -73,6 +74,11 @@ public NormalGame(Chapters chapters, Level level){
         finalWave.setCost(waves.getLast().getCost() * 2);
         finalWave.initWave(zombies);
         waves.add(finalWave);
+        System.out.println("waves count : " + finalWave.getId());
+        for (Wave wave : waves) {
+            System.out.println("wave : " + wave.getId() + " , zombie number " +
+                wave.getZombies().size() + " , cost : " + wave.getCost());
+        }
     }
 
     protected void updateProjectiles(float delta) {

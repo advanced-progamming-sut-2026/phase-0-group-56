@@ -157,14 +157,14 @@ public final class ToolsStack extends Table {
         hud.add(plantFoodHolder).padLeft(6f);
         hud.add(pauseButton).size(58f).padLeft(6f);
         hud.add(speedHolder).padLeft(6f);
-        hud.add(startWavesButton).width(122f).height(52f).padLeft(6f);
-        hud.add(debugButton).width(88f).height(52f).padLeft(6f);
+        hud.add(startWavesButton).width(112f).height(52f).padLeft(4f);
+        hud.add(debugButton).width(76f).height(52f).padLeft(4f);
 
         add(hud).expandX().fillX().top().row();
 
         Table progressRow = new Table();
         progressRow.add(waveLabel).width(120f).left();
-        progressRow.add(progressStack).width(420f).height(24f).center();
+        progressRow.add(progressStack).width(340f).height(24f).center();
         progressRow.add(statusLabel).expandX().fillX().padLeft(16f);
 
         add(progressRow)
@@ -458,9 +458,22 @@ public final class ToolsStack extends Table {
         int totalWaves = Math.max(1, game.getWaves() == null ? 0 : game.getWaves().size());
         int current = Math.max(0, game.getWaveID());
 
-        float progress = Math.min(1f, (float) current / totalWaves);
+        // Include the active wave state so the bar does not jump from one
+        // fifth to the next only when a wave is over.
+        float inWaveProgress = 0f;
+        if (game.getCurrentWave() != null && game.getCurrentWave().getZombies() != null
+            && !game.getCurrentWave().getZombies().isEmpty()) {
+            int alive = 0;
+            for (models.entity.Zombie zombie : game.getCurrentWave().getZombies()) {
+                if (zombie != null && !zombie.isDead()) {
+                    alive++;
+                }
+            }
+            inWaveProgress = 1f - alive / (float) game.getCurrentWave().getZombies().size();
+        }
+        float progress = Math.min(1f, (Math.max(0, current - 1) + inWaveProgress) / totalWaves);
         waveProgress.setValue(progress);
-        String waveText = "WAVE " + Math.min(current, totalWaves) + "/" + totalWaves;
+        String waveText = "WAVE " + Math.min(Math.max(1, current), totalWaves) + "/" + totalWaves;
         if (game instanceof TimedWar timedWar) {
             waveText += "\nTIME " + Math.max(0, (int) Math.ceil(timedWar.getTimeRemaining())) + "s";
         }

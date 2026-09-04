@@ -330,19 +330,25 @@ public class BaseGame implements Game {
     private static final float RELEASE_MAX_WAIT = 6f;
 
     protected Result attack(float delta) {
-        if (currentWave == null
-            || (currentWave.isFinished() && pendingWaveZombies.isEmpty())) {
-            if (currentWave != null && waves != null && !waves.isEmpty()
-                && currentWave == waves.getLast()) {
-                won = true;
-                state = GameState.END;
-                return new Result(true , "Won" , null);
-            }
-            if (waves == null || waveID >= waves.size()) {
+        System.out.println(waveID);
+        if (currentWave == null || (currentWave.isFinished() && pendingWaveZombies.isEmpty())) {
+
+            // A level can be completed only after every generated wave has
+            // actually finished. The old last-wave identity check was fragile:
+            // if the loader returned a shortened list or the index got out of
+            // sync, the first cleared wave could be treated as the final one.
+            if (currentWave != null && waveID >= waves.size()) {
                 won = true;
                 state = GameState.END;
                 return new Result(true, "Won", null);
             }
+
+            if (waves == null || waves.isEmpty()) {
+                won = true;
+                state = GameState.END;
+                return new Result(true, "Won", null);
+            }
+
             previousWave = currentWave;
             currentWave = waves.get(waveID);
             boolean lastWave = waveID == waves.size() - 1;

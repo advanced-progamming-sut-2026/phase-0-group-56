@@ -35,7 +35,7 @@ public final class NetworkClient implements Closeable {
         this.port = port;
     }
 
-    public synchronized NetworkResponse connect() {
+    public synchronized NetworkResponse    connect() {
         if (isConnected()) {
             return new NetworkResponse(true, "ALREADY_CONNECTED", "Already connected.", new String[0]);
         }
