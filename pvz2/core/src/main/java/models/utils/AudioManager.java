@@ -102,4 +102,8 @@ public class AudioManager implements Disposable {
         musicLibrary.clear();
         sfxLibrary.clear();
     }
+
+    public  void stop(){
+        currentMusic.stop();
+    }
 }

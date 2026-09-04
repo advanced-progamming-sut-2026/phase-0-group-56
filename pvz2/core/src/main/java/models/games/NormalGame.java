@@ -30,6 +30,8 @@ public NormalGame(Chapters chapters, Level level){
         case DarkAge ->    "dark_ages";
         default ->  null;
     };
+    AudioManager.getInstance().playMusic(chapterName);
+
 }
     @Override
     public void initGame(Chapters chapter , Level level) {
@@ -115,7 +117,6 @@ public NormalGame(Chapters chapters, Level level){
     String chapterName;
     @Override
     public String playGame(float delta) {
-        AudioManager.getInstance().playMusic(chapterName);
         updateProjectiles(delta);
         return super.playGame(delta);
     }
