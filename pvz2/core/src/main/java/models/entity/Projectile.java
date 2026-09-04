@@ -179,7 +179,7 @@ public class Projectile implements Cloneable {
                 if (target == null
                     || hitTime < targetHitTime - 0.0001f
                     || (Math.abs(hitTime - targetHitTime) <= 0.0001f
-                        && distance < targetDistance)) {
+                    && distance < targetDistance)) {
                     target = z;
                     targetDistance = distance;
                     targetHitTime = hitTime;
@@ -292,10 +292,8 @@ public class Projectile implements Cloneable {
         if (this.getTags().contains(Tag.POISON)) {
             z.addEffect(new Effect(EffectType.POISONED, 5.0f));
         }
-        // Any hit cracks a Frozen Caves ice shell; fire additionally clears
-        // dynamite-freeze state used by the Prospector.
-        z.setFrozen(false);
         if (this.getTags().contains(Tag.FIRE)) {
+            z.setFrozen(false);
             z.setDynamiteFrozen(false);
         }
 
@@ -327,11 +325,12 @@ public class Projectile implements Cloneable {
             }
             for (Tile tile : game.getField().getTiles().get(i)){
                 if(bounds.overlaps(tile.getBounds())) {
-                    if(tile.getTileType() == TileType.FROZEN && tile.getHp() > 0){
+                    if(tile.getTileType() == TileType.FROZEN && this.tags.contains(Tag.FIRE)){
+                        tile.setTileType(TileType.CAVE_TILE);
+                        setPierce(pierce - 1);
+                    }
+                    else if(tile.getHp() > 0){
                         tile.setHp(tile.getHp() - this.damage);
-                        if (tile.getHp() <= 0) {
-                            tile.setTileType(TileType.CAVE_TILE);
-                        }
                         setPierce(pierce - 1);
                     }
                 }
@@ -340,10 +339,6 @@ public class Projectile implements Cloneable {
 
         for (Plant p : game.getPlantsInField()){
             if (p == null || p.getLine() != line) {
-                continue;
-            }
-            Rectangle plantBounds = new Rectangle(p.getX(), p.getY(), p.getWidth(), p.getHeight());
-            if (!bounds.overlaps(plantBounds)) {
                 continue;
             }
             if(p.isFrozen()){
