@@ -291,10 +291,10 @@ public class ShopView extends View {
         Table card = pvzInnerPanel();
         card.pad(13f, 16f, 13f, 16f);
 
-        Image currencyIcon = MenuVisualAssets.image("gem");
-        if (currencyIcon != null) {
-            currencyIcon.setScaling(Scaling.fit);
-            card.add(currencyIcon)
+        Image productIcon = MenuVisualAssets.image("seed_packet");
+        if (productIcon != null) {
+            productIcon.setScaling(Scaling.fit);
+            card.add(productIcon)
                 .size(86f)
                 .center()
                 .padRight(8f);
@@ -459,11 +459,14 @@ public class ShopView extends View {
         if (title.contains("PLANT FOOD")) {
             return "plantfood";
         }
+        if (title.contains("SEED PACKET")) {
+            return "seed_packet";
+        }
         if (title.contains("DAILY")) {
             return "star";
         }
         if (title.contains("CURRENCY")) {
-            return "gem";
+            return "coin";
         }
 
         return priceText != null && priceText.toUpperCase().contains("GEM")

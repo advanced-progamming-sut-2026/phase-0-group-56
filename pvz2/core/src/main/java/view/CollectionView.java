@@ -21,9 +21,21 @@ import controllers.menus.secondarymenus.Collection;
 import models.entity.Zombie;
 import models.entity.ZombieRegistry;
 import models.entity.ZombieState;
+import models.entity.Armor;
+import models.entity.ability.Ability;
+import models.entity.ability.BulletAbility;
+import models.entity.ability.ExplodeAbility;
+import models.entity.ability.MoveAbility;
+import models.entity.ability.RandomChooserAbility;
+import models.entity.ability.SpawnAbility;
+import models.entity.ability.SpeedChangeAbility;
+import models.entity.ability.SunRobbingAbility;
 import models.factory.builder.PlantType;
 import models.gamepanes.Tile;
 import view.components.CollectionAssetCatalog;
+
+import java.util.List;
+import java.util.StringJoiner;
 
 public class CollectionView extends View {
 
@@ -1084,27 +1096,96 @@ public class CollectionView extends View {
             addDetail(
                 detail,
                 "ARMOR",
-                preview.hasArmor()
-                    ? preview
-                    .getArmors()
-                    .toString()
-                    : "NONE"
+                formatArmors(preview.getArmors())
             );
 
             addDetail(
                 detail,
                 "ABILITIES",
-                preview
-                    .getAbilities()
-                    .isEmpty()
-                    ? "NONE"
-                    : preview
-                    .getAbilities()
-                    .toString()
+                formatAbilities(preview.getAbilities())
             );
         }
 
         return detail;
+    }
+
+    /**
+     * Converts model abilities to stable, human-readable text. Calling
+     * List#toString() here used Object.toString() and exposed JVM
+     * implementation names/addresses in the Collection screen.
+     */
+    private static String formatAbilities(List<Ability> abilities) {
+        if (abilities == null || abilities.isEmpty()) {
+            return "NONE";
+        }
+
+        StringJoiner result = new StringJoiner(", ");
+        for (Ability ability : abilities) {
+            if (ability != null) {
+                result.add(formatAbility(ability));
+            }
+        }
+        String text = result.toString();
+        return text.isEmpty() ? "NONE" : text;
+    }
+
+    private static String formatArmors(List<Armor> armors) {
+        if (armors == null || armors.isEmpty()) {
+            return "NONE";
+        }
+
+        StringJoiner result = new StringJoiner(", ");
+        for (Armor armor : armors) {
+            if (armor == null) {
+                continue;
+            }
+            String type = armor.getType();
+            if (type == null || type.isBlank()) {
+                type = "Unknown armor";
+            }
+            result.add(type.replace('_', ' '));
+        }
+        String text = result.toString();
+        return text.isEmpty() ? "NONE" : text;
+    }
+
+    private static String formatAbility(Ability ability) {
+        if (ability instanceof BulletAbility) {
+            return "Ranged attack";
+        }
+        if (ability instanceof ExplodeAbility) {
+            return "Explosion";
+        }
+        if (ability instanceof SunRobbingAbility) {
+            return "Steals sunlight";
+        }
+        if (ability instanceof SpawnAbility) {
+            return "Summons reinforcements";
+        }
+        if (ability instanceof SpeedChangeAbility) {
+            return "Speed boost";
+        }
+        if (ability instanceof RandomChooserAbility) {
+            return "Special support";
+        }
+        if (ability instanceof MoveAbility move) {
+            if (move.getType() == null) {
+                return "Special movement";
+            }
+            return switch (move.getType()) {
+                case PUSH_ARCADE -> "Pushes plants";
+                case PUSH_ICE -> "Pushes ice";
+                case PUSH_BARREL -> "Rolls a barrel";
+                case PULL_PLANT -> "Pulls plants";
+                case SWAP_ZOMBIE -> "Moves other zombies";
+                case PIANO -> "Changes lanes";
+            };
+        }
+
+        String name = ability.getClass().getSimpleName()
+            .replaceAll("([a-z])([A-Z])", "$1 $2")
+            .trim();
+        return name.isEmpty() ? "Special ability" : name;
     }
 
     /**

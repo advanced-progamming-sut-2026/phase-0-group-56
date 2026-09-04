@@ -924,6 +924,15 @@ public final class GameView extends View {
             solidDrawable(new Color(0.015f, 0.035f, 0.045f, 0.78f))
         );
 
+        // Use a dedicated outer frame so the level briefing remains visibly
+        // boxed even when a skin drawable is unavailable. The inner PvZ
+        // panel keeps the normal dialog artwork and padding.
+        Table frame = new Table();
+        frame.setBackground(
+            solidDrawable(new Color(0.01f, 0.025f, 0.035f, 0.98f))
+        );
+        frame.pad(7f);
+
         Table card = pvzPanel();
         card.center();
 
@@ -990,8 +999,13 @@ public final class GameView extends View {
             .width(220f)
             .height(58f);
 
-        levelStartOverlay.add(card)
+        frame.add(card)
             .width(760f)
+            .minHeight(420f)
+            .center();
+
+        levelStartOverlay.add(frame)
+            .width(774f)
             .center();
 
         if (preparationRoot != null) {
