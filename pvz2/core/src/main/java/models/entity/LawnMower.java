@@ -3,6 +3,7 @@ package models.entity;
 import models.Constants;
 import models.gamepanes.Tile;
 import models.games.BaseGame;
+import models.utils.AudioManager;
 
 /**
  * One single-use lawn mower for one lane.
@@ -59,6 +60,7 @@ public class LawnMower extends Entity {
                 if (canHit(zombie) && Constants.overlap(zombie, this)) {
                     if (!activated) {
                         activate();
+                        AudioManager.getInstance().play("lawnmower");
                         activated = true;
                     }
                     kill(zombie);

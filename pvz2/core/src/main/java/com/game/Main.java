@@ -3,6 +3,7 @@ package com.game;
 import com.badlogic.gdx.Game;
 import controllers.datacontroller.Data;
 import models.App;
+import models.utils.AudioManager;
 import network.NetworkService;
 
 /**
@@ -14,12 +15,19 @@ public class Main extends Game {
     public void create() {
         new App(this);
 
+        AudioManager kanye = AudioManager.getInstance();
+        kanye.loadAll();
+        kanye.setMusicVolume(0.6f);
+        kanye.setSFXVolume(0.8f);
+
         Data.loadPlantsFromJson();
         Data.loadLevelsFromJson();
         Data.setUp();
         NetworkService.ensureEmbedded();
         NetworkService.importLocalAccounts();
     }
+
+
 
     @Override
     public void pause() {

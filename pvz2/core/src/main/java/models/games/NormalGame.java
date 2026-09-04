@@ -11,6 +11,7 @@ import models.gamepanes.Field;
 import models.gamepanes.Tile;
 import models.gamepanes.TileType;
 import models.gamepanes.Wave;
+import models.utils.AudioManager;
 import models.utils.Result;
 
 import java.util.ArrayList;
@@ -22,6 +23,13 @@ public class NormalGame extends BaseGame{
 public NormalGame(Chapters chapters, Level level){
     this.chapter = chapters;
     this.level = level;
+    chapterName = switch (chapters){
+        case AncientEgypt ->  "ancient_egypt";
+        case FrozenCaves ->   "frostbite_caves";
+        case BigWaveBeach ->    "big_wave_beach";
+        case DarkAge ->    "dark_ages";
+        default ->  null;
+    };
 }
     @Override
     public void initGame(Chapters chapter , Level level) {
@@ -46,6 +54,7 @@ public NormalGame(Chapters chapters, Level level){
         //initTestWave();
 
     }
+
 
 
 
@@ -103,8 +112,10 @@ public NormalGame(Chapters chapters, Level level){
         );
     }
 
+    String chapterName;
     @Override
     public String playGame(float delta) {
+        AudioManager.getInstance().playMusic(chapterName);
         updateProjectiles(delta);
         return super.playGame(delta);
     }
