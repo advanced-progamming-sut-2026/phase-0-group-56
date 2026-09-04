@@ -2,6 +2,7 @@ package view;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
+import com.badlogic.gdx.audio.Music;
 import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.scenes.scene2d.Actor;
@@ -34,14 +35,12 @@ import pvz.libpvz.textures.TextureBank;
 import pvz.skin.PvzSkin;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.EnumMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 
 public class PlayView extends View {
+    Music currentMusic;
+
 
     // -------------------------------------------------------------------------
     // Screen configuration
@@ -161,6 +160,11 @@ public class PlayView extends View {
          * Keep View's existing menu/controller contract.
          */
         this.menu = playMenu;
+        Random rand = new Random();
+        int random =  rand.nextInt(4);
+        currentMusic = Gdx.audio.newMusic(Gdx.files.internal(String.valueOf(random) + ".mp3"));
+        currentMusic.setLooping(true);
+        currentMusic.play();
     }
 
 
@@ -343,6 +347,8 @@ public class PlayView extends View {
             textureBank = null;
         }
 
+        currentMusic.dispose();
+
 
         worldRegions.clear();
 
@@ -460,6 +466,7 @@ public class PlayView extends View {
                     float y
                 ) {
 
+                    currentMusic.stop();
                     goBack();
                 }
             }
@@ -1633,4 +1640,6 @@ public class PlayView extends View {
                 "DARK AGES";
         };
     }
+
+
 }

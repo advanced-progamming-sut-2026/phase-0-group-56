@@ -46,6 +46,7 @@ import models.factory.builder.PlantType;
 import models.gameadventure.Chapters;
 import models.gameadventure.levels.Level;
 import models.games.BaseGame;
+import models.utils.AudioManager;
 import pvz.libpvz.textures.TextureBank;
 import pvz.skin.PvzSkin;
 import view.PlayView;
@@ -1521,6 +1522,7 @@ public final class GameView extends View {
             tiledMap.dispose();
             tiledMap = null;
         }
+        AudioManager.getInstance().stop();
 
 
         if (worldEntities != null) {
