@@ -15,6 +15,7 @@ public enum PlantType {
     SUNFLOWER{
         @Override
         public Plant allocateSkill(Plant plant) {
+            plant.getBaseSkill().add(new SunProduce(new SunProduceData(25)));
             SunProduceData data = new SunProduceData(25);
             plant.getPlantfoodSkill().add(new SunProduce(data));
             return super.allocateSkill(plant);
@@ -23,6 +24,7 @@ public enum PlantType {
     TWIN_SUNFLOWER{
         @Override
         public Plant allocateSkill(Plant plant) {
+            plant.getBaseSkill().add(new SunProduce(new SunProduceData(50)));
             SunProduceData data = new SunProduceData(50);
             plant.getPlantfoodSkill().add(new SunProduce(data));
             return super.allocateSkill(plant);
@@ -31,6 +33,7 @@ public enum PlantType {
     SUN_SHROOM{
         @Override
         public Plant allocateSkill(Plant plant) {
+            plant.getBaseSkill().add(new SunProduce(new SunProduceData(15)));
             SunProduceData data = new SunProduceData(15);
             plant.getPlantfoodSkill().add(new SunProduce(data));
             return super.allocateSkill(plant);
@@ -39,6 +42,7 @@ public enum PlantType {
     PRIMAL_SUNFLOWER{
         @Override
         public Plant allocateSkill(Plant plant) {
+            plant.getBaseSkill().add(new SunProduce(new SunProduceData(75)));
             SunProduceData data = new SunProduceData(75);
             plant.getPlantfoodSkill().add(new SunProduce(data));
             return super.allocateSkill(plant);
@@ -47,6 +51,7 @@ public enum PlantType {
     GOLD_BLOOM{
         @Override
         public Plant allocateSkill(Plant plant) {
+            plant.getBaseSkill().add(new SunProduce(new SunProduceData(375, true)));
             SunProduceData data = new SunProduceData(375 , true);
             plant.getPlantfoodSkill().add(new SunProduce(data));
             return super.allocateSkill(plant);
@@ -190,9 +195,9 @@ public enum PlantType {
         @Override
         public Plant allocateSkill(Plant plant) {
             ShootingData data = new ShootingData(ProjectileType.BUBBLE ,
-                    ShootingMood.MID_RANGE , 1);
+                ShootingMood.MID_RANGE , 1);
             data.range = PlantLevel.current(plant.getType())
-                    == 4 ? 4 : 3;
+                == 4 ? 4 : 3;
             ShootingData pf = new ShootingData(ProjectileType.BUBBLE , ShootingMood.MID_RANGE , 30);
             ExtraHP hp = new ExtraHP(ExtraHP.Type.LIFE_RESET);
             plant.getPlantfoodSkill().add(new Shoot(pf));
@@ -204,9 +209,9 @@ public enum PlantType {
         @Override
         public Plant allocateSkill(Plant plant) {
             ShootingData data = new ShootingData(ProjectileType.BUBBLE ,
-                    ShootingMood.MID_RANGE , 1);
+                ShootingMood.MID_RANGE , 1);
             data.range = PlantLevel.current(plant.getType())
-                    >= 2 ? 4 : 3;
+                >= 2 ? 4 : 3;
             ShootingData pf = new ShootingData(ProjectileType.BUBBLE , ShootingMood.MID_RANGE , 30);
             ExtraHP hp = new ExtraHP(ExtraHP.Type.LIFE_RESET);
             plant.getPlantfoodSkill().add(new Shoot(pf));
@@ -374,10 +379,10 @@ public enum PlantType {
         @Override
         public Plant allocateSkill(Plant plant) {
             ShootingData data = new ShootingData(ProjectileType.CACTUS , ShootingMood.OneLine,
-                    1);
+                1);
             plant.getBaseSkill().add(new Shoot(data));
             ShootingData pf = new ShootingData(ProjectileType.ELECTRICAL_CACTUS , ShootingMood.OneLine,
-                    1);
+                1);
             plant.getPlantfoodSkill().add(new Shoot(pf));
             return super.allocateSkill(plant);
         }
@@ -595,8 +600,8 @@ public enum PlantType {
     public Plant allocateSkill(Plant plant){
         for (int i = 2; i <= PlantLevel.current(plant.getType()); i++) {
             if(Data.getPlants().get(plant.getType())
-                    .getUpgrades().get(i - 1).getEffect().equals("AoE on Death")) plant
-                    .getTags().add(PlantTags.EXPLOSIVE);
+                .getUpgrades().get(i - 1).getEffect().equals("AoE on Death")) plant
+                .getTags().add(PlantTags.EXPLOSIVE);
         }
         return plant;
     }

@@ -8,7 +8,9 @@ public class Sun extends Entity{
     public enum AnimationType {
         NORMAL,
         SPECIAL,
-        RADIOACTIVE
+        RADIOACTIVE,
+        /** Radioactive sun after it has landed on the lawn. */
+        RADIOACTIVE_GROUNDED
     }
 
     Plant producer;
@@ -37,15 +39,15 @@ public class Sun extends Entity{
 
 
     public String land(float delta ,  BaseGame game){
-        if(producer != null){
-            producer.t = producer.getActionInterval();
-        }
         if(!ground)
         {
             this.y -= delta * Constants.SUN_DROPPING_VELOCITY;
             if(this.y + Sun.height / 2 <= this.line * Tile.getHeight()
                 + Tile.getHeight() / 2 ){
                 ground = true;
+                // The plant already starts its next cooldown when it creates
+                // this sun. Do not reset it every frame while the sun waits;
+                // doing so prevented sun producers from ever producing again.
                 return "Sun landed at " + this.tileIndex +
                     " , " + this.line;
             }
@@ -110,7 +112,7 @@ public class Sun extends Entity{
 
     public AnimationType getAnimationType() {
         if (radioActive || radioactiveVisual) {
-            return AnimationType.RADIOACTIVE;
+            return ground ? AnimationType.RADIOACTIVE_GROUNDED : AnimationType.RADIOACTIVE;
         }
         if (animationType == AnimationType.SPECIAL || price >= 100) {
             return AnimationType.SPECIAL;
@@ -124,7 +126,8 @@ public class Sun extends Entity{
             return;
         }
         this.animationType = animationType;
-        if (animationType == AnimationType.RADIOACTIVE) {
+        if (animationType == AnimationType.RADIOACTIVE
+            || animationType == AnimationType.RADIOACTIVE_GROUNDED) {
             radioactiveVisual = true;
         }
     }

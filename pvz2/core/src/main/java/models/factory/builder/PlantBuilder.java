@@ -9,6 +9,7 @@ import models.entity.PlantTags;
 import models.entity.WrampUpPlant;
 import models.gamepanes.Tile;
 
+import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -27,15 +28,17 @@ public class PlantBuilder {
         plant.setWidth(Tile.getWidth());
         plant.setHeight(Tile.getHeight());
         plant.setType(plantType);
+        plant.setCategory(plantType.getCategory());
         int level = PlantLevel.current(plantType);
         plant.setHp(upgradedHP(plantType , level));
         plant.setDamage(upgradedDamage(plantType , level));
         plant.setActionInterval(upgradedSpeed(plantType , level));
-        plant.setTags(Data.getPlants().get(plantType).getTags());
+        ArrayList<PlantTags> loadedTags = Data.getPlants().get(plantType).getTags();
+        plant.setTags(loadedTags == null ? new ArrayList<>() : new ArrayList<>(loadedTags));
         explodeOnFinish();
         plantType.allocateSkill(plant);
         if(plantType == PlantType.SEA_SHROOM ||
-        plantType == PlantType.PUFF_SHROOM){
+            plantType == PlantType.PUFF_SHROOM){
             plant.setLifeTime(60);
         }
         if(plant.getTags().contains(PlantTags.Wramp_up)){
@@ -60,7 +63,7 @@ public class PlantBuilder {
     private void explodeOnFinish(){
         for (int i = 2; i <= PlantLevel.current(plant.getType()); i++) {
             if(Data.getPlants().get(plant.getType()).getUpgrades().get(i - 2)
-                    .getEffect().matches("Explode on Finish")){
+                .getEffect().matches("Explode on Finish")){
                 plant.getTags().add(PlantTags.EXPLOSIVE);
             }
         }
@@ -69,7 +72,7 @@ public class PlantBuilder {
     private void plantFoodFromStart(){
         for (int i = 2; i <= PlantLevel.current(plant.getType()); i++) {
             if(Data.getPlants().get(plant.getType()).getUpgrades().get(i - 2)
-            .getEffect().matches("Plant Food From Start")){
+                .getEffect().matches("Plant Food From Start")){
                 plant.setPlantFood(true);
             }
         }
@@ -86,7 +89,7 @@ public class PlantBuilder {
         Pattern pattern = Pattern.compile(cost);
         Matcher matcher = pattern.matcher(effect);
         matcher.find();
-         return Float.parseFloat(matcher.group(1));
+        return Float.parseFloat(matcher.group(1));
     }
     private float damage(String effect){
         Pattern pattern = Pattern.compile(damage);

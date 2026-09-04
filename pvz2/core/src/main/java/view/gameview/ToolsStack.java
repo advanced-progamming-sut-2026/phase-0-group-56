@@ -123,14 +123,7 @@ public final class ToolsStack extends Table {
         debugControls = new Table();
         debugControls.setVisible(false);
 
-        waveProgress = new ProgressBar(
-            0f,
-            1f,
-            0.001f,
-            false,
-            skin,
-            "ingame_progress"
-        );
+        waveProgress = createWaveProgressBar();
         waveProgress.setAnimateDuration(0.15f);
         TextureRegion markerRegion = loadWaveMarker();
         waveMarkers = new WaveMarkerLayer(markerRegion);
@@ -434,16 +427,16 @@ public final class ToolsStack extends Table {
         TextButton.TextButtonStyle base = skin.get("brown" ,TextButton.TextButtonStyle.class);
         TextButton.TextButtonStyle boosted = new TextButton.TextButtonStyle(base);
         Drawable background = base.up;
-                if (background != null) {
-                        boosted.up = skin.newDrawable(background, new Color(1f, 0.78f, 0.08f, 1f));
-                        boosted.down = skin.newDrawable(background, new Color(0.86f, 0.61f, 0.03f, 1f));
-                        boosted.over = skin.newDrawable(background, new Color(1f, 0.88f, 0.28f, 1f));
-                        boosted.checked = boosted.down;
-                        boosted.disabled = skin.newDrawable(
-                              background,
-                                new Color(0.55f, 0.47f, 0.20f, 1f)
-                                );
-                }
+        if (background != null) {
+            boosted.up = skin.newDrawable(background, new Color(1f, 0.78f, 0.08f, 1f));
+            boosted.down = skin.newDrawable(background, new Color(0.86f, 0.61f, 0.03f, 1f));
+            boosted.over = skin.newDrawable(background, new Color(1f, 0.88f, 0.28f, 1f));
+            boosted.checked = boosted.down;
+            boosted.disabled = skin.newDrawable(
+                background,
+                new Color(0.55f, 0.47f, 0.20f, 1f)
+            );
+        }
 
         boosted.fontColor = Color.BLACK;
         boosted.downFontColor = Color.BLACK;
@@ -456,7 +449,10 @@ public final class ToolsStack extends Table {
     private void refreshWaveProgress() {
         BaseGame game = controller.getGame();
         int totalWaves = Math.max(1, game.getWaves() == null ? 0 : game.getWaves().size());
-        int current = Math.max(0, game.getWaveID());
+        // BaseGame exposes a one-based count of waves that have actually
+        // started. Before the first simulation tick this is zero, then it
+        // advances exactly once for each announced wave.
+        int current = Math.max(0, Math.min(game.getWaveID(), totalWaves));
 
         float progress = Math.min(1f, (float) current / totalWaves);
         waveProgress.setValue(progress);
@@ -469,6 +465,49 @@ public final class ToolsStack extends Table {
             waveMarkers.setMarkerRegion(loadWaveMarker());
         }
         waveMarkers.setTotalWaves(totalWaves);
+    }
+
+    /**
+     * Builds the wave meter with the fill on the left side. The legacy skin
+     * assigns the fill drawable to {@code knobAfter}; LibGDX consequently
+     * paints the uncompleted portion as filled when the value is near zero.
+     */
+    private ProgressBar createWaveProgressBar() {
+        ProgressBar.ProgressBarStyle style = new ProgressBar.ProgressBarStyle();
+        Drawable background = safeDrawable("image_ui_hud_ingame_progress_meter_10");
+        Drawable fill = safeDrawable("image_ui_hud_ingame_progress_meter_fill_10");
+
+        if (background == null || fill == null) {
+            try {
+                ProgressBar.ProgressBarStyle base =
+                    skin.get("ingame_progress", ProgressBar.ProgressBarStyle.class);
+                style.background = base.background;
+                style.knobBefore = base.knobBefore != null
+                    ? base.knobBefore
+                    : base.knobAfter;
+                fill = style.knobBefore;
+            } catch (RuntimeException ignored) {
+                // Keep a valid fallback style for headless/test environments.
+            }
+        } else {
+            style.background = background;
+            style.knobBefore = fill;
+        }
+
+        if (style.background == null) {
+            style.background = safeDrawable("white-pixel");
+        }
+        Drawable transparentSource = fill != null ? fill : style.background;
+        if (transparentSource != null) {
+            Drawable transparent = skin.newDrawable(
+                transparentSource,
+                new Color(1f, 1f, 1f, 0f)
+            );
+            style.knobAfter = transparent;
+            style.knob = transparent;
+        }
+
+        return new ProgressBar(0f, 1f, 0.001f, false, style);
     }
 
     private TextureRegion loadWaveMarker() {

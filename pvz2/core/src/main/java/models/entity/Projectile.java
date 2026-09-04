@@ -1,4 +1,5 @@
 package models.entity;
+
 import com.badlogic.gdx.math.Rectangle;
 import models.factory.builder.PlantType;
 
@@ -139,7 +140,10 @@ public class Projectile implements Cloneable {
         // flag remains set after landing so the impact is not consumed by the
         // landing tile before collision resolution.
         if (!ignoresObstacles && !tags.contains(Tag.MAGICAL) && toLockIn == null && grounded) {
-            block(game);
+            if (block(game) || pierce <= 0) {
+                dispose(game);
+                return;
+            }
         }
 
         if (bowling.contains(this.type)) {
@@ -179,7 +183,7 @@ public class Projectile implements Cloneable {
                 if (target == null
                     || hitTime < targetHitTime - 0.0001f
                     || (Math.abs(hitTime - targetHitTime) <= 0.0001f
-                        && distance < targetDistance)) {
+                    && distance < targetDistance)) {
                     target = z;
                     targetDistance = distance;
                     targetHitTime = hitTime;
@@ -292,8 +296,10 @@ public class Projectile implements Cloneable {
         if (this.getTags().contains(Tag.POISON)) {
             z.addEffect(new Effect(EffectType.POISONED, 5.0f));
         }
+        // Any hit cracks a Frozen Caves ice shell; fire additionally clears
+        // dynamite-freeze state used by the Prospector.
+        z.setFrozen(false);
         if (this.getTags().contains(Tag.FIRE)) {
-            z.setFrozen(false);
             z.setDynamiteFrozen(false);
         }
 
@@ -314,31 +320,56 @@ public class Projectile implements Cloneable {
         game.getBullets().remove(this);
     }
 
-    private void block(BaseGame game){
+    /**
+     * Resolves solid lawn obstacles before zombie collision. Graves used to
+     * be rendered as Tile/GridItem objects but were never considered here, so
+     * normal pea projectiles visually passed through them. Return true when
+     * this projectile hit a destructible obstacle so its pierce is consumed
+     * exactly once and the shot cannot also damage a zombie behind it.
+     */
+    private boolean block(BaseGame game){
+        if (game == null || game.getField() == null || line < 0 || line >= 5) {
+            return false;
+        }
+
         Rectangle bounds = new Rectangle(x , y , width, height);
-        for (int i = 0; i < 5; i++) {
-            // A straight shot belongs to one lane. Checking every row made a
-            // projectile at a row boundary consume its pierce on the adjacent
-            // lane's tile before it could reach the zombie in front of it.
-            if (i != line) {
+        for (Tile tile : game.getField().getTiles().get(line)) {
+            if (tile == null || !bounds.overlaps(tile.getBounds())) {
                 continue;
             }
-            for (Tile tile : game.getField().getTiles().get(i)){
-                if(bounds.overlaps(tile.getBounds())) {
-                    if(tile.getTileType() == TileType.FROZEN && this.tags.contains(Tag.FIRE)){
-                        tile.setTileType(TileType.CAVE_TILE);
-                        setPierce(pierce - 1);
-                    }
-                    else if(tile.getHp() > 0){
-                        tile.setHp(tile.getHp() - this.damage);
-                        setPierce(pierce - 1);
-                    }
+
+            TileType tileType = tile.getTileType();
+            if (tileType == TileType.FROZEN && tile.getHp() > 0) {
+                tile.setHp(tile.getHp() - Math.max(1f, this.damage));
+                if (tile.getHp() <= 0) {
+                    tile.setTileType(TileType.CAVE_TILE);
                 }
+                setPierce(pierce - 1);
+                return true;
+            }
+
+            if (isGrave(tileType) && tile.getHp() > 0) {
+                tile.setHp(tile.getHp() - Math.max(1f, this.damage));
+                if (tile.getHp() <= 0) {
+                    TileType replacement = tileType == TileType.EGYPTIAN_GRAVE
+                        ? TileType.EGYPTIAN_TILE
+                        : TileType.DARK_AGE_TILE;
+                    tile.setTileType(replacement);
+                    tile.setEmpty(true);
+                    tile.setBlock(false);
+                    removeGridGrave(game, tile.getLine(), tile.getCol());
+                }
+                setPierce(pierce - 1);
+                return true;
             }
         }
 
         for (Plant p : game.getPlantsInField()){
             if (p == null || p.getLine() != line) {
+                continue;
+            }
+            Rectangle plantBounds = new Rectangle(p.getX(), p.getY(), p.getWidth(), p.getHeight());
+            if (!bounds.overlaps(plantBounds)) {
                 continue;
             }
             if(p.isFrozen()){
@@ -350,8 +381,24 @@ public class Projectile implements Cloneable {
                 }
             }
         }
-        Zombie z ;
+        return false;
+    }
 
+    private static boolean isGrave(TileType tileType) {
+        return tileType == TileType.EGYPTIAN_GRAVE
+            || tileType == TileType.DARK_AGE_GRAVE;
+    }
+
+    private static void removeGridGrave(BaseGame game, int row, int col) {
+        if (game.getGridController() == null) {
+            return;
+        }
+        game.getGridController().getGridItems().removeIf(item ->
+            item != null
+                && "grave".equalsIgnoreCase(item.getType())
+                && item.getRow() == row
+                && item.getCol() == col
+        );
     }
 
     public int line;

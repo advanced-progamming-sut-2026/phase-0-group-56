@@ -22,24 +22,24 @@ public class Block implements Skill{
     @Override
     public void do_skill(Plant plant, BaseGame game) {
         System.out.println(plant.getType() + " is blocking ..");
-            if(all) all(plant , game);
-            else if(plant.getTags().contains(PlantTags.MOVE_ZOMBIES)){
-                if(in) attract(plant, game);
-            }
-            else if(plant.getHeight() >= Constants.TALL_WALL_NUT_HEIGHT){
-                tall(plant, game);
-            }
-            damaged_action(plant, game);
+        if(all) all(plant , game);
+        else if(plant.getTags().contains(PlantTags.MOVE_ZOMBIES)){
+            if(in) attract(plant, game);
+        }
+        else if(plant.getHeight() >= Constants.TALL_WALL_NUT_HEIGHT){
+            tall(plant, game);
+        }
+        damaged_action(plant, game);
     }
 
     @Override
     public void all(Plant plant, BaseGame game) {
-            if(in){
+        if(in){
 
-            }
-            else{
+        }
+        else{
 
-            }
+        }
     }
 
     @Override
@@ -50,13 +50,13 @@ public class Block implements Skill{
     boolean all = false;
     @Override
     public void setAll(boolean all) {
-            this.all = all;
+        this.all = all;
     }
 
     private void tall(Plant self , BaseGame game) {
         for (Zombie zombie: game.getZombies()) {
             if(zombie.getLine() == self.getLine() && Math.abs(zombie.getX() - self.getX()) < 6 &&
-            !zombie.isGround()) {
+                !zombie.isGround()) {
                 zombie.setGround(true);
             }
         }
@@ -66,16 +66,27 @@ public class Block implements Skill{
     private void damaged_action(Plant self, BaseGame game) {
         for (Zombie zombie: game.getZombies()) {
             if(zombie.getX() - self.getX() < 10 && self.isHurt()) {
-               if(damage) {
-                   float extraDamage = self.getArmor() != null ? Constants.ENDURIAN_ARMOR_DAMAGE : 0;
-                   if (PlantLevel.current(self.getType()) >= 2) extraDamage += 5;
-                   zombie.setHp(zombie.getHp() - self.getDamage() - extraDamage);
-               }
-               else if(self.getTags().contains(PlantTags.SUN)) {
-                   int level = PlantLevel.current(self.getType());
-                   game.getSuns().add(new Sun(level >= 2 ? 10 : 5 , 5 , self.getX() + self.getWidth(),
-                           self.getY()));
-               }
+                if(damage) {
+                    float extraDamage = self.getArmor() != null ? Constants.ENDURIAN_ARMOR_DAMAGE : 0;
+                    if (PlantLevel.current(self.getType()) >= 2) extraDamage += 5;
+                    zombie.setHp(zombie.getHp() - self.getDamage() - extraDamage);
+                }
+                else if(self.getTags().contains(PlantTags.SUN)) {
+                    int level = PlantLevel.current(self.getType());
+                    Sun produced = new Sun(
+                        level >= 2 ? 10 : 5,
+                        5,
+                        self.getX() + self.getWidth() * 0.25f,
+                        self.getY() + self.getHeight() * 0.35f
+                    );
+                    produced.setLine(self.getLine());
+                    produced.setTileIndex(self.getTileIndex());
+                    // setLine/setTileIndex initialise the cell origin; place
+                    // the collectible back inside the producer's own tile.
+                    produced.setX(self.getX() + self.getWidth() * 0.25f);
+                    produced.setY(self.getY() + self.getHeight() * 0.35f);
+                    game.getSuns().add(produced);
+                }
             }
         }
     }
