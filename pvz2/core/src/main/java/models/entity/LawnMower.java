@@ -137,6 +137,11 @@ public class LawnMower extends Entity {
         zombie.setAlive(false);
         zombie.setHp(0);
         zombie.die();
+
+        // Feed the event-driven quest system from the authoritative mower
+        // kill path.  Zombie#die emits the generic kill event, but it cannot
+        // identify the killing source; this event is therefore emitted here.
+        models.QuestProgress.add("LAWNMOWER_KILL", 1);
     }
 
     public State getState() {

@@ -139,22 +139,27 @@ public final class QuestGameSession {
             plantedColumns[plant.getTileIndex()] = true;
         }
 
-        if (plant.getCategory() != null) {
-            usedFamilies.add(plant.getCategory());
+        PlantCategory category = categoryOf(plant);
+        if (category != null) {
+            usedFamilies.add(category);
         }
 
         if (plant.getTags() != null) {
-            if (plant.getTags().contains(PlantTags.EXPLOSIVE)) {
-                QuestProgress.add("USE_EXPLOSIVE_PLANT", 1);
-            }
-
             if (plant.getTags().contains(PlantTags.Shroom)) {
                 plantedMushroom = true;
             }
+        }
 
-            if (plant.getTags().contains(PlantTags.SUN)) {
-                sunProducerPlantsUsed++;
-            }
+        if (isExplosivePlant(plant)) {
+            QuestProgress.add("USE_EXPLOSIVE_PLANT", 1);
+        }
+
+        // The data file identifies producers by their category/type; only a
+        // legacy Sun tag exists for Sun Bean.  Count every producer exactly
+        // once at placement time, regardless of which representation supplied
+        // the classification.
+        if (isSunProducerPlant(plant)) {
+            sunProducerPlantsUsed++;
         }
 
         if (isOffensivePlant(plant)) {
@@ -162,8 +167,8 @@ public final class QuestGameSession {
                 offensivePlantTypes.add(plant.getType());
             }
 
-            if (plant.getCategory() != null) {
-                offensiveFamilies.add(plant.getCategory());
+            if (category != null) {
+                offensiveFamilies.add(category);
             }
         }
     }
@@ -312,7 +317,42 @@ public final class QuestGameSession {
         }
 
         LawnMower mower = game.getField().getMoaners().get(row);
-        return mower != null && mower.getState() != LawnMower.State.IDLE;
+        // "Gone" means the single-use mower has completed its run and left
+        // the board.  RUNNING is not gone yet and must not qualify this quest.
+        return mower != null && mower.getState() == LawnMower.State.USED;
+    }
+
+    private boolean isExplosivePlant(Plant plant) {
+        if (plant == null) {
+            return false;
+        }
+
+        return categoryOf(plant) == PlantCategory.Explosive
+            || (plant.getTags() != null
+            && plant.getTags().contains(PlantTags.EXPLOSIVE));
+    }
+
+    private boolean isSunProducerPlant(Plant plant) {
+        if (plant == null) {
+            return false;
+        }
+
+        return categoryOf(plant) == PlantCategory.SunProducer
+            || (plant.getTags() != null
+            && plant.getTags().contains(PlantTags.SUN));
+    }
+
+    /** Resolves the family even for plants loaded from older save/data code. */
+    private PlantCategory categoryOf(Plant plant) {
+        if (plant == null) {
+            return null;
+        }
+
+        if (plant.getCategory() != null) {
+            return plant.getCategory();
+        }
+
+        return plant.getType() == null ? null : plant.getType().getCategory();
     }
 
     private boolean isOffensivePlant(Plant plant) {
@@ -327,11 +367,27 @@ public final class QuestGameSession {
             return true;
         }
 
-        PlantCategory category = plant.getCategory();
+        PlantCategory category = categoryOf(plant);
 
-        return category == PlantCategory.SHOOTER
-            || category == PlantCategory.Explosive
-            || category == PlantCategory.StrikeThrough;
+        if (category == PlantCategory.SHOOTER
+            || category == PlantCategory.Explosive) {
+            return true;
+        }
+
+        // PlantCategory.StrikeThrough is also used by this project for wall
+        // plants.  Keep genuine lobbers/strike-through plants offensive while
+        // excluding the defensive wall family from "only offensive plant"
+        // quests.
+        if (category == PlantCategory.StrikeThrough) {
+            PlantType type = plant.getType();
+            return type == null || switch (type) {
+                case WALL_NUT, TALL_NUT, ENDURIAN, GARLIC, SWEET_POTATO,
+                     EXPLODE_O_NUT, PUMPKIN, SUN_BEAN -> false;
+                default -> true;
+            };
+        }
+
+        return false;
     }
 
     private PlantType[][] buildFinalGrid() {
